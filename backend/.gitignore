@@ -1,0 +1,9 @@
+# Author: @SaadZarook
+.venv/
+__pycache__/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+dist/
+*.egg-info/
+.coverage

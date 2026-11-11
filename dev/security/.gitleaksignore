@@ -1,0 +1,5 @@
+# Author: @SaadZarook
+# Findings in git history that are made-up test values, not secrets: each line is a gitleaks fingerprint
+# (commit:file:rule:line). Lines changed since carry an inline gitleaks:allow instead.
+b9095cc5f5ee52a5b57e484375bfb1c65c40e5a1:web/e2e-live/compare-files.spec.ts:generic-api-key:4
+d6611f2d5c20ae186679790b086b776aac878c3a:backend/tests/test_rest.py:generic-api-key:255

@@ -1,0 +1,39 @@
+# Author: @SaadZarook
+name: web
+
+on:
+  # No paths filter: a required check that did not run leaves the pull request unmergeable.
+  pull_request:
+  push:
+    branches: [main, develop]
+    paths: ["web/**", "examples/**", ".github/workflows/web.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  web-check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - name: Client is up to date with the contract
+        run: npm run check:api
+      - name: Mocks match examples/
+        run: npm run check:mocks
+      - name: Lint
+        run: npm run lint
+      - name: Types
+        run: npm run typecheck
+      - name: Install browser
+        run: npx playwright install --with-deps chromium
+      - name: Smoke and axe tests
+        run: npm run test:e2e

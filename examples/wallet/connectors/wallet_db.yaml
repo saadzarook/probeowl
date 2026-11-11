@@ -1,0 +1,24 @@
+# Author: @SaadZarook
+# These are local containers from dev/, labelled Production for testing. They are not
+# replicas; replica: true lets Production rules apply to the examples.
+connector: wallet_db
+type: sqlserver
+owner: payments-team
+environments:
+  prod:
+    host: 127.0.0.1
+    port: 1433
+    database: wallet
+    user: probeowl_ro
+    secret: keyring:probeowl/wallet_db.prod
+    replica: true
+    trust_server_certificate: true
+    trust_server_certificate_reason: local dev container with a self-signed certificate
+  uat:
+    host: 127.0.0.1
+    port: 1433
+    database: wallet_uat
+    user: probeowl_ro
+    secret: env:PROBEOWL_WALLET_DB_UAT
+    trust_server_certificate: true
+    trust_server_certificate_reason: local dev container with a self-signed certificate

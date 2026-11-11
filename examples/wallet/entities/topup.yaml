@@ -1,0 +1,77 @@
+# Author: @SaadZarook
+# One top-up, found by its own ID, the provider's payment ID or the ledger transaction ID.
+# The credited event, push log and balance locations from the design are phase 2.
+entity: topup
+title: Top-up
+root_key: topup_id
+owner: payments-team
+
+identifiers:
+  topup_id: { pattern: '^tp_[0-9a-z]{6}$', unique: true }
+  provider_payment_id: { pattern: '^pay_[0-9a-z]{6}$', via: record.provider_payment_id, unique: true }
+  ledger_txn_id: { pattern: '^lt_[0-9a-z]{6}$', via: record.ledger_txn_id, unique: true }
+
+locations:
+  record:
+    title: Top-up record
+    using: wallet_db
+    lookup: >
+      SELECT id AS topup_id, user_id, amount, currency, status, provider_payment_id,
+             ledger_txn_id, payment_method, app_version, customer_email, created_at
+      FROM topups WHERE id = :topup_id
+    exposes: [topup_id, user_id, amount, currency, status, provider_payment_id,
+              ledger_txn_id, payment_method, app_version, created_at]
+    pii: [customer_email]
+
+  payment:
+    title: Provider payment
+    using: checkout_api
+    key_from: record.provider_payment_id
+    lookup: GET /payments/{{provider_payment_id}}
+    fallback: GET /payments?reference={{topup_id}}
+    exposes: [status, amount, currency]
+    # A provider's payment may carry the customer's details; they never leave the runner.
+    mask: [customer.email, customer.phone]
+    compare: [status, amount, currency]
+    expected_to_vary: [amount]
+
+  webhook:
+    title: Webhook deliveries
+    using: wallet_db
+    key_from: record.provider_payment_id
+    lookup: >
+      SELECT id, payment_id, event_type, received_at
+      FROM provider_webhooks WHERE payment_id = :provider_payment_id
+    cardinality: many
+    max_rows: 20
+
+  ledger:
+    title: Ledger entries
+    using: ledger_db
+    key_from: record.ledger_txn_id
+    lookup: >
+      SELECT account, direction, amount, posted_at
+      FROM ledger_entries WHERE txn_id = :ledger_txn_id
+    cardinality: many
+    max_rows: 20
+
+# Recent top-ups that look healthy. Running the probe proves it: this query only finds candidates.
+healthy_sample:
+  using: wallet_db
+  lookup: >
+    SELECT id AS topup_id FROM topups
+    WHERE status = 'succeeded' AND id <> :topup_id
+      AND created_at < :created_at AND created_at >= DATEADD(day, -7, :created_at)
+    ORDER BY created_at DESC
+  parameters:
+    topup_id: record.topup_id
+    created_at: record.created_at
+    payment_method: record.payment_method
+  narrow:
+    same_payment_method:
+      title: Same payment method
+      lookup: >
+        SELECT id AS topup_id FROM topups
+        WHERE status = 'succeeded' AND id <> :topup_id AND payment_method = :payment_method
+          AND created_at < :created_at AND created_at >= DATEADD(day, -7, :created_at)
+        ORDER BY created_at DESC

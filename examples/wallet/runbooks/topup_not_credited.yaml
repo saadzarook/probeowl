@@ -1,0 +1,53 @@
+# Author: @SaadZarook
+# Suggested when a top-up's ledger entries are missing. The write step is never run by ProbeOwl.
+runbook: topup_not_credited
+title: Top-up captured but wallet not credited
+application: wallet
+applies_to: { entity: topup, when: [ledger.missing] }
+owner: payments-team
+last_verified: 2026-10-12
+steps:
+  - kind: read_query
+    id: check-outbox
+    title: Is the ledger posting stuck in the outbox?
+    using: wallet_db
+    sql: |
+      SELECT TOP (20) id, status, attempts, last_error, created_at
+      FROM outbox_events WHERE aggregate_id = :topup_id
+      ORDER BY created_at DESC
+    # `owl runbook hash <file>` prints the hash of each read query.
+    reviewed:
+      by: s.khan
+      date: 2026-10-12
+      sql_sha256: 6cd2729de728c782f470a5978a49188ed078f281ef7afff7c41bf32a76b591ab
+  - kind: read_query
+    id: check-locks
+    title: Is the ledger posting job blocked by a lock?
+    using: ledger_db
+    sql: |
+      SELECT sid, blocking_session, event, seconds_in_wait
+      FROM v$session WHERE blocking_session IS NOT NULL
+  - kind: external_query
+    id: ledger-errors
+    title: Ledger service errors for this top-up
+    tool: dynatrace
+    query: |
+      fetch logs
+      | filter loglevel == "ERROR" and contains(content, :topup_id)
+      | limit 100
+  - kind: manual
+    id: confirm-capture
+    title: Confirm the capture in the provider dashboard
+    text: Search the payment ID; check for a refund, dispute or partial capture.
+  - kind: write_query
+    id: requeue-posting
+    title: Re-queue the ledger posting
+    using: wallet_db
+    requires: change approval; run by a DBA
+    sql: |
+      UPDATE outbox_events SET status = 'pending', attempts = 0
+      WHERE aggregate_id = :topup_id AND status = 'failed'
+  - kind: probe
+    id: revalidate
+    title: Re-validate after the fix
+    probe: topup_completed

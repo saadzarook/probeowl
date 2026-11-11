@@ -1,0 +1,43 @@
+# Author: @SaadZarook
+name: Bug
+description: ProbeOwl did something it should not, or not what the docs say.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: >
+        Never paste credentials, connection strings with passwords, or real data from a system you
+        probed. A security issue goes to the Security tab instead (see SECURITY.md).
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to see it
+      description: >
+        The steps, and the probe, entity or connector YAML if it matters, with hosts, logins and
+        values replaced by made-up ones. The examples in examples/ are a good place to start from.
+      render: yaml
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      placeholder: v0.1.0, or a commit hash
+    validations:
+      required: true
+  - type: dropdown
+    id: database
+    attributes:
+      label: Database or API involved
+      multiple: true
+      options: [SQL Server, Oracle, MariaDB, REST API, The store, None]
+  - type: input
+    id: platform
+    attributes:
+      label: Operating system and Python version
+      placeholder: Windows 11, Python 3.12.7

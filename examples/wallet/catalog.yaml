@@ -1,0 +1,61 @@
+# Author: @SaadZarook
+# Tables the Wallet probes and runbooks read. Only marked columns are listed.
+catalog: wallet
+tables:
+  - connector: wallet_db
+    table: topups
+    label: transaction
+    owner: payments-team
+    description: One row per top-up attempt.
+    columns:
+      id: { roles: [primary_key] }
+      created_at: { roles: [time], indexed: true }
+      status: { roles: [status, compare], values: [pending, succeeded, failed] }
+      provider_payment_id:
+        roles: [external_key]
+        links_to: { connector: checkout_api }
+      ledger_txn_id:
+        roles: [link]
+        links_to: { connector: ledger_db, table: ledger_entries, column: txn_id }
+      amount: { roles: [compare, expected_to_vary] }
+      payment_method: { roles: [compare] }
+      app_version: { roles: [compare] }
+      customer_email: { roles: [pii] }
+
+  - connector: wallet_db
+    table: provider_webhooks
+    label: log
+    owner: payments-team
+    description: Webhook deliveries from the payment provider, one row per delivery.
+    retention: 30d
+    columns:
+      id: { roles: [primary_key] }
+      received_at: { roles: [time], indexed: true }
+      payment_id:
+        roles: [external_key]
+        links_to: { connector: checkout_api }
+
+  - connector: wallet_db
+    table: outbox_events
+    label: outbox
+    owner: payments-team
+    description: Events waiting to be published, including ledger postings.
+    columns:
+      id: { roles: [primary_key] }
+      created_at: { roles: [time], indexed: true }
+      status: { roles: [status], values: [pending, published, failed] }
+      aggregate_id:
+        roles: [link]
+        links_to: { connector: wallet_db, table: topups, column: id }
+
+  - connector: ledger_db
+    table: ledger_entries
+    label: transaction
+    owner: ledger-team
+    description: Double-entry postings; a completed top-up has one credit and one debit.
+    columns:
+      # A transaction has two rows, so (txn_id, direction) identifies one.
+      txn_id: { roles: [primary_key] }
+      direction: { roles: [primary_key, compare] }
+      posted_at: { roles: [time], indexed: true }
+      amount: { roles: [compare, expected_to_vary] }

@@ -1,0 +1,26 @@
+# Author: @SaadZarook
+# Did a top-up complete everywhere? tp_91f2c7 fails (ledger Missing); tp_91f2b9 passes.
+probe: topup_completed
+title: Top-up completed
+kind: validate
+entity: topup
+owner: payments-team
+description: A top-up was captured, confirmed by webhook and posted to the ledger once.
+steps:
+  - expect: record.status in ['succeeded', 'failed', 'pending']
+  - expect:
+      - payment.amount == record.amount
+      - payment.currency == record.currency
+  - expect: count(webhook) >= 1
+  - when: record.status == 'succeeded'
+    expect:
+      - count(ledger) == 2                       # exactly one double entry
+      - sum(ledger.amount where direction == 'credit')
+        == sum(ledger.amount where direction == 'debit')
+  - when: record.status == 'failed'
+    expect:
+      # No money moved: a failed top-up never gets a ledger_txn_id. There is no other key
+      # to find ledger rows by, so the ledger location is Blocked here, and Blocked means
+      # "could not look", never "does not exist". Check the empty link itself instead.
+      - record.ledger_txn_id == null
+      - payment.status != 'captured'             # provider agrees

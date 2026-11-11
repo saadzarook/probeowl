@@ -1,0 +1,16 @@
+# card_access/runbooks/visitor_profile_missing.yaml
+runbook: visitor_profile_missing
+title: profile missing for a visitor
+application: card_access
+applies_to: { entity: visitor, when: [profile.missing] }
+owner: access-team
+last_verified: 2026-11-09
+steps:
+  - kind: manual
+    id: check-the-source
+    title: Check where the record should have been written
+    text: Look the subject up in the system that writes it, and note what you find.
+  - kind: probe
+    id: check-again
+    title: Check again after the fix
+    probe: visitor_cards

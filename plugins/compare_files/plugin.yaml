@@ -1,0 +1,7 @@
+# Author: @SaadZarook
+name: compare_files
+version: 1.0.0
+kind: tool
+author: "@SaadZarook"
+description: Compare two files a person uploads or pastes, on this machine, without storing them.
+capabilities: [local_input]

@@ -1,0 +1,362 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Runbook",
+  "$defs": {
+    "AppliesTo": {
+      "additionalProperties": false,
+      "description": "When a failed run suggests this runbook.",
+      "properties": {
+        "entity": {
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Entity",
+          "type": "string"
+        },
+        "when": {
+          "items": {
+            "description": "<location>.<outcome>, such as ledger.missing.",
+            "pattern": "^[a-z][a-z0-9_]*\\.(found|missing|waiting|blocked|ambiguous|error|stale|not_configured)$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "When",
+          "type": "array"
+        }
+      },
+      "required": [
+        "entity",
+        "when"
+      ],
+      "title": "AppliesTo",
+      "type": "object"
+    },
+    "ExternalQueryStep": {
+      "additionalProperties": false,
+      "description": "A query for another tool, such as Dynatrace DQL. Copied, never run by ProbeOwl.",
+      "properties": {
+        "kind": {
+          "const": "external_query",
+          "title": "Kind",
+          "type": "string"
+        },
+        "id": {
+          "description": "Short and unique in its runbook. Results, ticks and the audit key on it.",
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "tool": {
+          "minLength": 1,
+          "title": "Tool",
+          "type": "string"
+        },
+        "query": {
+          "minLength": 1,
+          "title": "Query",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "title",
+        "tool",
+        "query"
+      ],
+      "title": "ExternalQueryStep",
+      "type": "object"
+    },
+    "ManualStep": {
+      "additionalProperties": false,
+      "description": "A checklist item for a person.",
+      "properties": {
+        "kind": {
+          "const": "manual",
+          "title": "Kind",
+          "type": "string"
+        },
+        "id": {
+          "description": "Short and unique in its runbook. Results, ticks and the audit key on it.",
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "text": {
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "title",
+        "text"
+      ],
+      "title": "ManualStep",
+      "type": "object"
+    },
+    "ProbeStep": {
+      "additionalProperties": false,
+      "description": "Run a probe again, for example after a fix.",
+      "properties": {
+        "kind": {
+          "const": "probe",
+          "title": "Kind",
+          "type": "string"
+        },
+        "id": {
+          "description": "Short and unique in its runbook. Results, ticks and the audit key on it.",
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "probe": {
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Probe",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "title",
+        "probe"
+      ],
+      "title": "ProbeStep",
+      "type": "object"
+    },
+    "ReadQueryStep": {
+      "additionalProperties": false,
+      "description": "A single SELECT. Runnable only after review and save checks; until then copy only.",
+      "properties": {
+        "kind": {
+          "const": "read_query",
+          "title": "Kind",
+          "type": "string"
+        },
+        "id": {
+          "description": "Short and unique in its runbook. Results, ticks and the audit key on it.",
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "using": {
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Using",
+          "type": "string"
+        },
+        "sql": {
+          "minLength": 1,
+          "title": "Sql",
+          "type": "string"
+        },
+        "reviewed": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Review"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Set in the reviewed PR. Without it the step is copy only."
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "title",
+        "using",
+        "sql"
+      ],
+      "title": "ReadQueryStep",
+      "type": "object"
+    },
+    "Review": {
+      "additionalProperties": false,
+      "description": "Who reviewed a read query, when, and exactly what they read.",
+      "properties": {
+        "by": {
+          "minLength": 1,
+          "title": "By",
+          "type": "string"
+        },
+        "date": {
+          "description": "The 90-day review flag counts from this date.",
+          "format": "date",
+          "title": "Date",
+          "type": "string"
+        },
+        "sql_sha256": {
+          "description": "The reviewed SQL's hash. If the SQL changes, the step goes back to copy only.",
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sql Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "by",
+        "date",
+        "sql_sha256"
+      ],
+      "title": "Review",
+      "type": "object"
+    },
+    "WriteQueryStep": {
+      "additionalProperties": false,
+      "description": "A query that changes data. ProbeOwl never runs it; copying it is recorded in the audit.",
+      "properties": {
+        "kind": {
+          "const": "write_query",
+          "title": "Kind",
+          "type": "string"
+        },
+        "id": {
+          "description": "Short and unique in its runbook. Results, ticks and the audit key on it.",
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "using": {
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Using",
+          "type": "string"
+        },
+        "sql": {
+          "minLength": 1,
+          "title": "Sql",
+          "type": "string"
+        },
+        "requires": {
+          "description": "The approval needed, such as change approval.",
+          "minLength": 1,
+          "title": "Requires",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "title",
+        "using",
+        "sql",
+        "requires"
+      ],
+      "title": "WriteQueryStep",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "An ordered list of steps for a symptom, stored in the knowledge base.",
+  "properties": {
+    "runbook": {
+      "maxLength": 64,
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "title": "Runbook",
+      "type": "string"
+    },
+    "title": {
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+    },
+    "application": {
+      "maxLength": 64,
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "title": "Application",
+      "type": "string"
+    },
+    "applies_to": {
+      "$ref": "#/$defs/AppliesTo"
+    },
+    "owner": {
+      "minLength": 1,
+      "title": "Owner",
+      "type": "string"
+    },
+    "last_verified": {
+      "format": "date",
+      "title": "Last Verified",
+      "type": "string"
+    },
+    "steps": {
+      "items": {
+        "discriminator": {
+          "mapping": {
+            "external_query": "#/$defs/ExternalQueryStep",
+            "manual": "#/$defs/ManualStep",
+            "probe": "#/$defs/ProbeStep",
+            "read_query": "#/$defs/ReadQueryStep",
+            "write_query": "#/$defs/WriteQueryStep"
+          },
+          "propertyName": "kind"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/$defs/ReadQueryStep"
+          },
+          {
+            "$ref": "#/$defs/WriteQueryStep"
+          },
+          {
+            "$ref": "#/$defs/ExternalQueryStep"
+          },
+          {
+            "$ref": "#/$defs/ManualStep"
+          },
+          {
+            "$ref": "#/$defs/ProbeStep"
+          }
+        ]
+      },
+      "minItems": 1,
+      "title": "Steps",
+      "type": "array"
+    }
+  },
+  "required": [
+    "runbook",
+    "title",
+    "application",
+    "applies_to",
+    "owner",
+    "last_verified",
+    "steps"
+  ],
+  "type": "object"
+}

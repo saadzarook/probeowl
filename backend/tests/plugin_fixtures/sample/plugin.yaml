@@ -1,0 +1,7 @@
+# Author: @SaadZarook
+name: sample
+version: 1.0.0
+kind: tool
+author: "@SaadZarook"
+description: A plugin for the tests.
+capabilities: [local_input]

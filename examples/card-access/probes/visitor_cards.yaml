@@ -1,0 +1,12 @@
+# Author: @SaadZarook
+# Are a visitor's cards consistent? VP00012931 (or card C204518) has three planted issues.
+probe: visitor_cards
+title: Visitor cards
+kind: inspect
+entity: visitor
+owner: access-team
+description: At most one active card, no active card past its end date, and the controller agrees.
+expect:
+  - count(cards where status == 'active') <= 1
+  - all(cards where status == 'active', valid_to > now())
+  - all(cards, controller.status == status)     # database and controller agree

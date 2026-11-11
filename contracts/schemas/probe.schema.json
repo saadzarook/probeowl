@@ -1,0 +1,165 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Probe",
+  "$defs": {
+    "ProbeKind": {
+      "description": "Inspect checks current state; validate checks one flow. Health is phase 2.",
+      "enum": [
+        "inspect",
+        "validate",
+        "health"
+      ],
+      "title": "ProbeKind",
+      "type": "string"
+    },
+    "Step": {
+      "additionalProperties": false,
+      "description": "Expectations that apply together, only when the condition holds if one is given.",
+      "properties": {
+        "when": {
+          "anyOf": [
+            {
+              "description": "When the step applies, such as record.status == 'failed'.",
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "When"
+        },
+        "expect": {
+          "anyOf": [
+            {
+              "description": "One rule, such as count(ledger) == 2.",
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "items": {
+                "description": "One rule, such as count(ledger) == 2.",
+                "minLength": 1,
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array"
+            }
+          ],
+          "title": "Expect"
+        }
+      },
+      "required": [
+        "expect"
+      ],
+      "title": "Step",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "A saved, reviewed check over an entity's locations. One model for inspect and validate.",
+  "oneOf": [
+    {
+      "required": [
+        "steps"
+      ]
+    },
+    {
+      "required": [
+        "expect"
+      ]
+    }
+  ],
+  "properties": {
+    "probe": {
+      "maxLength": 64,
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "title": "Probe",
+      "type": "string"
+    },
+    "title": {
+      "default": "",
+      "description": "How the web app and the run header name it. Omitted: its name with spaces for underscores, so visitor_cards is Visitor cards.",
+      "title": "Title",
+      "type": "string"
+    },
+    "kind": {
+      "$ref": "#/$defs/ProbeKind"
+    },
+    "entity": {
+      "maxLength": 64,
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "title": "Entity",
+      "type": "string"
+    },
+    "owner": {
+      "description": "The team responsible for this probe.",
+      "minLength": 1,
+      "title": "Owner",
+      "type": "string"
+    },
+    "description": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Description"
+    },
+    "environments": {
+      "anyOf": [
+        {
+          "items": {
+            "maxLength": 64,
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "type": "string"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "The environments this probe may run in. Omitted: every environment of its application. Every location needs a binding in each one.",
+      "title": "Environments"
+    },
+    "steps": {
+      "items": {
+        "$ref": "#/$defs/Step"
+      },
+      "minItems": 1,
+      "title": "Steps",
+      "type": "array"
+    },
+    "expect": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array"
+        }
+      ],
+      "description": "Shorthand for steps: [{expect: ...}]."
+    }
+  },
+  "required": [
+    "probe",
+    "kind",
+    "entity",
+    "owner"
+  ],
+  "type": "object"
+}

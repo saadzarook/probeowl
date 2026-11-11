@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Application",
+  "$defs": {
+    "Environment": {
+      "additionalProperties": false,
+      "description": "Production, UAT, Staging or Dev within an application.",
+      "properties": {
+        "title": {
+          "description": "Shown in the UI, such as Production or UAT.",
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "production": {
+          "default": false,
+          "description": "Production rules apply: read replicas only, guards cannot be relaxed, reason and reference mandatory on every investigation.",
+          "title": "Production",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "title"
+      ],
+      "title": "Environment",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "A product area that owns its connectors, entities and probes.",
+  "properties": {
+    "application": {
+      "maxLength": 64,
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "title": "Application",
+      "type": "string"
+    },
+    "title": {
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+    },
+    "owner": {
+      "description": "The team responsible for this application.",
+      "minLength": 1,
+      "title": "Owner",
+      "type": "string"
+    },
+    "environments": {
+      "minProperties": 1,
+      "patternProperties": {
+        "^[a-z][a-z0-9_]*$": {
+          "$ref": "#/$defs/Environment"
+        }
+      },
+      "propertyNames": {
+        "maxLength": 64
+      },
+      "title": "Environments",
+      "type": "object"
+    }
+  },
+  "required": [
+    "application",
+    "title",
+    "owner",
+    "environments"
+  ],
+  "type": "object"
+}

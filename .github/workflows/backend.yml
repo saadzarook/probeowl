@@ -1,0 +1,312 @@
+# Author: @SaadZarook
+name: backend
+
+# Not run for contracts/ alone: a contract PR is approved by a person, and the
+# backend PR that goes with it fails if the models and contracts/schemas/ differ.
+# dev/ is included: a seed or fake API change can break the exit checks, which run here.
+on:
+  # No paths filter: a required check that did not run leaves the pull request unmergeable.
+  pull_request:
+  push:
+    branches: [main, develop]
+    paths: ["backend/**", "examples/**", "dev/**", ".github/workflows/backend.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --locked
+      - name: Lint
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+      - name: Types
+        run: uv run mypy probeowl tests
+      - name: Tests
+        # The store on other databases runs in its own job below. Guards are
+        # safety-critical: the plan requires at least 85% coverage on guards/.
+        run: uv run pytest -m "not database" --cov=probeowl/guards --cov-fail-under=85
+
+  store-databases:
+    # The store must migrate and round-trip on every database a team may choose, and each
+    # probe adapter must keep its guards (no lock waits, statement timeout) on a real server.
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        database: [postgresql, mssql, mariadb, oracle]
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --locked
+      - name: Store and adapter tests on ${{ matrix.database }}
+        run: uv run pytest -m database -k "${{ matrix.database }}"
+
+  mssql-python-linux:
+    # mssql-python on Linux needs no ODBC driver install, only three system packages.
+    # Checked from a clean python:3.12-slim container, since a runner image may carry one.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Start SQL Server 2022
+        run: |
+          MSSQL_PW="P$(openssl rand -hex 16)!x"
+          echo "::add-mask::$MSSQL_PW"
+          echo "MSSQL_PW=$MSSQL_PW" >> "$GITHUB_ENV"
+          docker run -d --name mssql -e ACCEPT_EULA=Y -e MSSQL_SA_PASSWORD="$MSSQL_PW"             -p 1433:1433 mcr.microsoft.com/mssql/server:2022-latest
+      - name: Connect with mssql-python from a clean container
+        run: |
+          docker run --rm --network host -e MSSQL_PW -v "$PWD/backend/ci:/ci:ro" python:3.12-slim sh /ci/mssql_python_linux.sh
+
+  m1-exit-check:
+    # owl validate against the dev stack: the planted cases in Production, and the audit.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      # The local stack's documented test password (dev/README.md); not a real credential.
+      PROBEOWL_RO_PASSWORD: ProbeOwl_Ro_Local1
+      # CI has no system keychain; the examples' keyring: references read this file one,
+      # which owl refuses unless it is allowed here, in CI only.
+      PYTHON_KEYRING_BACKEND: keyrings.alt.file.PlaintextKeyring
+      PROBEOWL_ALLOW_INSECURE_KEYRING: "1"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --locked
+      - name: Start the dev stack
+        working-directory: .
+        run: docker compose -f dev/docker-compose.yml up --wait --wait-timeout 900
+      - name: Production passwords in the keychain, UAT passwords in the environment
+        run: |
+          for connector in wallet_db ledger_db access_db; do
+            printf '%s\n' "$PROBEOWL_RO_PASSWORD" | uv run keyring set probeowl "$connector.prod"
+          done
+          {
+            echo "PROBEOWL_WALLET_DB_UAT=$PROBEOWL_RO_PASSWORD"
+            echo "PROBEOWL_LEDGER_DB_UAT=$PROBEOWL_RO_PASSWORD"
+            echo "PROBEOWL_ACCESS_DB_UAT=$PROBEOWL_RO_PASSWORD"
+            echo "PROBEOWL_STORE_URL=sqlite:///$RUNNER_TEMP/probeowl-store.db"
+          } >> "$GITHUB_ENV"
+      - name: Start owl serve
+        run: |
+          uv run owl store init
+          # Straight from the venv, not through uv run, which would hold uv's cache lock and
+          # stall setup-uv's cache cleanup at the end of the job.
+          nohup .venv/bin/owl serve --config ../examples > "$RUNNER_TEMP/owl-serve.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/owl-serve.pid"
+          for _ in $(seq 1 60); do
+            curl -sf http://127.0.0.1:7878/openapi.json > /dev/null && exit 0
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/owl-serve.log"
+          exit 1
+      - name: M1 exit check
+        run: sh ci/m1_exit_check.sh
+      - name: Logs on failure
+        if: failure()
+        run: |
+          cat "$RUNNER_TEMP/owl-serve.log" || true
+          docker compose -f ../dev/docker-compose.yml logs --no-color
+      - name: Stop owl serve
+        if: always()
+        run: kill "$(cat "$RUNNER_TEMP/owl-serve.pid")" 2>/dev/null || true
+      - name: Stop the dev stack
+        if: always()
+        working-directory: .
+        run: docker compose -f dev/docker-compose.yml down -v
+
+  m2-exit-check:
+    # owl inspect against the dev stack: C204518's three card issues, the shared email
+    # Ambiguous, and UAT through its own bindings.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      # The local stack's documented test password (dev/README.md); not a real credential.
+      PROBEOWL_RO_PASSWORD: ProbeOwl_Ro_Local1
+      # CI has no system keychain; the examples' keyring: references read this file one,
+      # which owl refuses unless it is allowed here, in CI only.
+      PYTHON_KEYRING_BACKEND: keyrings.alt.file.PlaintextKeyring
+      PROBEOWL_ALLOW_INSECURE_KEYRING: "1"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --locked
+      - name: Start the dev stack
+        working-directory: .
+        run: docker compose -f dev/docker-compose.yml up --wait --wait-timeout 900
+      - name: Production passwords in the keychain, UAT passwords in the environment
+        run: |
+          for connector in wallet_db ledger_db access_db; do
+            printf '%s\n' "$PROBEOWL_RO_PASSWORD" | uv run keyring set probeowl "$connector.prod"
+          done
+          {
+            echo "PROBEOWL_WALLET_DB_UAT=$PROBEOWL_RO_PASSWORD"
+            echo "PROBEOWL_LEDGER_DB_UAT=$PROBEOWL_RO_PASSWORD"
+            echo "PROBEOWL_ACCESS_DB_UAT=$PROBEOWL_RO_PASSWORD"
+            echo "PROBEOWL_STORE_URL=sqlite:///$RUNNER_TEMP/probeowl-store.db"
+          } >> "$GITHUB_ENV"
+      - name: Start owl serve
+        run: |
+          uv run owl store init
+          # Straight from the venv, not through uv run, which would hold uv's cache lock and
+          # stall setup-uv's cache cleanup at the end of the job.
+          nohup .venv/bin/owl serve --config ../examples > "$RUNNER_TEMP/owl-serve.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/owl-serve.pid"
+          for _ in $(seq 1 60); do
+            curl -sf http://127.0.0.1:7878/openapi.json > /dev/null && exit 0
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/owl-serve.log"
+          exit 1
+      - name: M2 exit check
+        run: sh ci/m2_exit_check.sh
+      - name: Logs on failure
+        if: failure()
+        run: |
+          cat "$RUNNER_TEMP/owl-serve.log" || true
+          docker compose -f ../dev/docker-compose.yml logs --no-color
+      - name: Stop owl serve
+        if: always()
+        run: kill "$(cat "$RUNNER_TEMP/owl-serve.pid")" 2>/dev/null || true
+      - name: Stop the dev stack
+        if: always()
+        working-directory: .
+        run: docker compose -f dev/docker-compose.yml down -v
+
+  m4-exit-check:
+    # Against the dev stack: the failing top-up shows its differences from a healthy one, runbook
+    # steps fill in from the run, and copying the write step appears in the audit.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      # The local stack's documented test password (dev/README.md); not a real credential.
+      PROBEOWL_WALLET_DB_UAT: ProbeOwl_Ro_Local1
+      PROBEOWL_LEDGER_DB_UAT: ProbeOwl_Ro_Local1
+      PROBEOWL_ACCESS_DB_UAT: ProbeOwl_Ro_Local1
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --locked
+      - name: Start the dev stack
+        working-directory: .
+        run: docker compose -f dev/docker-compose.yml up --wait --wait-timeout 900
+      - name: Start owl serve
+        run: |
+          echo "PROBEOWL_STORE_URL=sqlite:///$RUNNER_TEMP/probeowl-store.db" >> "$GITHUB_ENV"
+          export PROBEOWL_STORE_URL="sqlite:///$RUNNER_TEMP/probeowl-store.db"
+          uv run owl store init
+          nohup .venv/bin/owl serve --config ../examples > "$RUNNER_TEMP/owl-serve.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/owl-serve.pid"
+          for _ in $(seq 1 60); do
+            curl -sf http://127.0.0.1:7878/openapi.json > /dev/null && break
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:7878/openapi.json > /dev/null || {
+            cat "$RUNNER_TEMP/owl-serve.log"
+            exit 1
+          }
+      - name: M4 exit check
+        run: uv run python ci/m4_exit_check.py "$PROBEOWL_STORE_URL"
+      - name: Logs on failure
+        if: failure()
+        run: |
+          cat "$RUNNER_TEMP/owl-serve.log" || true
+          docker compose -f ../dev/docker-compose.yml logs --no-color
+      - name: Stop owl serve
+        if: always()
+        run: kill "$(cat "$RUNNER_TEMP/owl-serve.pid")" || true
+      - name: Stop the dev stack
+        if: always()
+        working-directory: .
+        run: docker compose -f dev/docker-compose.yml down -v
+
+  m3-exit-check:
+    # Against the dev stack: importing wallet_db suggests a label for every table, a query on
+    # a Transaction table without a time filter cannot be saved, and a good probe can.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      # The local stack's documented test password (dev/README.md); not a real credential.
+      PROBEOWL_WALLET_DB_UAT: ProbeOwl_Ro_Local1
+      PROBEOWL_LEDGER_DB_UAT: ProbeOwl_Ro_Local1
+      PROBEOWL_ACCESS_DB_UAT: ProbeOwl_Ro_Local1
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --locked
+      - name: Start the dev stack
+        working-directory: .
+        run: docker compose -f dev/docker-compose.yml up --wait --wait-timeout 900
+      - name: Start owl serve on two copies of the examples
+        run: |
+          {
+            echo "PROBEOWL_STORE_URL=sqlite:///$RUNNER_TEMP/probeowl-store.db"
+            echo "PROBEOWL_M3_CONFIG=$RUNNER_TEMP/config"
+            echo "PROBEOWL_M3_BAD_CONFIG=$RUNNER_TEMP/bad-config"
+          } >> "$GITHUB_ENV"
+          export PROBEOWL_STORE_URL="sqlite:///$RUNNER_TEMP/probeowl-store.db"
+          uv run owl store init
+          # Saving writes to the folder served, so never the checkout.
+          cp -r ../examples "$RUNNER_TEMP/config"
+          # The ledger lookup without a key or a time filter: loads, but cannot be saved.
+          cp -r ../examples "$RUNNER_TEMP/bad-config"
+          sed -i 's/WHERE txn_id = :ledger_txn_id/WHERE account = :ledger_txn_id/' \
+            "$RUNNER_TEMP/bad-config/wallet/entities/topup.yaml"
+          # UAT bindings that fail, so runs there hold what real drivers say when they do.
+          sed -i '/^  uat:/,$ s/port: 1521/port: 1/' \
+            "$RUNNER_TEMP/bad-config/wallet/connectors/ledger_db.yaml"
+          sed -i '/^  uat:/,$ s/user: probeowl_ro/user: probeowl_nobody/' \
+            "$RUNNER_TEMP/bad-config/card-access/connectors/access_db.yaml"
+          # Straight from the venv, not through uv run, which would hold uv's cache lock and
+          # stall setup-uv's cache cleanup at the end of the job.
+          nohup .venv/bin/owl serve --config "$RUNNER_TEMP/config" > "$RUNNER_TEMP/owl-serve.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/owl-serve.pid"
+          nohup .venv/bin/owl serve --port 7879 --config "$RUNNER_TEMP/bad-config" > "$RUNNER_TEMP/owl-serve-bad.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/owl-serve-bad.pid"
+          for port in 7878 7879; do
+            for _ in $(seq 1 60); do
+              curl -sf "http://127.0.0.1:$port/openapi.json" > /dev/null && break
+              sleep 1
+            done
+            curl -sf "http://127.0.0.1:$port/openapi.json" > /dev/null || {
+              cat "$RUNNER_TEMP"/owl-serve*.log
+              exit 1
+            }
+          done
+      - name: M3 exit check
+        run: sh ci/m3_exit_check.sh
+      - name: Logs on failure
+        if: failure()
+        run: |
+          cat "$RUNNER_TEMP"/owl-serve*.log || true
+          docker compose -f ../dev/docker-compose.yml logs --no-color
+      - name: Stop owl serve
+        if: always()
+        run: kill "$(cat "$RUNNER_TEMP/owl-serve.pid")" "$(cat "$RUNNER_TEMP/owl-serve-bad.pid")" 2>/dev/null || true
+      - name: Stop the dev stack
+        if: always()
+        working-directory: .
+        run: docker compose -f dev/docker-compose.yml down -v

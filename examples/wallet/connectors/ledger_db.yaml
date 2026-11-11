@@ -1,0 +1,26 @@
+# Author: @SaadZarook
+# These are local containers from dev/, labelled Production for testing. They are not
+# replicas; replica: true lets Production rules apply to the examples.
+connector: ledger_db
+type: oracle
+owner: payments-team
+environments:
+  prod:
+    host: 127.0.0.1
+    port: 1521
+    database: FREEPDB1
+    schema: LEDGER
+    user: probeowl_ro
+    secret: keyring:probeowl/ledger_db.prod
+    replica: true
+    encrypt: false
+    encrypt_reason: local dev container; Oracle Free has no tcps listener
+  uat:
+    host: 127.0.0.1
+    port: 1521
+    database: FREEPDB1
+    schema: LEDGER_UAT
+    user: probeowl_ro
+    secret: env:PROBEOWL_LEDGER_DB_UAT
+    encrypt: false
+    encrypt_reason: local dev container; Oracle Free has no tcps listener

@@ -1,0 +1,45 @@
+/* Author: @SaadZarook */
+.compare-header { align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
+.compare-header .hint { margin: 0.25rem 0 0; }
+.compare-actions { display: flex; gap: 0.5rem; }
+.compare-ignore { grid-column: span 2; }
+.compare-files { display: grid; grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+.compare-file-header, .compare-side-header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.compare-file-header h2, .compare-side-header h2, .compare-summary h2 { margin: 0; font-size: 1.1rem; }
+.compare-file .field, .compare-options .field { display: grid; gap: 0.25rem; font-weight: 500; font-size: 0.875rem; }
+.compare-file .field { margin-top: 0.75rem; }
+.compare-file input, .compare-file textarea, .compare-options input:not([type="checkbox"]), .compare-options select { padding: 0.55rem 0.75rem; border: 1px solid var(--color-border); border-radius: 0.5rem; font: inherit; width: 100%; box-sizing: border-box; }
+.compare-file textarea { font-family: var(--font-mono); font-size: 0.85rem; }
+.compare-drop { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-top: 0.75rem; padding: 0.75rem 1rem; border: 1px dashed var(--color-border); border-radius: 0.5rem; }
+.compare-drop .hint { margin: 0.2rem 0 0; }
+/* Specific enough to beat .compare-file input, whose padding and width spread the hidden file input across the page. */
+.compare-file .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; border: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.segmented { display: inline-flex; gap: 0.25rem; padding: 0.25rem; background: #eceef2; border-radius: 0.5rem; }
+.segmented button { border: 0; background: transparent; padding: 0.3rem 0.8rem; border-radius: 0.4rem; cursor: pointer; font: inherit; color: inherit; }
+.segmented button[aria-pressed="true"] { background: var(--color-card); font-weight: 600; }
+.compare-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: 0.75rem 1rem; margin-bottom: 1rem; }
+.compare-help { grid-column: 1 / -1; margin: 0; }
+.compare-checks { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1.25rem; }
+.compare-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; margin-bottom: 0.75rem; }
+.compare-counts { margin-left: auto; }
+.compare-chip { display: inline-block; padding: 0.15rem 0.7rem; border-radius: 999px; font-size: 0.85rem; font-weight: 500; background: #eceef2; }
+.compare-chip[data-change="changed"] { background: #fdf0dc; color: #7a4a00; }
+.compare-chip[data-change="added"] { background: #e3f4e8; color: #17622f; }
+.compare-chip[data-change="removed"] { background: #fdeeec; color: var(--color-production); }
+.compare-table { max-height: 28rem; overflow: auto; }
+.compare-table table { width: 100%; border-collapse: collapse; }
+.compare-table th { position: sticky; top: 0; background: var(--color-card); text-align: left; padding: 0.6rem 0.75rem; font-size: 0.875rem; }
+.compare-table td { padding: 0.5rem 0.75rem; border-top: 1px solid var(--color-border); vertical-align: top; overflow-wrap: anywhere; }
+.compare-table code { font-family: var(--font-mono); }
+.compare-table tr[data-change="added"] td { background: #f6fbf7; }
+.compare-table tr[data-change="removed"] td { background: #fef8f7; }
+.compare-note td { background: #fdf6e9; color: #7a4a00; font-size: 0.875rem; }
+.compare-change { white-space: nowrap; }
+.compare-reveal { margin-left: 0.5rem; padding: 0.15rem 0.6rem; font-size: 0.85rem; }
+.compare-panes { display: grid; grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); gap: 1px; margin-top: 0.75rem; }
+.compare-pane { min-width: 0; }
+.compare-pane .hint { margin: 0 0 0.25rem; }
+.compare-pane pre { margin: 0; max-height: 24rem; overflow: auto; font-family: var(--font-mono); font-size: 0.85rem; }
+.compare-line { display: block; white-space: pre; padding: 0 0.5rem; }
+.compare-line[data-differs="true"] { background: #fdf0dc; }
+.compare-line[data-target="true"] { outline: 2px solid var(--color-action-blue); outline-offset: -2px; }

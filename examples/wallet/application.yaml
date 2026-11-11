@@ -1,0 +1,7 @@
+# Author: @SaadZarook
+application: wallet
+title: Wallet
+owner: payments-team
+environments:
+  prod: { title: Production, production: true }
+  uat: { title: UAT }

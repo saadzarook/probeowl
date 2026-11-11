@@ -1,0 +1,99 @@
+# Author: @SaadZarook
+# Local stack: ProbeOwl's own store plus the three seeded databases it probes.
+# Every port is bound to 127.0.0.1. The passwords below are for local use only.
+# Start with: docker compose -f dev/docker-compose.yml up --wait
+name: probeowl-dev
+
+services:
+  probeowl-store:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: probeowl
+      POSTGRES_USER: probeowl
+      POSTGRES_PASSWORD: ProbeOwl_Store_Local1
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U probeowl -d probeowl"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  wallet-sql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    user: mssql
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ProbeOwl_Sa_Local1
+    ports:
+      - "127.0.0.1:1433:1433"
+    volumes:
+      - ./seed:/seed:ro
+    command: ["/bin/bash", "/seed/sqlserver/entrypoint.sh"]
+    healthcheck:
+      # The marker file is written only after both copies are seeded.
+      test: ["CMD-SHELL", "test -f /var/opt/mssql/.seeded"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+      start_period: 20s
+
+  ledger-ora:
+    image: gvenzl/oracle-free:23-slim
+    environment:
+      ORACLE_PASSWORD: ProbeOwl_Ora_Local1
+    ports:
+      - "127.0.0.1:1521:1521"
+    volumes:
+      - ./seed:/seed:ro
+      - ./seed/oracle/initdb:/container-entrypoint-initdb.d:ro
+    healthcheck:
+      # The read-only login gets its grants last, so this works only once seeding is done.
+      test:
+        - CMD-SHELL
+        - >-
+          printf 'WHENEVER SQLERROR EXIT FAILURE\nSELECT COUNT(*) FROM LEDGER_UAT.FEE_RULES;\n'
+          | sqlplus -s probeowl_ro/ProbeOwl_Ro_Local1@//localhost:1521/FREEPDB1
+      interval: 10s
+      timeout: 10s
+      retries: 60
+      start_period: 60s
+
+  access-maria:
+    image: mariadb:11
+    environment:
+      MARIADB_ROOT_PASSWORD: ProbeOwl_Root_Local1
+    ports:
+      - "127.0.0.1:3306:3306"
+    volumes:
+      - ./seed:/seed:ro
+      - ./seed/mariadb/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # The init temporary server does not listen on TCP, so this passes only after seeding.
+      test: ["CMD-SHELL", "mariadb -h127.0.0.1 -uprobeowl_ro -pProbeOwl_Ro_Local1 -e 'SELECT 1 FROM access_uat.cards LIMIT 1'"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+      start_period: 15s
+
+  fake-payments:
+    build: ./fakes
+    command: ["uvicorn", "payments:app", "--host", "0.0.0.0", "--port", "8081"]
+    ports:
+      - "127.0.0.1:8081:8081"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:8081/payments/pay_7hq2m9')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  fake-door-controller:
+    build: ./fakes
+    command: ["uvicorn", "door_controller:app", "--host", "0.0.0.0", "--port", "8082"]
+    ports:
+      - "127.0.0.1:8082:8082"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:8082/cards/C177031')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10

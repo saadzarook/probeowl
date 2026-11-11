@@ -1,0 +1,23 @@
+# Author: @SaadZarook
+name: Feature
+description: Something ProbeOwl should do.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What you are trying to check or find, and how you do it today.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you would like
+      description: How ProbeOwl could help. A sketch of the probe YAML is welcome.
+  - type: textarea
+    id: safety
+    attributes:
+      label: Safety
+      description: >
+        Anything it would read, from which systems, and how it stays read-only, bounded and masked.

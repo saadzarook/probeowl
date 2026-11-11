@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "types": ["vite/client", "node"],
+    // A plugin's screens live outside web/, where nothing would find web/node_modules.
+    "paths": {
+      "@plugins/*": ["../plugins/*"],
+      "@probeowl/plugin-web": ["./src/pluginApi.ts"],
+      "react": ["./node_modules/@types/react"],
+      "react/jsx-runtime": ["./node_modules/@types/react/jsx-runtime"],
+      "@tanstack/react-query": ["./node_modules/@tanstack/react-query"]
+    }
+  },
+  "include": ["src", "mocks", "e2e", "vite.config.ts", "playwright.config.ts", "playwright.live.config.ts", "e2e-live", "scripts", "../plugins/*/web"]
+}

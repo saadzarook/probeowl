@@ -1,0 +1,9 @@
+# Author: @SaadZarook
+# The door controller's API; locally the fake-door-controller app in dev/.
+# The prod binding is that local app, labelled Production for testing.
+connector: door_controller_api
+type: rest
+owner: access-team
+environments:
+  prod: { base_url: "http://127.0.0.1:8082" }
+  uat: { base_url: "http://127.0.0.1:8082" }

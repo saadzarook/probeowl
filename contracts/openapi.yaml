@@ -1,0 +1,6025 @@
+openapi: 3.1.0
+info:
+  title: ProbeOwl API
+  description: Validate production data across databases and APIs, safely.
+  version: 0.1.0
+paths:
+  /api/applications:
+    get:
+      tags:
+      - applications
+      summary: List Applications
+      description: List the applications this ProbeOwl knows.
+      operationId: list_applications
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/ApplicationSummary'
+                type: array
+                title: Response List Applications
+        '500':
+          description: Internal Server Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '501':
+          description: Not Implemented
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/applications/{application}:
+    get:
+      tags:
+      - applications
+      summary: Get Application
+      description: Get one application.
+      operationId: get_application
+      parameters:
+      - name: application
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Application
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplicationSummary'
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+        '501':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Implemented
+        '404':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Found
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/applications/{application}/environments:
+    get:
+      tags:
+      - applications
+      summary: List Environments
+      description: List an application's environments.
+      operationId: list_environments
+      parameters:
+      - name: application
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Application
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EnvironmentSummary'
+                title: Response List Environments
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+        '501':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Implemented
+        '404':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Found
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/applications/{application}/entities:
+    get:
+      tags:
+      - entities
+      summary: List Entities
+      description: List an application's entities with their identifiers and locations.
+      operationId: list_entities
+      parameters:
+      - name: application
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Application
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Entity'
+                title: Response List Entities
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+        '501':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Implemented
+        '404':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Found
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/applications/{application}/entities/{entity}:
+    get:
+      tags:
+      - entities
+      summary: Get Entity
+      description: 'Get one entity: identifiers, locations and key graph.'
+      operationId: get_entity
+      parameters:
+      - name: application
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Application
+      - name: entity
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Entity
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Entity'
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+        '501':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Implemented
+        '404':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Found
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    put:
+      tags:
+      - entities
+      summary: Save Entity
+      description: 'Save a new entity into its own YAML file in the folder owl serve
+        loaded.
+
+
+        As a probe''s save: first without `base`, nothing is written and the response
+        is the change
+
+        and the save checks'' report, plans included; then with that `base` to write
+        exactly that
+
+        change. An entity failing a save check is a 422 and is never written; 409
+        if the file
+
+        changed in between. Only a new entity: one that exists is changed with one
+        of its probes,
+
+        so that they are checked together. Never commits or pushes; audited.'
+      operationId: save_entity
+      parameters:
+      - name: application
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Application
+      - name: entity
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Entity
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveEntity'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntityChange'
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+        '501':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Implemented
+        '404':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Found
+        '409':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Conflict
+        '422':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Unprocessable Entity
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      security:
+      - ProbeOwlRequest: []
+  /api/applications/{application}/probes:
+    get:
+      tags:
+      - probes
+      summary: List Probes
+      description: 'List an application''s inspect and validate probes.
+
+
+        entity: only that entity''s probes. environment: only the probes enabled there.'
+      operationId: list_probes
+      parameters:
+      - name: application
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Application
+      - name: entity
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Entity
+      - name: environment
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Environment
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProbeSummary'
+                title: Response List Probes
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+        '501':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Implemented
+        '404':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Found
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/applications/{application}/probes/checks:
+    post:
+      tags:
+      - probes
+      summary: Check Draft Probe
+      description: 'The save checks of a draft probe (and entity), without saving
+        anything.
+
+
+        Read-only SQL for every lookup the probe can run (its entity''s lookups, fallbacks,
+
+        fan-out and identifier lookups), the expectations against the entity, the
+        environments''
+
+        bindings, and the label rules: a Transaction, Log or Audit table is read by
+        key or within
+
+        a time window, and every PII column selected is masked. A failed check means
+        it cannot be
+
+        saved; a draft that cannot be read fails the first check.'
+      operationId: check_draft_probe
+      parameters:
+      - name: application
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Application
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DraftProbe'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SaveCheckReport'
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+        '501':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Implemented
+        '404':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Found
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      security:
+      - ProbeOwlRequest: []
+  /api/plugins:
+    get:
+      tags:
+      - plugins
+      summary: List Plugins
+      description: The plugins that are on. One that is off is not listed, and its
+        routes do not exist.
+      operationId: list_plugins
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/PluginManifest'
+                type: array
+                title: Response List Plugins
+        '500':
+          description: Internal Server Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '501':
+          description: Not Implemented
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/me:
+    get:
+      tags:
+      - runs
+      summary: Who Am I
+      description: 'Who is acting: the person running owl serve, as every run and
+        audit record names them.'
+      operationId: who_am_i
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Actor'
+        '500':
+          description: Internal Server Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '501':
+          description: Not Implemented
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/config/reload:
+    post:
+      tags:
+      - connectors
+      summary: Reload Configuration
+      description: 'Read owl serve''s config folder again and load it, without a restart.
+        Audited.
+
+
+        The folder is checked exactly as at start: if owl serve would refuse it, the
+        reload is
+
+        refused (422) and the configuration loaded before stays. Refused (409) while
+        a run is
+
+        running. Kill switches stay as they are: they are kept in the store, not the
+        folder.'
+      operationId: reload_configuration
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfigReload'
+        '500':
+          description: Internal Server Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '501':
+          description: Not Implemented
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: Unprocessable Entity
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      security:
+      - ProbeOwlRequest: []
+  /api/kill-switches:
+    get:
+      tags:
+      - connectors
+      summary: List Kill Switches
+      description: The kill switches that are on. 503 if the store cannot be read.
+      operationId: list_kill_switches
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/KillSwitch'
+                type: array
+                title: Response List Kill Switches
+        '500':
+          description: Internal Server Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '501':
+          description: Not Implemented
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    post:
+      tags:
+      - connectors
+      summary: Engage Kill Switch
+      description: 'Turn a kill switch on: global, for an application, or for a connector
+        in every environment.
+
+
+        It stops every read through what it covers: runs, plan checks, schema import,
+        live status and
+
+        Test connection. A lookup in flight finishes within its statement timeout,
+        then the run stops
+
+        with this reason; new runs are Skipped. If it is already on, returns it as
+        it is. Audited.'
+      operationId: engage_kill_switch
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetKillSwitch'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KillSwitch'
+        '500':
+          description: Internal Server Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '501':
+          description: Not Implemented
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: Unprocessable Entity
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      security:
+      - ProbeOwlRequest: []
+  /api/kill-switches/release:
+    post:
+      tags:
+      - connectors
+      summary: Release Kill Switch
+      description: 'Turn a kill switch off, and return what was on. Audited. 404 if
+        it is not on.
+
+
+        Broader switches that are on still apply.'
+      operationId: release_kill_switch
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetKillSwitch'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KillSwitch'
+        '500':
+          description: Internal Server Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '501':
+          description: Not Implemented
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: Unprocessable Entity
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      security:
+      - ProbeOwlRequest: []
+  /api/applications/{application}/probes/{probe}/yaml:
+    get:
+      tags:
+      - probes
+      summary: Get Probe Yaml
+      description: 'Get a probe''s file as it is on disk, to edit: a rebuilt copy
+        would lose its comments.
+
+
+        404 if there is no such probe; 422 if the file holds more than this probe.'
+      operationId: get_probe_yaml
+      parameters:
+      - name: application
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Application
+      - name: probe
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Probe
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/YamlFile'
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+        '501':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Implemented
+        '404':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Found
+        '422':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Unprocessable Entity
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/applications/{application}/entities/{entity}/yaml:
+    get:
+      tags:
+      - entities
+      summary: Get Entity Yaml
+      description: 'Get an entity''s file as it is on disk, to edit: a rebuilt copy
+        would lose its comments.
+
+
+        404 if there is no such entity; 422 if the file holds more than this entity.'
+      operationId: get_entity_yaml
+      parameters:
+      - name: application
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Application
+      - name: entity
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Entity
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/YamlFile'
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+        '501':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Implemented
+        '404':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Found
+        '422':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Unprocessable Entity
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/applications/{application}/probes/{probe}:
+    put:
+      tags:
+      - probes
+      summary: Save Probe
+      description: 'Save a probe into its YAML file in the folder owl serve loaded.
+
+
+        Call it first without `base`: nothing is written, and the response is the
+        change as a
+
+        diff with its `base` and the save checks'' report. Then call it again with
+        that `base` to
+
+        write exactly that change, atomically. The save checks run both times, plans
+        included: a
+
+        probe that fails one is a 422 naming each failure, and is never written. 409
+        if a file
+
+        changed in between. Never commits or pushes; audited.
+
+
+        With `entity`, its file is saved too, under the same rules: one `base` covers
+        both, and
+
+        both are written or neither. Other probes of the entity must still pass.
+
+
+        In a Production environment, a write whose plan checks could not run is a
+        422 unless
+
+        `save_without_plan_check` is true; that acknowledgement is audited with the
+        actor.'
+      operationId: save_probe
+      parameters:
+      - name: application
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Application
+      - name: probe
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Probe
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveProbe'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProbeChange'
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+        '501':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Implemented
+        '404':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Found
+        '409':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Conflict
+        '422':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Unprocessable Entity
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      security:
+      - ProbeOwlRequest: []
+  /api/applications/{application}/probes/test-runs:
+    post:
+      tags:
+      - probes
+      summary: Run Draft
+      description: 'Run a draft probe without saving it. Poll the Location until it
+        is no longer running.
+
+
+        Like any run: an investigation record (with a reference in Production), every
+        guard, the
+
+        run limits, stored and audited; its probe_version starts with draft:. 422
+        when the draft
+
+        fails a save check, naming each failure.'
+      operationId: run_draft
+      parameters:
+      - name: application
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Application
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DraftRun'
+      responses:
+        '202':
+          description: The test run has started.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunStarted'
+          headers:
+            Location:
+              description: The run's URL, /api/runs/{id}.
+              schema:
+                type: string
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+        '501':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Implemented
+        '404':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Found
+        '422':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Unprocessable Entity
+        '429':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Too Many Requests
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      security:
+      - ProbeOwlRequest: []
+  /api/runs:
+    post:
+      tags:
+      - runs
+      summary: Start Run
+      description: 'Start an inspect or validate run. Poll the Location until it is
+        no longer running.
+
+
+        The identifier is detected from the value''s pattern unless one is given.
+        A value of
+
+        any identifier other than the root key is looked up first: one subject runs
+        the
+
+        probe; several make the run Ambiguous, with its matches and nothing else run.
+
+
+        404 for an unknown application, environment or probe. 422 when the value matches
+        no
+
+        identifier or several, the probe is not enabled in the environment, the investigation
+
+        record is incomplete for it (reason and reference in Production), or a location
+        has no
+
+        binding there. 429 when the maximum number of runs is already running; nothing
+        is queued.'
+      operationId: start_run
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartRun'
+      responses:
+        '202':
+          description: The run has started.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunStarted'
+          headers:
+            Location:
+              description: The run's URL, /api/runs/{id}.
+              schema:
+                type: string
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+        '501':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Implemented
+        '404':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Found
+        '422':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Unprocessable Entity
+        '429':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Too Many Requests
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      security:
+      - ProbeOwlRequest: []
+    get:
+      tags:
+      - runs
+      summary: List Recent Runs
+      description: 'Runs in one application and environment, newest first, 50 at a
+        time.
+
+
+        Each opens with GET /api/runs/{id}. A draft''s test run is marked draft. A
+        healthy
+
+        comparison''s candidates are left out: they show on the run they were compared
+        with.
+
+        Identifiers that are PII stay masked. before: the next value of the previous
+        page.'
+      operationId: list_recent_runs
+      parameters:
+      - name: application
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Application
+      - name: environment
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Environment
+      - name: before
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Before
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunList'
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+        '501':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Implemented
+        '404':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Found
+        '422':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Unprocessable Entity
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/runs/{run_id}/matches:
+    post:
+      tags:
+      - runs
+      summary: Pick Matches
+      description: 'Run an Ambiguous run''s probe for subjects picked from its matches,
+        up to 5.
+
+
+        Each picked subject gets its own run, with the Ambiguous run''s investigation
+        record and
+
+        from_run pointing back to it. They run one after another and count as one
+        run toward
+
+        the limit. 404 for an unknown run; 422 when the run is not Ambiguous or a
+        subject is not
+
+        one of its matches; 429 when the maximum number of runs is already running.'
+      operationId: pick_matches
+      parameters:
+      - name: run_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Run Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PickMatches'
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunsStarted'
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+        '501':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Implemented
+        '404':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Found
+        '422':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Unprocessable Entity
+        '429':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Too Many Requests
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      security:
+      - ProbeOwlRequest: []
+  /api/runs/{run_id}/healthy-comparison:
+    post:
+      tags:
+      - runs
+      summary: Start Healthy Comparison
+      description: 'Compare a finished run with a known-good subject. Poll the same
+        path until it has ended.
+
+
+        The sample lookup finds candidates, and the probe runs on each until one passes,
+        up to 3
+
+        audited runs linked by healthy_for, with this run''s investigation record.
+        A pasted ID runs
+
+        once and is compared even if it does not pass, with a warning. They run one
+        after another
+
+        and count as one run toward the limit. A new comparison replaces the last.
+        403 if a kill
+
+        switch covers the sample''s connector. 422 if the run is not finished or lacks
+        a field the
+
+        sample needs. 429 when the maximum number of runs is already running.'
+      operationId: start_healthy_comparison
+      parameters:
+      - name: run_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Run Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartHealthyComparison'
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthyComparison'
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+        '501':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Implemented
+        '403':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Forbidden
+        '404':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Found
+        '422':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Unprocessable Entity
+        '429':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Too Many Requests
+        '503':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Service Unavailable
+      security:
+      - ProbeOwlRequest: []
+    get:
+      tags:
+      - runs
+      summary: Get Healthy Comparison
+      description: A run's latest comparison, field by field. A masked field says
+        only whether it matches.
+      operationId: get_healthy_comparison
+      parameters:
+      - name: run_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Run Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthyComparison'
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+        '501':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Implemented
+        '404':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Found
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/runs/{run_id}:
+    get:
+      tags:
+      - runs
+      summary: Get Run
+      description: 'Get a run as it progresses: location outcomes fill in as they
+        arrive (masked).'
+      operationId: get_run
+      parameters:
+      - name: run_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Run Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Run'
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+        '501':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Implemented
+        '404':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Found
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/applications/{application}/catalog:
+    get:
+      tags:
+      - catalog
+      summary: Get Catalog
+      description: 'Get an application''s table catalog: its confirmed labels and
+        marked columns (YAML).'
+      operationId: get_catalog
+      parameters:
+      - name: application
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Application
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Catalog'
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+        '501':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Implemented
+        '404':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Found
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/applications/{application}/catalog/imports:
+    post:
+      tags:
+      - catalog
+      summary: Import Schema
+      description: 'Import a SQL connector''s schema in one environment from its binding,
+        never data.
+
+
+        Tables, columns with types, primary keys, indexes and row estimates, read
+        from the
+
+        database''s catalog views through the connector''s read-only login (in Production,
+        the
+
+        replica). The snapshot is stored and the import audited. 404 for an unknown
+        application,
+
+        environment or connector; 422 for a REST connector or one with no binding
+        there; 502
+
+        when the database cannot be read.'
+      operationId: import_schema
+      parameters:
+      - name: application
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Application
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImportSchema'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SchemaSnapshot'
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+        '501':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Implemented
+        '404':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Found
+        '422':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Unprocessable Entity
+        '502':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Bad Gateway
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      security:
+      - ProbeOwlRequest: []
+  /api/applications/{application}/catalog/schema:
+    get:
+      tags:
+      - catalog
+      summary: Get Schema
+      description: The most recent schema import of a connector in one environment.
+      operationId: get_schema
+      parameters:
+      - name: application
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Application
+      - name: connector
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Connector
+      - name: environment
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Environment
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SchemaSnapshot'
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+        '501':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Implemented
+        '404':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Found
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/applications/{application}/catalog/review:
+    get:
+      tags:
+      - catalog
+      summary: Review Catalog
+      description: 'Tables to review: suggested labels, drift from each environment''s
+        latest import, usage.
+
+
+        Every table in catalog.yaml, in an import, or read by a probe. A suggestion
+        is guessed from
+
+        the table''s name and shape; a person confirms each label. Drift compares
+        the catalog with
+
+        each environment''s latest import, and environments with one another.'
+      operationId: review_catalog
+      parameters:
+      - name: application
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Application
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogReview'
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+        '501':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Implemented
+        '404':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Found
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/applications/{application}/catalog/tables/{connector}/{table}:
+    put:
+      tags:
+      - catalog
+      summary: Confirm Table
+      description: 'Confirm a table''s label, owner and marked columns into the application''s
+        catalog.yaml.
+
+
+        Call it first without `base`: nothing is written, and the response is the
+        change as a
+
+        diff with the file''s `base`. Then call it again with that `base` to write
+        exactly that
+
+        change, atomically. 409 if the file changed in between; 422 if the catalog
+        would not be
+
+        valid or the path leaves the folder owl serve loaded. Never commits or pushes;
+        audited.'
+      operationId: confirm_table
+      parameters:
+      - name: application
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Application
+      - name: connector
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Connector
+      - name: table
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Table
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmTable'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogChange'
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+        '501':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Implemented
+        '404':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Found
+        '409':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Conflict
+        '422':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Unprocessable Entity
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      security:
+      - ProbeOwlRequest: []
+  /api/applications/{application}/connectors:
+    get:
+      tags:
+      - connectors
+      summary: List Connectors
+      description: 'Each connector in one environment: health, lag, plan access and
+        guards, read live.
+
+
+        Never where a connector points or who logs in.'
+      operationId: list_connectors
+      parameters:
+      - name: application
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Application
+      - name: environment
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Environment
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ConnectorStatus'
+                title: Response List Connectors
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+        '501':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Implemented
+        '404':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Found
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/applications/{application}/connectors/{connector}/test:
+    post:
+      tags:
+      - connectors
+      summary: Test Connection
+      description: 'Connect once to a binding, or GET a REST API''s base URL once,
+        and say how it went. Audited.
+
+
+        Reads no data. 403 if a kill switch covers it, before its secret is read.
+        A connector the
+
+        circuit breaker paused is left alone, and reported as not reached with the
+        reason.'
+      operationId: test_connection
+      parameters:
+      - name: application
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Application
+      - name: connector
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Connector
+      - name: environment
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Environment
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectionTest'
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+        '501':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Implemented
+        '403':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Forbidden
+        '404':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Found
+        '503':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Service Unavailable
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      security:
+      - ProbeOwlRequest: []
+  /api/applications/{application}/runbooks:
+    get:
+      tags:
+      - runbooks
+      summary: List Runbooks
+      description: 'List an application''s runbooks, matching every filter given.
+
+
+        q searches the symptom: its title, its steps'' titles and the outcomes it
+        applies to.
+
+        table is a catalog table it uses; identifier is a type its queries take as
+        a parameter.'
+      operationId: list_runbooks
+      parameters:
+      - name: application
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Application
+      - name: entity
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Entity
+      - name: q
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Q
+      - name: table
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Table
+      - name: identifier
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Identifier
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RunbookView'
+                title: Response List Runbooks
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+        '501':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Implemented
+        '404':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Found
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/applications/{application}/runbooks/{runbook}:
+    get:
+      tags:
+      - runbooks
+      summary: Get Runbook
+      description: Get one runbook. Write query steps are never runnable.
+      operationId: get_runbook
+      parameters:
+      - name: application
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Application
+      - name: runbook
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Runbook
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunbookView'
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+        '501':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Implemented
+        '404':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Found
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/runs/{run_id}/runbooks:
+    get:
+      tags:
+      - runbooks
+      summary: Suggest Runbooks
+      description: The runbooks whose applies_to matches this run's outcomes, closest
+        first.
+      operationId: suggest_runbooks
+      parameters:
+      - name: run_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Run Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SuggestedRunbook'
+                title: Response Suggest Runbooks
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+        '501':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Implemented
+        '404':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Found
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/runs/{run_id}/runbooks/{runbook}/steps:
+    get:
+      tags:
+      - runbooks
+      summary: List Steps In Run
+      description: 'A runbook''s steps with this run''s values, ticks and latest results.
+
+
+        A masked value is never filled in: its parameter stays as :name, and says
+        why.'
+      operationId: list_steps_in_run
+      parameters:
+      - name: run_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Run Id
+      - name: runbook
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Runbook
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StepInRun'
+                title: Response List Steps In Run
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+        '501':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Implemented
+        '404':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Found
+        '422':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Unprocessable Entity
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/runs/{run_id}/runbooks/{runbook}/steps/{step}/run:
+    post:
+      tags:
+      - runbooks
+      summary: Run Step
+      description: 'Run one step the server marks runnable: a reviewed read query,
+        or a probe. Audited.
+
+
+        It takes a step''s ID and never SQL: the SQL comes from the runbook and its
+        values from the
+
+        run. A read query''s plan is read first: a full scan of a large table is refused,
+        and in
+
+        Production a plan that cannot be read needs run_without_plan_check. A write
+        query is always
+
+        refused. 403 if a kill switch covers it; 429 when the maximum number of runs
+        is running.'
+      operationId: run_step
+      parameters:
+      - name: run_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Run Id
+      - name: runbook
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Runbook
+      - name: step
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Step
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RunRunbookStep'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StepRan'
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+        '501':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Implemented
+        '403':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Forbidden
+        '404':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Found
+        '422':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Unprocessable Entity
+        '429':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Too Many Requests
+        '503':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Service Unavailable
+      security:
+      - ProbeOwlRequest: []
+  /api/runs/{run_id}/runbooks/{runbook}/steps/{step}/tick:
+    post:
+      tags:
+      - runbooks
+      summary: Tick Step
+      description: Save a manual step's tick with the run. Audited.
+      operationId: tick_step
+      parameters:
+      - name: run_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Run Id
+      - name: runbook
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Runbook
+      - name: step
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Step
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TickRunbookStep'
+      responses:
+        '204':
+          description: Successful Response
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+        '501':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Implemented
+        '404':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Found
+        '422':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Unprocessable Entity
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      security:
+      - ProbeOwlRequest: []
+  /api/runs/{run_id}/runbooks/{runbook}/steps/{step}/copy:
+    post:
+      tags:
+      - runbooks
+      summary: Copy Write Query
+      description: A write query with this run's values, under its header. The copy
+        is audited. Never run.
+      operationId: copy_write_query
+      parameters:
+      - name: run_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Run Id
+      - name: runbook
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Runbook
+      - name: step
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Step
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CopiedWriteQuery'
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+        '501':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Implemented
+        '404':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Found
+        '422':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Unprocessable Entity
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      security:
+      - ProbeOwlRequest: []
+  /api/applications/{application}/runbooks/{runbook}/steps/{step}/copy:
+    post:
+      tags:
+      - runbooks
+      summary: Copy Write Query Without A Run
+      description: A write query as written, for a runbook opened with no run. The
+        copy is audited.
+      operationId: copy_write_query_without_a_run
+      parameters:
+      - name: application
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Application
+      - name: runbook
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Runbook
+      - name: step
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Step
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CopiedWriteQuery'
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+        '501':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Implemented
+        '404':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Found
+        '422':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Unprocessable Entity
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      security:
+      - ProbeOwlRequest: []
+  /api/plugins/compare_files/compare:
+    post:
+      tags:
+      - plugin compare_files
+      summary: Compare Files
+      description: 'Compare two files a person uploaded or pasted. Nothing is stored.
+
+
+        Masked values never come back: only where each sits in the file supplied.
+        A secret found
+
+        on either side is masked wherever its exact text appears in both, if 8 characters
+        or more.
+
+        413 past 10 MB per file or 25 MB per request; 422 if a file is not valid in
+        the chosen
+
+        format, never quoting its content.'
+      operationId: compare_files
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompareRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompareResult'
+        '413':
+          description: Request Entity Too Large
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: Unprocessable Entity
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      security:
+      - ProbeOwlRequest: []
+components:
+  schemas:
+    Actor:
+      properties:
+        kind:
+          $ref: '#/components/schemas/ActorKind'
+        name:
+          type: string
+          minLength: 1
+          title: Name
+          description: The operating system user, or 'scheduler'.
+        on_behalf_of:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: On Behalf Of
+          description: The person an agent acts for.
+      additionalProperties: false
+      type: object
+      required:
+      - kind
+      - name
+      title: Actor
+      description: Who started a run.
+    ActorKind:
+      type: string
+      enum:
+      - person
+      - scheduler
+      - agent
+      title: ActorKind
+      description: Who started a run.
+    ApplicationSummary:
+      properties:
+        name:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Name
+        title:
+          type: string
+          title: Title
+        owner:
+          type: string
+          title: Owner
+        environments:
+          items:
+            $ref: '#/components/schemas/EnvironmentSummary'
+          type: array
+          title: Environments
+      additionalProperties: false
+      type: object
+      required:
+      - name
+      - title
+      - owner
+      - environments
+      title: ApplicationSummary
+      description: An application as listed in the application selector.
+    AppliesTo:
+      properties:
+        entity:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Entity
+        when:
+          items:
+            type: string
+            pattern: ^[a-z][a-z0-9_]*\.(found|missing|waiting|blocked|ambiguous|error|stale|not_configured)$
+            description: <location>.<outcome>, such as ledger.missing.
+          type: array
+          minItems: 1
+          title: When
+      additionalProperties: false
+      type: object
+      required:
+      - entity
+      - when
+      title: AppliesTo
+      description: When a failed run suggests this runbook.
+    ArrayMatch:
+      type: string
+      enum:
+      - by_position
+      - any_order
+      - by_key
+      title: ArrayMatch
+      description: How array elements are paired.
+    BindingHealth:
+      type: string
+      enum:
+      - healthy
+      - lagging
+      - paused
+      - stopped
+      - unreachable
+      - not_checked
+      - not_configured
+      title: BindingHealth
+      description: How a binding is doing right now.
+    Capability:
+      type: string
+      enum:
+      - local_input
+      title: Capability
+      description: What a plugin may be given. Only what is built can be declared.
+    Cardinality:
+      type: string
+      enum:
+      - one
+      - optional
+      - many
+      title: Cardinality
+      description: How many records a location should return.
+    Catalog:
+      properties:
+        catalog:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Catalog
+          description: The application this catalog belongs to.
+        tables:
+          items:
+            $ref: '#/components/schemas/CatalogTable'
+          type: array
+          minItems: 1
+          title: Tables
+      additionalProperties: false
+      type: object
+      required:
+      - catalog
+      - tables
+      title: Catalog
+      description: An application's table catalog.
+    CatalogChange:
+      properties:
+        path:
+          type: string
+          title: Path
+          description: Relative to the folder owl serve loaded.
+        diff:
+          type: string
+          title: Diff
+          description: Unified diff of the change.
+        base:
+          type: string
+          title: Base
+          description: sha256 of the file before the change, or 'absent'.
+        after:
+          type: string
+          title: After
+          description: sha256 of the file after the change.
+        written:
+          type: boolean
+          title: Written
+      additionalProperties: false
+      type: object
+      required:
+      - path
+      - diff
+      - base
+      - after
+      - written
+      title: CatalogChange
+      description: A change to a YAML file in the folder owl serve loaded. Never committed
+        or pushed.
+    CatalogReview:
+      properties:
+        application:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Application
+        tables:
+          items:
+            $ref: '#/components/schemas/TableReview'
+          type: array
+          title: Tables
+        unconfirmed:
+          type: integer
+          title: Unconfirmed
+          description: Tables with a suggested label not yet in catalog.yaml.
+        drifted:
+          type: integer
+          title: Drifted
+          description: Tables that differ from a live schema somewhere.
+      additionalProperties: false
+      type: object
+      required:
+      - application
+      - tables
+      - unconfirmed
+      - drifted
+      title: CatalogReview
+      description: 'An application''s tables to review: unconfirmed labels, drift,
+        tables probes read.'
+    CatalogTable:
+      properties:
+        connector:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Connector
+        table:
+          type: string
+          maxLength: 128
+          pattern: ^[A-Za-z_][A-Za-z0-9_]*$
+          title: Table
+        label:
+          $ref: '#/components/schemas/TableLabel'
+        owner:
+          type: string
+          minLength: 1
+          title: Owner
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        columns:
+          patternProperties:
+            ^[A-Za-z_][A-Za-z0-9_]*$:
+              $ref: '#/components/schemas/Column'
+          propertyNames:
+            maxLength: 128
+          type: object
+          title: Columns
+          description: Marked columns only; unmarked columns are not listed.
+        retention:
+          anyOf:
+          - type: string
+            pattern: ^[1-9][0-9]*(ms|s|m|h|d)$
+            description: A duration such as 2s, 2m, 1h or 7d.
+          - type: 'null'
+          title: Retention
+          description: How long rows are kept.
+        approx_rows:
+          anyOf:
+          - type: integer
+            minimum: 0.0
+          - type: 'null'
+          title: Approx Rows
+      additionalProperties: false
+      type: object
+      required:
+      - connector
+      - table
+      - label
+      - owner
+      - columns
+      title: CatalogTable
+      description: One table in the catalog, with its label, owner and marked columns.
+    Change:
+      type: string
+      enum:
+      - changed
+      - added
+      - removed
+      title: Change
+      description: How a path differs.
+    CheckStatus:
+      type: string
+      enum:
+      - pass
+      - warn
+      - fail
+      title: CheckStatus
+      description: Pass; warn (saving is allowed, with the reason); or fail (saving
+        is refused).
+    Column:
+      properties:
+        roles:
+          items:
+            $ref: '#/components/schemas/ColumnRole'
+          type: array
+          minItems: 1
+          title: Roles
+        indexed:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Indexed
+          description: 'For time columns: is it indexed?'
+        values:
+          items:
+            type: string
+          type: array
+          title: Values
+          description: 'For status columns: the values it can hold.'
+        links_to:
+          anyOf:
+          - $ref: '#/components/schemas/LinkTarget'
+          - type: 'null'
+          description: For link and external key columns.
+      additionalProperties: false
+      type: object
+      required:
+      - roles
+      title: Column
+      description: One marked column and its roles.
+    ColumnRole:
+      type: string
+      enum:
+      - primary_key
+      - time
+      - status
+      - link
+      - external_key
+      - pii
+      - compare
+      - expected_to_vary
+      title: ColumnRole
+      description: A marked column.
+    ColumnSchema:
+      properties:
+        name:
+          type: string
+          title: Name
+        type:
+          type: string
+          title: Type
+          description: As the database names it, such as varchar(20) or number(18,2).
+        nullable:
+          type: boolean
+          title: Nullable
+      additionalProperties: false
+      type: object
+      required:
+      - name
+      - type
+      - nullable
+      title: ColumnSchema
+      description: One column as the database defines it.
+    CompareOptions:
+      properties:
+        ignore_paths:
+          items:
+            type: string
+          type: array
+          title: Ignore Paths
+        ignore_key_order:
+          type: boolean
+          title: Ignore Key Order
+          default: true
+        arrays:
+          $ref: '#/components/schemas/ArrayMatch'
+          default: by_position
+        array_key:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Array Key
+          description: 'With arrays by_key: the field, or the CSV column, to match
+            on.'
+        ignore_whitespace:
+          type: boolean
+          title: Ignore Whitespace
+          default: false
+        ignore_case:
+          type: boolean
+          title: Ignore Case
+          description: Applies to values, not to keys.
+          default: false
+        number_tolerance:
+          anyOf:
+          - type: number
+            minimum: 0.0
+          - type: string
+          title: Number Tolerance
+          default: '0'
+      type: object
+      title: CompareOptions
+      description: What counts as the same.
+    CompareRequest:
+      properties:
+        left:
+          $ref: '#/components/schemas/SuppliedFile'
+        right:
+          $ref: '#/components/schemas/SuppliedFile'
+        format:
+          $ref: '#/components/schemas/FormatChoice'
+          default: auto
+        options:
+          $ref: '#/components/schemas/CompareOptions'
+      type: object
+      required:
+      - left
+      - right
+      title: CompareRequest
+      description: Two files to compare.
+    CompareResult:
+      properties:
+        left:
+          $ref: '#/components/schemas/FileSummary'
+        right:
+          $ref: '#/components/schemas/FileSummary'
+        summary:
+          $ref: '#/components/schemas/CompareSummary'
+        differences:
+          items:
+            $ref: '#/components/schemas/FileDifference'
+          type: array
+          title: Differences
+        notes:
+          items:
+            type: string
+          type: array
+          title: Notes
+        masked_left:
+          anyOf:
+          - items:
+              $ref: '#/components/schemas/Range'
+            type: array
+          - type: 'null'
+          title: Masked Left
+          description: Everything to hide in the left file's side-by-side view. Null
+            if a secret could not be located, so that view must not be shown.
+        masked_right:
+          anyOf:
+          - items:
+              $ref: '#/components/schemas/Range'
+            type: array
+          - type: 'null'
+          title: Masked Right
+      type: object
+      required:
+      - left
+      - right
+      - summary
+      - differences
+      - notes
+      - masked_left
+      title: CompareResult
+      description: What differs, masked. Everything here is safe to show and export.
+    CompareSummary:
+      properties:
+        changed:
+          type: integer
+          title: Changed
+        added:
+          type: integer
+          title: Added
+        removed:
+          type: integer
+          title: Removed
+        unchanged:
+          type: integer
+          title: Unchanged
+        ignored:
+          type: integer
+          title: Ignored
+        masked:
+          type: integer
+          title: Masked
+      type: object
+      required:
+      - changed
+      - added
+      - removed
+      - unchanged
+      - ignored
+      - masked
+      title: CompareSummary
+      description: How much differs.
+    ComparedField:
+      properties:
+        location:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Location
+        connector:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Connector
+        field:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Field
+          description: 'The compare field. Null: the location''s outcome and rows.'
+        failing:
+          $ref: '#/components/schemas/JsonValue'
+          description: Always null for a masked field.
+        healthy:
+          $ref: '#/components/schemas/JsonValue'
+          description: Always null for a masked field.
+        result:
+          $ref: '#/components/schemas/FieldResult'
+        masked:
+          type: boolean
+          title: Masked
+          default: false
+      additionalProperties: false
+      type: object
+      required:
+      - location
+      - connector
+      - result
+      title: ComparedField
+      description: One location's outcome and rows, or one compare field, on the two
+        subjects.
+    Conclusion:
+      type: string
+      enum:
+      - root_cause_found
+      - no_issue
+      - escalated
+      title: Conclusion
+      description: What an investigation concluded, added after the run.
+    ConfigReload:
+      properties:
+        applications:
+          type: integer
+          minimum: 0.0
+          title: Applications
+          description: Applications loaded.
+        connectors:
+          type: integer
+          minimum: 0.0
+          title: Connectors
+          description: Connectors loaded, across applications.
+        probes:
+          type: integer
+          minimum: 0.0
+          title: Probes
+          description: Probes loaded, across applications.
+        applications_added:
+          items:
+            type: string
+            maxLength: 64
+            pattern: ^[a-z][a-z0-9_]*$
+          type: array
+          title: Applications Added
+        applications_removed:
+          items:
+            type: string
+            maxLength: 64
+            pattern: ^[a-z][a-z0-9_]*$
+          type: array
+          title: Applications Removed
+        connectors_added:
+          items:
+            type: string
+          type: array
+          title: Connectors Added
+          description: Each as application/connector.
+        connectors_removed:
+          items:
+            type: string
+          type: array
+          title: Connectors Removed
+          description: Each as application/connector.
+        connectors_changed:
+          items:
+            type: string
+          type: array
+          title: Connectors Changed
+          description: 'Connectors whose file changed: a binding, a guard or their
+            owner.'
+        note:
+          type: string
+          title: Note
+          description: What a reload leaves as it was.
+          default: Plugins, the port, the store and the log file change only when
+            owl serve is restarted.
+      additionalProperties: false
+      type: object
+      required:
+      - applications
+      - connectors
+      - probes
+      title: ConfigReload
+      description: The configuration owl serve loaded again, and how it differs from
+        the one before.
+    ConfirmTable:
+      properties:
+        entry:
+          $ref: '#/components/schemas/CatalogTable'
+        base:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Base
+          description: 'The base of the preview being confirmed. Omitted: nothing
+            is written and the change is returned. Given: written only if catalog.yaml
+            is still as it was then.'
+      additionalProperties: false
+      type: object
+      required:
+      - entry
+      title: ConfirmTable
+      description: 'A table''s catalog entry to confirm. Without base: preview it.
+        With it: write it.'
+    ConnectionTest:
+      properties:
+        connector:
+          type: string
+          title: Connector
+        environment:
+          type: string
+          title: Environment
+        reachable:
+          type: boolean
+          title: Reachable
+        reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Reason
+          description: Why not, when it could not be reached.
+        duration_ms:
+          type: integer
+          title: Duration Ms
+      additionalProperties: false
+      type: object
+      required:
+      - connector
+      - environment
+      - reachable
+      - duration_ms
+      title: ConnectionTest
+      description: What Test connection found for one binding.
+    ConnectorStatus:
+      properties:
+        connector:
+          type: string
+          title: Connector
+        type:
+          type: string
+          title: Type
+        owner:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Owner
+        environment:
+          type: string
+          title: Environment
+        production:
+          type: boolean
+          title: Production
+        health:
+          $ref: '#/components/schemas/BindingHealth'
+        reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Reason
+        replica:
+          type: boolean
+          title: Replica
+          default: false
+        role:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Role
+          description: 'What kind of copy this binding reads from: Read replica, Readable
+            secondary or Active Data Guard standby. Null for a REST API, for a SQL
+            binding that is not a replica, or with no binding here.'
+        limits:
+          items:
+            type: string
+          type: array
+          title: Limits
+          description: 'The limits a lookup runs under, as enforced today: its time
+            limit, then the default row cap (a many location can set its own), or
+            a REST API''s rate budget and that it only reads with GET.'
+        row_ceiling:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Row Ceiling
+          description: The most rows one lookup through this connector may return.
+            Null with no binding here.
+        transport:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Transport
+        time_zone:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Time Zone
+          description: 'Oracle: the time zone its sessions use, such as ''+04:00 (from
+            the binding)'' or ''the database''s own (DBTIMEZONE)''. Null for SQL Server
+            and MariaDB, which have none to set, for a REST API, or with no binding
+            here.'
+        lag_seconds:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Lag Seconds
+        lag_note:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Lag Note
+        max_replica_lag_seconds:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Max Replica Lag Seconds
+        plan_access:
+          anyOf:
+          - $ref: '#/components/schemas/PlanAccess'
+          - type: 'null'
+          description: Null for a REST API, which has no plans.
+        plan_message:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Plan Message
+        guards:
+          items:
+            type: string
+          type: array
+          title: Guards
+        forbidden:
+          items:
+            type: string
+          type: array
+          title: Forbidden
+          description: What the statement guard refuses in this dialect's probe SQL,
+            by example. Empty for a REST API, whose guards say what it may do.
+      additionalProperties: false
+      type: object
+      required:
+      - connector
+      - type
+      - environment
+      - production
+      - health
+      title: ConnectorStatus
+      description: One connector in one environment.
+    CopiedWriteQuery:
+      properties:
+        text:
+          type: string
+          title: Text
+          description: Its SQL under a header naming the environment and the run.
+        unfilled:
+          items:
+            $ref: '#/components/schemas/UnfilledParameter'
+          type: array
+          title: Unfilled
+      additionalProperties: false
+      type: object
+      required:
+      - text
+      title: CopiedWriteQuery
+      description: A write query to take to a change request. Copying it was recorded
+        in the audit.
+    DraftProbe:
+      properties:
+        probe:
+          type: string
+          minLength: 1
+          title: Probe
+          description: The probe's YAML, as in the editor.
+        entity:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Entity
+          description: 'The entity''s YAML when it is edited too; omitted: the loaded
+            entity.'
+        environment:
+          anyOf:
+          - type: string
+            maxLength: 64
+            pattern: ^[a-z][a-z0-9_]*$
+          - type: 'null'
+          title: Environment
+          description: Where plans are read for the index checks.
+      additionalProperties: false
+      type: object
+      required:
+      - probe
+      title: DraftProbe
+      description: A probe as it is being edited, and optionally its entity, to check
+        before saving.
+    DraftRun:
+      properties:
+        probe:
+          type: string
+          minLength: 1
+          title: Probe
+          description: The probe's YAML, as in the editor.
+        entity:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Entity
+          description: The entity's YAML when it is edited too.
+        environment:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Environment
+        value:
+          type: string
+          minLength: 1
+          title: Value
+          description: Any identifier of the subject.
+        identifier:
+          anyOf:
+          - type: string
+            maxLength: 128
+            pattern: ^[A-Za-z_][A-Za-z0-9_]*$
+          - type: 'null'
+          title: Identifier
+        investigation:
+          $ref: '#/components/schemas/InvestigationRecord'
+      additionalProperties: false
+      type: object
+      required:
+      - probe
+      - environment
+      - value
+      - investigation
+      title: DraftRun
+      description: 'Run a draft probe without saving it, like any run: checked, guarded,
+        stored, audited.'
+    Drift:
+      properties:
+        environment:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Environment
+        message:
+          type: string
+          title: Message
+      additionalProperties: false
+      type: object
+      required:
+      - environment
+      - message
+      title: Drift
+      description: One way the catalog or another environment differs from an environment's
+        live schema.
+    Entity:
+      properties:
+        entity:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Entity
+        title:
+          type: string
+          title: Title
+          description: 'How the web app and the run header name it. Omitted: its name
+            with spaces for underscores, so visitor_cards is Visitor cards.'
+        root_key:
+          type: string
+          maxLength: 128
+          pattern: ^[A-Za-z_][A-Za-z0-9_]*$
+          title: Root Key
+          description: The identifier every other lookup starts from.
+        owner:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Owner
+        identifiers:
+          patternProperties:
+            ^[A-Za-z_][A-Za-z0-9_]*$:
+              $ref: '#/components/schemas/Identifier'
+          propertyNames:
+            maxLength: 128
+          type: object
+          title: Identifiers
+          description: Every identifier the entity can be found by. The root key is
+            added if absent.
+        locations:
+          patternProperties:
+            ^[a-z][a-z0-9_]*$:
+              $ref: '#/components/schemas/Location'
+          propertyNames:
+            maxLength: 64
+          type: object
+          minProperties: 1
+          title: Locations
+        healthy_sample:
+          anyOf:
+          - $ref: '#/components/schemas/HealthySample'
+          - type: 'null'
+          description: 'How to find a known-good subject. Omitted: a known-good ID
+            is pasted.'
+      additionalProperties: false
+      type: object
+      required:
+      - entity
+      - root_key
+      - locations
+      - title
+      title: Entity
+      description: A business subject type, its identifiers and the locations its
+        data lives in.
+    EntityChange:
+      properties:
+        path:
+          type: string
+          title: Path
+          description: Relative to the folder owl serve loaded.
+        diff:
+          type: string
+          title: Diff
+          description: Unified diff of the change.
+        base:
+          type: string
+          title: Base
+          description: sha256 of the file before the change, or 'absent'.
+        after:
+          type: string
+          title: After
+          description: sha256 of the file after the change.
+        written:
+          type: boolean
+          title: Written
+        report:
+          $ref: '#/components/schemas/SaveCheckReport'
+      additionalProperties: false
+      type: object
+      required:
+      - path
+      - diff
+      - base
+      - after
+      - written
+      - report
+      title: EntityChange
+      description: A new entity's YAML file, and the save checks it passed.
+    EnvironmentSummary:
+      properties:
+        name:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Name
+        title:
+          type: string
+          title: Title
+        production:
+          type: boolean
+          title: Production
+      additionalProperties: false
+      type: object
+      required:
+      - name
+      - title
+      - production
+      title: EnvironmentSummary
+      description: One environment of an application.
+    Evidence:
+      properties:
+        connector:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Connector
+        query:
+          type: string
+          title: Query
+          description: The statement or request as sent, after guards rewrote it.
+        parameters:
+          additionalProperties:
+            $ref: '#/components/schemas/JsonValue'
+          type: object
+          title: Parameters
+        guards:
+          items:
+            type: string
+          type: array
+          title: Guards
+          description: Guards applied, such as SET LOCK_TIMEOUT 0.
+        rows:
+          items:
+            additionalProperties:
+              $ref: '#/components/schemas/JsonValue'
+            type: object
+          type: array
+          title: Rows
+        rows_total:
+          anyOf:
+          - type: integer
+            minimum: 0.0
+          - type: 'null'
+          title: Rows Total
+          description: Rows that matched, when more than were returned.
+        column_types:
+          additionalProperties:
+            $ref: '#/components/schemas/ValueKind'
+          type: object
+          title: Column Types
+          description: Each column's type as read, so a value can be bound as that
+            type again.
+        started_at:
+          type: string
+          format: date-time
+          title: Started At
+        duration_ms:
+          type: integer
+          minimum: 0.0
+          title: Duration Ms
+      additionalProperties: false
+      type: object
+      required:
+      - connector
+      - query
+      - started_at
+      - duration_ms
+      title: Evidence
+      description: The exact query, parameters, guards and raw result behind an outcome.
+        Values are masked.
+    ExpectationEvaluation:
+      properties:
+        step:
+          type: integer
+          minimum: 0.0
+          title: Step
+          description: Index of the step in the probe.
+        expectation:
+          type: string
+          title: Expectation
+        result:
+          $ref: '#/components/schemas/ExpectationResult'
+        detail:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Detail
+          description: Values seen, or why it was skipped.
+        caveat:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Caveat
+          description: 'Why this result may not be final: it read a Missing record
+            that carries a caveat.'
+      additionalProperties: false
+      type: object
+      required:
+      - step
+      - expectation
+      - result
+      title: ExpectationEvaluation
+      description: The result of one expectation in one run.
+    ExpectationResult:
+      type: string
+      enum:
+      - pass
+      - fail
+      - skip
+      title: ExpectationResult
+      description: 'How one expectation ended. Skip: an input it needs is Blocked.'
+    ExternalQueryStepView:
+      properties:
+        kind:
+          type: string
+          const: external_query
+          title: Kind
+        id:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9-]*$
+          title: Id
+          description: Short and unique in its runbook. Results, ticks and the audit
+            key on it.
+        title:
+          type: string
+          minLength: 1
+          title: Title
+        tool:
+          type: string
+          minLength: 1
+          title: Tool
+        query:
+          type: string
+          minLength: 1
+          title: Query
+        runnable:
+          type: boolean
+          const: false
+          title: Runnable
+      additionalProperties: false
+      type: object
+      required:
+      - kind
+      - id
+      - title
+      - tool
+      - query
+      - runnable
+      title: ExternalQueryStepView
+      description: An external query step. Copied, never run by ProbeOwl.
+    FanOutLocation:
+      properties:
+        title:
+          type: string
+          title: Title
+          description: 'How the web app and the run header name it. Omitted: its name
+            with spaces for underscores, so visitor_cards is Visitor cards.'
+        using:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Using
+          description: The connector that does the lookup.
+        lookup:
+          type: string
+          minLength: 1
+          title: Lookup
+          description: A single SELECT with bound parameters, or GET <path>.
+        fallback:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Fallback
+          description: Tried when the lookup finds nothing.
+        cardinality:
+          $ref: '#/components/schemas/Cardinality'
+          default: one
+        exposes:
+          items:
+            type: string
+            maxLength: 128
+            pattern: ^[A-Za-z_][A-Za-z0-9_]*$
+          type: array
+          title: Exposes
+          description: Fields other locations and identifiers may use.
+        pii:
+          items:
+            type: string
+            maxLength: 128
+            pattern: ^[A-Za-z_][A-Za-z0-9_]*$
+          type: array
+          title: Pii
+          description: 'SQL locations: columns masked in every result and in evidence.'
+        mask:
+          items:
+            type: string
+            pattern: ^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$
+            description: 'A field, or a dotted path into nested fields: customer.email.'
+          type: array
+          title: Mask
+          description: 'REST locations: fields of the JSON response masked in every
+            result and in evidence, as dotted paths such as customer.email.'
+        within:
+          anyOf:
+          - type: string
+            pattern: ^[1-9][0-9]*(ms|s|m|h|d)$
+            description: A duration such as 2s, 2m, 1h or 7d.
+          - type: 'null'
+          title: Within
+          description: How long to report Waiting before Missing.
+        anchor_time:
+          anyOf:
+          - type: string
+            pattern: ^[a-z][a-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*$
+            description: A field of a location, written <location>.<field>.
+          - type: 'null'
+          title: Anchor Time
+          description: The record's own timestamp the window starts from.
+        compare:
+          items:
+            type: string
+            pattern: ^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$
+            description: 'A field, or a dotted path into nested fields: customer.email.'
+          type: array
+          title: Compare
+          description: 'REST locations: fields of the JSON response a healthy comparison
+            shows. SQL locations mark compare columns in the table catalog instead.'
+        expected_to_vary:
+          items:
+            type: string
+            pattern: ^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$
+            description: 'A field, or a dotted path into nested fields: customer.email.'
+          type: array
+          title: Expected To Vary
+          description: 'REST locations: compare fields that normally differ between
+            two healthy records. Shown in the differences, but never highlighted as
+            a likely cause.'
+        max_fanout:
+          type: integer
+          exclusiveMinimum: 0.0
+          title: Max Fanout
+          description: The most rows this lookup is repeated for.
+      additionalProperties: false
+      type: object
+      required:
+      - using
+      - lookup
+      - max_fanout
+      - title
+      title: FanOutLocation
+      description: A lookup repeated for each row of a many location. Its lookup uses
+        that row's fields.
+    FieldError:
+      properties:
+        field:
+          type: string
+          title: Field
+          description: 'The field, dotted: investigation.reference.'
+        message:
+          type: string
+          title: Message
+      additionalProperties: false
+      type: object
+      required:
+      - field
+      - message
+      title: FieldError
+      description: One field of a request that was not accepted.
+    FieldResult:
+      type: string
+      enum:
+      - same
+      - different
+      - expected_to_vary
+      - not_compared
+      title: FieldResult
+      description: 'How a field compares. Expected to vary: it differs, and is not
+        a likely cause.'
+    FileDifference:
+      properties:
+        path:
+          type: string
+          title: Path
+        change:
+          $ref: '#/components/schemas/Change'
+        left:
+          $ref: '#/components/schemas/JsonValue'
+        right:
+          $ref: '#/components/schemas/JsonValue'
+        masked:
+          type: boolean
+          title: Masked
+          default: false
+        reveal_left:
+          anyOf:
+          - $ref: '#/components/schemas/Range'
+          - type: 'null'
+          description: 'Masked only: where the value sits in the left file. Null if
+            it cannot be found exactly, so it has no Reveal.'
+        reveal_right:
+          anyOf:
+          - $ref: '#/components/schemas/Range'
+          - type: 'null'
+      type: object
+      required:
+      - path
+      - change
+      title: FileDifference
+      description: One path that differs. left and right are `[masked]` if masked.
+    FileSummary:
+      properties:
+        name:
+          type: string
+          title: Name
+        size:
+          type: integer
+          title: Size
+        sha256:
+          type: string
+          title: Sha256
+        format:
+          $ref: '#/components/schemas/Format'
+      type: object
+      required:
+      - name
+      - size
+      - sha256
+      - format
+      title: FileSummary
+      description: What the audit also records. Never the content.
+    Format:
+      type: string
+      enum:
+      - json
+      - yaml
+      - csv
+      - xml
+      - properties
+      - ini
+      - env
+      - text
+      title: Format
+      description: What a file is.
+    FormatChoice:
+      type: string
+      enum:
+      - auto
+      - json
+      - yaml
+      - csv
+      - xml
+      - properties
+      - ini
+      - env
+      - text
+      title: FormatChoice
+      description: 'What the person asked for: detected from the content, or overridden.'
+    HealthyAttempt:
+      properties:
+        status:
+          $ref: '#/components/schemas/HealthyAttemptStatus'
+        narrow:
+          anyOf:
+          - type: string
+            maxLength: 64
+            pattern: ^[a-z][a-z0-9_]*$
+          - type: 'null'
+          title: Narrow
+          description: The closer match chosen, if any.
+        pasted:
+          type: boolean
+          title: Pasted
+          description: A person gave the known-good ID.
+          default: false
+        replaced:
+          type: boolean
+          title: Replaced
+          description: It replaced an earlier attempt on this run.
+          default: false
+        replaced_subject:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Replaced Subject
+          description: Who the attempt it replaced compared with, if it got that far.
+        runs:
+          items:
+            type: string
+          type: array
+          title: Runs
+          description: The candidates' runs, in order.
+        healthy_run:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Healthy Run
+          description: The run compared with.
+        message:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Message
+          description: Why there is nothing to compare.
+        sample:
+          anyOf:
+          - $ref: '#/components/schemas/Evidence'
+          - type: 'null'
+          description: 'The sample lookup behind the candidates: root keys only.'
+      additionalProperties: false
+      type: object
+      required:
+      - status
+      title: HealthyAttempt
+      description: The latest attempt to find a known-good subject for this run.
+    HealthyAttemptStatus:
+      type: string
+      enum:
+      - running
+      - compared
+      - no_candidates
+      - none_passed
+      - could_not_run
+      title: HealthyAttemptStatus
+      description: Where an attempt to compare a run with a known-good subject is.
+    HealthyChoice:
+      properties:
+        name:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Name
+        title:
+          type: string
+          title: Title
+      additionalProperties: false
+      type: object
+      required:
+      - name
+      - title
+      title: HealthyChoice
+      description: A closer match a person can choose.
+    HealthyComparison:
+      properties:
+        run:
+          type: string
+          title: Run
+        has_sample:
+          type: boolean
+          title: Has Sample
+          description: 'False: the entity has no sample, so an ID is pasted.'
+        choices:
+          items:
+            $ref: '#/components/schemas/HealthyChoice'
+          type: array
+          title: Choices
+        attempt:
+          anyOf:
+          - $ref: '#/components/schemas/HealthyAttempt'
+          - type: 'null'
+          description: The latest attempt. Null until one has been started.
+        failing_subject:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Failing Subject
+        healthy_subject:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Healthy Subject
+        warning:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Warning
+          description: Set when the subject compared with did not pass.
+        differences:
+          items:
+            $ref: '#/components/schemas/ComparedField'
+          type: array
+          title: Differences
+          description: Every location and compare field, in location order.
+      additionalProperties: false
+      type: object
+      required:
+      - run
+      - has_sample
+      title: HealthyComparison
+      description: A run compared with a known-good subject, or what it takes to start
+        one.
+    HealthyNarrowing:
+      properties:
+        title:
+          type: string
+          minLength: 1
+          title: Title
+        lookup:
+          type: string
+          minLength: 1
+          title: Lookup
+          description: As healthy_sample's lookup, with more filters.
+      additionalProperties: false
+      type: object
+      required:
+      - title
+      - lookup
+      title: HealthyNarrowing
+      description: 'A closer match a person can choose, as a lookup of its own: same
+        payment method, say.'
+    HealthySample:
+      properties:
+        using:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Using
+          description: The SQL connector that does the lookup.
+        lookup:
+          type: string
+          minLength: 1
+          title: Lookup
+          description: 'A single SELECT of the root key, newest first, leaving out
+            the failing subject, on an indexed column. Its rows are candidates: each
+            is proved by running the probe.'
+        parameters:
+          patternProperties:
+            ^[A-Za-z_][A-Za-z0-9_]*$:
+              type: string
+              pattern: ^[a-z][a-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*$
+              description: A field of a location, written <location>.<field>.
+          propertyNames:
+            maxLength: 128
+          type: object
+          title: Parameters
+          description: 'Where each :parameter comes from in the failing run: <location>.<field>,
+            from a location with one row, and never a masked field.'
+        narrow:
+          patternProperties:
+            ^[a-z][a-z0-9_]*$:
+              $ref: '#/components/schemas/HealthyNarrowing'
+          propertyNames:
+            maxLength: 64
+          type: object
+          title: Narrow
+          description: Closer matches a person can choose.
+      additionalProperties: false
+      type: object
+      required:
+      - using
+      - lookup
+      title: HealthySample
+      description: How to find known-good subjects to compare a failing one with.
+        SQL connectors only.
+    Identifier:
+      properties:
+        pattern:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Pattern
+          description: A regular expression used to detect this identifier's type.
+        via:
+          anyOf:
+          - type: string
+            pattern: ^[a-z][a-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*$
+            description: A field of a location, written <location>.<field>.
+          - type: 'null'
+          title: Via
+          description: <location>.<field> to look this identifier up in. The location
+            must expose the root key. Omitted only for the root key itself.
+        unique:
+          type: boolean
+          title: Unique
+        pii:
+          type: boolean
+          title: Pii
+          default: false
+      additionalProperties: false
+      type: object
+      required:
+      - unique
+      title: Identifier
+      description: A value that finds a subject. An identifier that matches several
+        subjects is Ambiguous.
+    ImportSchema:
+      properties:
+        connector:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Connector
+        environment:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Environment
+      additionalProperties: false
+      type: object
+      required:
+      - connector
+      - environment
+      title: ImportSchema
+      description: Import one SQL connector's schema in one environment.
+    IndexSchema:
+      properties:
+        name:
+          type: string
+          title: Name
+        columns:
+          items:
+            type: string
+          type: array
+          minItems: 1
+          title: Columns
+        unique:
+          type: boolean
+          title: Unique
+      additionalProperties: false
+      type: object
+      required:
+      - name
+      - columns
+      - unique
+      title: IndexSchema
+      description: One index, its key columns in order.
+    InvestigationRecord:
+      properties:
+        reason:
+          $ref: '#/components/schemas/Reason'
+        reference:
+          anyOf:
+          - type: string
+            maxLength: 64
+            pattern: ^\S+$
+          - type: 'null'
+          title: Reference
+          description: Jira key, support case ID or change ID, such as WALLET-482.
+        notes:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Notes
+        customer_reference:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Customer Reference
+          description: Stored masked.
+        related_runs:
+          items:
+            type: string
+          type: array
+          title: Related Runs
+        conclusion:
+          anyOf:
+          - $ref: '#/components/schemas/Conclusion'
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - reason
+      title: InvestigationRecord
+      description: Why a person ran an investigation. Reference is mandatory in Production.
+    JsonValue: {}
+    KillScope:
+      type: string
+      enum:
+      - global
+      - application
+      - connector
+      title: KillScope
+      description: How much one kill switch stops.
+    KillSwitch:
+      properties:
+        scope:
+          $ref: '#/components/schemas/KillScope'
+        application:
+          anyOf:
+          - type: string
+            maxLength: 64
+            pattern: ^[a-z][a-z0-9_]*$
+          - type: 'null'
+          title: Application
+          description: For application and connector.
+        connector:
+          anyOf:
+          - type: string
+            maxLength: 64
+            pattern: ^[a-z][a-z0-9_]*$
+          - type: 'null'
+          title: Connector
+          description: For connector.
+        reason:
+          type: string
+          minLength: 1
+          title: Reason
+        reference:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Reference
+        actor:
+          $ref: '#/components/schemas/Actor'
+        engaged_at:
+          type: string
+          format: date-time
+          title: Engaged At
+      additionalProperties: false
+      type: object
+      required:
+      - scope
+      - reason
+      - actor
+      - engaged_at
+      title: KillSwitch
+      description: One kill switch that is on, and who turned it on and why.
+    LabelSuggestion:
+      properties:
+        label:
+          $ref: '#/components/schemas/TableLabel'
+        reasons:
+          items:
+            type: string
+          type: array
+          title: Reasons
+          description: Why this label, such as 'created_at and status'.
+        columns:
+          additionalProperties:
+            items:
+              $ref: '#/components/schemas/ColumnRole'
+            type: array
+          type: object
+          title: Columns
+          description: Suggested roles for the columns that have one.
+        links:
+          additionalProperties:
+            $ref: '#/components/schemas/LinkTarget'
+          type: object
+          title: Links
+          description: 'Where each column with a suggested link role points, as its
+            links_to: a column named for another imported table''s key, such as visitor_profile_id
+            for visitor_profile.id.'
+      additionalProperties: false
+      type: object
+      required:
+      - label
+      - reasons
+      title: LabelSuggestion
+      description: A label and column roles guessed from a table's name and shape.
+        A person confirms it.
+    LinkTarget:
+      properties:
+        connector:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Connector
+        table:
+          anyOf:
+          - type: string
+            maxLength: 128
+            pattern: ^[A-Za-z_][A-Za-z0-9_]*$
+          - type: 'null'
+          title: Table
+        column:
+          anyOf:
+          - type: string
+            maxLength: 128
+            pattern: ^[A-Za-z_][A-Za-z0-9_]*$
+          - type: 'null'
+          title: Column
+      additionalProperties: false
+      type: object
+      required:
+      - connector
+      title: LinkTarget
+      description: 'Where a link or external key column points: a table column, or
+        another system''s key.'
+    Location:
+      properties:
+        title:
+          type: string
+          title: Title
+          description: 'How the web app and the run header name it. Omitted: its name
+            with spaces for underscores, so visitor_cards is Visitor cards.'
+        using:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Using
+          description: The connector that does the lookup.
+        lookup:
+          type: string
+          minLength: 1
+          title: Lookup
+          description: A single SELECT with bound parameters, or GET <path>.
+        fallback:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Fallback
+          description: Tried when the lookup finds nothing.
+        cardinality:
+          $ref: '#/components/schemas/Cardinality'
+          default: one
+        exposes:
+          items:
+            type: string
+            maxLength: 128
+            pattern: ^[A-Za-z_][A-Za-z0-9_]*$
+          type: array
+          title: Exposes
+          description: Fields other locations and identifiers may use.
+        pii:
+          items:
+            type: string
+            maxLength: 128
+            pattern: ^[A-Za-z_][A-Za-z0-9_]*$
+          type: array
+          title: Pii
+          description: 'SQL locations: columns masked in every result and in evidence.'
+        mask:
+          items:
+            type: string
+            pattern: ^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$
+            description: 'A field, or a dotted path into nested fields: customer.email.'
+          type: array
+          title: Mask
+          description: 'REST locations: fields of the JSON response masked in every
+            result and in evidence, as dotted paths such as customer.email.'
+        within:
+          anyOf:
+          - type: string
+            pattern: ^[1-9][0-9]*(ms|s|m|h|d)$
+            description: A duration such as 2s, 2m, 1h or 7d.
+          - type: 'null'
+          title: Within
+          description: How long to report Waiting before Missing.
+        anchor_time:
+          anyOf:
+          - type: string
+            pattern: ^[a-z][a-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*$
+            description: A field of a location, written <location>.<field>.
+          - type: 'null'
+          title: Anchor Time
+          description: The record's own timestamp the window starts from.
+        compare:
+          items:
+            type: string
+            pattern: ^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$
+            description: 'A field, or a dotted path into nested fields: customer.email.'
+          type: array
+          title: Compare
+          description: 'REST locations: fields of the JSON response a healthy comparison
+            shows. SQL locations mark compare columns in the table catalog instead.'
+        expected_to_vary:
+          items:
+            type: string
+            pattern: ^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$
+            description: 'A field, or a dotted path into nested fields: customer.email.'
+          type: array
+          title: Expected To Vary
+          description: 'REST locations: compare fields that normally differ between
+            two healthy records. Shown in the differences, but never highlighted as
+            a likely cause.'
+        key_from:
+          anyOf:
+          - type: string
+            pattern: ^[a-z][a-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*$
+            description: A field of a location, written <location>.<field>.
+          - type: 'null'
+          title: Key From
+          description: '<location>.<field> that gives this location its key. Omitted:
+            the root key.'
+        max_rows:
+          anyOf:
+          - type: integer
+            exclusiveMinimum: 0.0
+          - type: 'null'
+          title: Max Rows
+          description: Row cap for a many location; results say if cut.
+        each:
+          patternProperties:
+            ^[a-z][a-z0-9_]*$:
+              $ref: '#/components/schemas/FanOutLocation'
+          propertyNames:
+            maxLength: 64
+          type: object
+          title: Each
+          description: Lookups repeated per row of a many location.
+      additionalProperties: false
+      type: object
+      required:
+      - using
+      - lookup
+      - title
+      title: Location
+      description: One place a subject's data lives, with its own key and lookup.
+    LocationResult:
+      properties:
+        location:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Location
+        title:
+          type: string
+          title: Title
+          description: 'The location''s title, set when the run is read: never stored.'
+        parent:
+          anyOf:
+          - type: string
+            maxLength: 64
+            pattern: ^[a-z][a-z0-9_]*$
+          - type: 'null'
+          title: Parent
+          description: The many location this fans out from.
+        row:
+          anyOf:
+          - type: integer
+            minimum: 0.0
+          - type: 'null'
+          title: Row
+          description: The parent row this lookup is for.
+        outcome:
+          $ref: '#/components/schemas/Outcome'
+        reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Reason
+          description: 'Why, when not Found: the error, or the missing link.'
+        caveat:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Caveat
+          description: 'Why this outcome may not be final. Set on a Missing record
+            read from a Production replica whose lag is unknown: the record may not
+            have arrived yet.'
+        evidence:
+          anyOf:
+          - $ref: '#/components/schemas/Evidence'
+          - type: 'null'
+          description: Absent when no lookup ran (Blocked, Not configured).
+      additionalProperties: false
+      type: object
+      required:
+      - location
+      - outcome
+      - title
+      title: LocationResult
+      description: The outcome of one location, or of one fan-out lookup for one row.
+    ManualStepView:
+      properties:
+        kind:
+          type: string
+          const: manual
+          title: Kind
+        id:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9-]*$
+          title: Id
+          description: Short and unique in its runbook. Results, ticks and the audit
+            key on it.
+        title:
+          type: string
+          minLength: 1
+          title: Title
+        text:
+          type: string
+          minLength: 1
+          title: Text
+        runnable:
+          type: boolean
+          const: false
+          title: Runnable
+      additionalProperties: false
+      type: object
+      required:
+      - kind
+      - id
+      - title
+      - text
+      - runnable
+      title: ManualStepView
+      description: A manual step. Nothing to run.
+    Match:
+      properties:
+        subject:
+          type: string
+          title: Subject
+          description: The subject's root key value.
+        fields:
+          additionalProperties:
+            $ref: '#/components/schemas/JsonValue'
+          type: object
+          title: Fields
+          description: The via location's record for this subject.
+      additionalProperties: false
+      type: object
+      required:
+      - subject
+      title: Match
+      description: One subject an identifier found, with the record it was found in.
+        Values are masked.
+    Outcome:
+      type: string
+      enum:
+      - found
+      - missing
+      - waiting
+      - blocked
+      - ambiguous
+      - error
+      - stale
+      - not_configured
+      title: Outcome
+      description: What one location returned.
+    PickMatches:
+      properties:
+        subjects:
+          items:
+            type: string
+          type: array
+          maxItems: 5
+          minItems: 1
+          title: Subjects
+          description: Root key values from the run's matches; up to 5 run together.
+      additionalProperties: false
+      type: object
+      required:
+      - subjects
+      title: PickMatches
+      description: Subjects picked from an Ambiguous run's matches, to run its probe
+        for.
+    PlanAccess:
+      type: string
+      enum:
+      - readable
+      - denied
+      - not_checked
+      title: PlanAccess
+      description: Whether a SQL binding's login can read plans, which the plan save
+        checks need.
+    PluginManifest:
+      properties:
+        name:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Name
+        version:
+          type: string
+          minLength: 1
+          title: Version
+        kind:
+          type: string
+          enum:
+          - tool
+          - integration
+          title: Kind
+        author:
+          type: string
+          minLength: 1
+          title: Author
+        description:
+          type: string
+          minLength: 1
+          title: Description
+          description: One line.
+        capabilities:
+          items:
+            $ref: '#/components/schemas/Capability'
+          type: array
+          title: Capabilities
+      additionalProperties: false
+      type: object
+      required:
+      - name
+      - version
+      - kind
+      - author
+      - description
+      title: PluginManifest
+      description: 'A plugin''s plugin.yaml: who it is, and what it needs.'
+    ProbeChange:
+      properties:
+        path:
+          type: string
+          title: Path
+          description: Relative to the folder owl serve loaded.
+        diff:
+          type: string
+          title: Diff
+          description: Unified diff of the change.
+        base:
+          type: string
+          title: Base
+          description: sha256 of the file before the change, or 'absent'.
+        after:
+          type: string
+          title: After
+          description: sha256 of the file after the change.
+        written:
+          type: boolean
+          title: Written
+        report:
+          $ref: '#/components/schemas/SaveCheckReport'
+        entity_change:
+          anyOf:
+          - $ref: '#/components/schemas/CatalogChange'
+          - type: 'null'
+          description: The entity's change, when an entity was sent.
+      additionalProperties: false
+      type: object
+      required:
+      - path
+      - diff
+      - base
+      - after
+      - written
+      - report
+      title: ProbeChange
+      description: 'A probe''s change to its YAML file, and the save checks it passed.
+
+
+        With an entity, `base` covers both files and both changes, and is what to
+        confirm with.'
+    ProbeKind:
+      type: string
+      enum:
+      - inspect
+      - validate
+      - health
+      title: ProbeKind
+      description: Inspect checks current state; validate checks one flow. Health
+        is phase 2.
+    ProbeStepView:
+      properties:
+        kind:
+          type: string
+          const: probe
+          title: Kind
+        id:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9-]*$
+          title: Id
+          description: Short and unique in its runbook. Results, ticks and the audit
+            key on it.
+        title:
+          type: string
+          minLength: 1
+          title: Title
+        probe:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Probe
+        runnable:
+          type: boolean
+          title: Runnable
+          description: Set by the server.
+      additionalProperties: false
+      type: object
+      required:
+      - kind
+      - id
+      - title
+      - probe
+      - runnable
+      title: ProbeStepView
+      description: A probe step; runnable when the probe exists in this application.
+    ProbeSummary:
+      properties:
+        name:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Name
+        title:
+          type: string
+          title: Title
+          description: 'As in the probe''s file; omitted there: its name, spaced.'
+        kind:
+          $ref: '#/components/schemas/ProbeKind'
+        entity:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Entity
+        owner:
+          type: string
+          title: Owner
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+      additionalProperties: false
+      type: object
+      required:
+      - name
+      - title
+      - kind
+      - entity
+      - owner
+      title: ProbeSummary
+      description: A probe as listed for an entity.
+    Problem:
+      properties:
+        type:
+          type: string
+          title: Type
+          description: A URI that identifies the problem type.
+          default: about:blank
+        title:
+          type: string
+          title: Title
+        status:
+          type: integer
+          maximum: 599.0
+          minimum: 400.0
+          title: Status
+        detail:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Detail
+          description: What happened, for a person to act on.
+        instance:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Instance
+          description: The request path.
+        errors:
+          anyOf:
+          - items:
+              $ref: '#/components/schemas/FieldError'
+            type: array
+          - type: 'null'
+          title: Errors
+          description: 'For a 422: each field that was not accepted, and why.'
+      additionalProperties: false
+      type: object
+      required:
+      - title
+      - status
+      title: Problem
+      description: An error, as RFC 9457 problem details. Never contains a stack trace.
+    Range:
+      properties:
+        start:
+          type: integer
+          title: Start
+        end:
+          type: integer
+          title: End
+      type: object
+      required:
+      - start
+      - end
+      title: Range
+      description: Where text sits in the supplied file, in the units a browser's
+        strings count.
+    ReadQueryStepView:
+      properties:
+        kind:
+          type: string
+          const: read_query
+          title: Kind
+        id:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9-]*$
+          title: Id
+          description: Short and unique in its runbook. Results, ticks and the audit
+            key on it.
+        title:
+          type: string
+          minLength: 1
+          title: Title
+        using:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Using
+        sql:
+          type: string
+          minLength: 1
+          title: Sql
+        reviewed:
+          anyOf:
+          - $ref: '#/components/schemas/Review'
+          - type: 'null'
+          description: Set in the reviewed PR. Without it the step is copy only.
+        runnable:
+          type: boolean
+          title: Runnable
+          description: Set by the server.
+        why_copy_only:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Why Copy Only
+          description: 'Why it is a reference query: not reviewed, or fails a check.'
+      additionalProperties: false
+      type: object
+      required:
+      - kind
+      - id
+      - title
+      - using
+      - sql
+      - runnable
+      title: ReadQueryStepView
+      description: A read query step; runnable once reviewed and passing save checks.
+    Reason:
+      type: string
+      enum:
+      - incident
+      - customer_complaint
+      - deploy_verification
+      - audit_or_compliance
+      - proactive_check
+      title: Reason
+      description: Why an investigation was run.
+    Review:
+      properties:
+        by:
+          type: string
+          minLength: 1
+          title: By
+        date:
+          type: string
+          format: date
+          title: Date
+          description: The 90-day review flag counts from this date.
+        sql_sha256:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+          title: Sql Sha256
+          description: The reviewed SQL's hash. If the SQL changes, the step goes
+            back to copy only.
+      additionalProperties: false
+      type: object
+      required:
+      - by
+      - date
+      - sql_sha256
+      title: Review
+      description: Who reviewed a read query, when, and exactly what they read.
+    Run:
+      properties:
+        id:
+          type: string
+          title: Id
+        application:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Application
+        environment:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Environment
+        probe:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Probe
+        probe_title:
+          type: string
+          title: Probe Title
+          description: 'The probe''s title, set when the run is read: never stored.'
+        kind:
+          $ref: '#/components/schemas/ProbeKind'
+        probe_version:
+          type: string
+          title: Probe Version
+        entity:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Entity
+        identifier:
+          type: string
+          maxLength: 128
+          pattern: ^[A-Za-z_][A-Za-z0-9_]*$
+          title: Identifier
+          description: The identifier the run was started from.
+        identifier_value:
+          type: string
+          title: Identifier Value
+          description: As entered; masked when the identifier is PII.
+        subject:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Subject
+          description: The root key value, once resolved. None when Ambiguous.
+        via:
+          anyOf:
+          - type: string
+            pattern: ^[a-z][a-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*$
+            description: A field of a location, written <location>.<field>.
+          - type: 'null'
+          title: Via
+          description: <location>.<field> the identifier was looked up in. None for
+            the root key.
+        resolution:
+          anyOf:
+          - $ref: '#/components/schemas/LocationResult'
+          - type: 'null'
+          description: 'The lookup that found the subject from the identifier, with
+            its evidence: Found, Missing, Ambiguous or Error. None for the root key.'
+        matches:
+          items:
+            $ref: '#/components/schemas/Match'
+          type: array
+          title: Matches
+          description: The subjects the identifier found. Several make the run Ambiguous.
+        from_run:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: From Run
+          description: The Ambiguous run this run's subject was picked from.
+        healthy_for:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Healthy For
+          description: The run this one is a known-good candidate to compare with.
+        healthy_attempt:
+          anyOf:
+          - $ref: '#/components/schemas/HealthyAttempt'
+          - type: 'null'
+          description: The latest attempt to compare this run with a healthy one.
+        status:
+          $ref: '#/components/schemas/RunStatus'
+        skip_reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Skip Reason
+        stop_reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Stop Reason
+          description: 'Why a failed run stopped before it finished: ''run time limit
+            reached'', or ''interrupted'' when owl serve stopped while it ran.'
+        actor:
+          $ref: '#/components/schemas/Actor'
+        investigation:
+          anyOf:
+          - $ref: '#/components/schemas/InvestigationRecord'
+          - type: 'null'
+        started_at:
+          type: string
+          format: date-time
+          title: Started At
+        finished_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Finished At
+        locations:
+          items:
+            $ref: '#/components/schemas/LocationResult'
+          type: array
+          title: Locations
+          description: Filled in as each location's outcome arrives.
+        expectations:
+          items:
+            $ref: '#/components/schemas/ExpectationEvaluation'
+          type: array
+          title: Expectations
+        warnings:
+          items:
+            type: string
+          type: array
+          title: Warnings
+          description: 'What limits how far this run''s results can be trusted, without
+            failing it: a Production replica whose lag is unknown.'
+        caveat:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Caveat
+          description: Why the status may not be final, counting the Missing records
+            that carry a caveat. The status itself is unchanged.
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - application
+      - environment
+      - probe
+      - kind
+      - probe_version
+      - entity
+      - identifier
+      - identifier_value
+      - status
+      - actor
+      - started_at
+      - probe_title
+      title: Run
+      description: One execution of a probe, with every lookup, result and timing.
+        Read while running too.
+    RunList:
+      properties:
+        runs:
+          items:
+            $ref: '#/components/schemas/RunSummary'
+          type: array
+          title: Runs
+        next:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Next
+          description: 'Pass as before to list the next, older page. Null: no more.'
+      additionalProperties: false
+      type: object
+      required:
+      - runs
+      title: RunList
+      description: A page of runs, newest first.
+    RunRunbookStep:
+      properties:
+        run_without_plan_check:
+          type: boolean
+          title: Run Without Plan Check
+          description: In Production, the person's acknowledgement that the step's
+            plan could not be read. Recorded in the audit with the actor.
+          default: false
+      additionalProperties: false
+      type: object
+      title: RunRunbookStep
+      description: 'Run a step, named in the path. It carries no SQL and no values:
+        the server has both.'
+    RunStarted:
+      properties:
+        id:
+          type: string
+          title: Id
+        status:
+          type: string
+          const: running
+          title: Status
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - status
+      title: RunStarted
+      description: A run that has started. Poll GET /api/runs/{id} until it is no
+        longer running.
+    RunStatus:
+      type: string
+      enum:
+      - running
+      - passed
+      - failed
+      - skipped
+      - ambiguous
+      title: RunStatus
+      description: 'Where a run is.
+
+
+        Skipped: a guard or circuit breaker stopped it before any lookup. Ambiguous:
+        the
+
+        identifier matched several subjects, so nothing else ran; see the run''s matches.'
+    RunSummary:
+      properties:
+        id:
+          type: string
+          title: Id
+        application:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Application
+        environment:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Environment
+        probe:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Probe
+        probe_title:
+          type: string
+          title: Probe Title
+          description: 'The probe''s title, set when the list is read: never stored.'
+        kind:
+          $ref: '#/components/schemas/ProbeKind'
+        draft:
+          type: boolean
+          title: Draft
+          description: A test run of a draft from the Probe editor.
+        identifier:
+          type: string
+          maxLength: 128
+          pattern: ^[A-Za-z_][A-Za-z0-9_]*$
+          title: Identifier
+        identifier_value:
+          type: string
+          title: Identifier Value
+          description: As entered; masked when the identifier is PII.
+        subject:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Subject
+          description: The root key value, once resolved.
+        status:
+          $ref: '#/components/schemas/RunStatus'
+        stop_reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Stop Reason
+          description: 'Why it stopped early: a kill switch or the time limit.'
+        skip_reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Skip Reason
+        caveat:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Caveat
+          description: Why the status may not be final.
+        actor:
+          type: string
+          title: Actor
+          description: Who started it.
+        reason:
+          anyOf:
+          - $ref: '#/components/schemas/Reason'
+          - type: 'null'
+        reference:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Reference
+        started_at:
+          type: string
+          format: date-time
+          title: Started At
+        finished_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Finished At
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - application
+      - environment
+      - probe
+      - kind
+      - draft
+      - identifier
+      - identifier_value
+      - status
+      - actor
+      - started_at
+      - probe_title
+      title: RunSummary
+      description: 'One run as the Runs list shows it: no locations, expectations
+        or evidence.'
+    RunbookView:
+      properties:
+        runbook:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Runbook
+        title:
+          type: string
+          minLength: 1
+          title: Title
+        application:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Application
+        applies_to:
+          $ref: '#/components/schemas/AppliesTo'
+        owner:
+          type: string
+          minLength: 1
+          title: Owner
+        last_verified:
+          type: string
+          format: date
+          title: Last Verified
+        steps:
+          items:
+            oneOf:
+            - $ref: '#/components/schemas/ReadQueryStepView'
+            - $ref: '#/components/schemas/WriteQueryStepView'
+            - $ref: '#/components/schemas/ExternalQueryStepView'
+            - $ref: '#/components/schemas/ManualStepView'
+            - $ref: '#/components/schemas/ProbeStepView'
+            discriminator:
+              propertyName: kind
+              mapping:
+                external_query: '#/components/schemas/ExternalQueryStepView'
+                manual: '#/components/schemas/ManualStepView'
+                probe: '#/components/schemas/ProbeStepView'
+                read_query: '#/components/schemas/ReadQueryStepView'
+                write_query: '#/components/schemas/WriteQueryStepView'
+          type: array
+          title: Steps
+        review_due:
+          type: boolean
+          title: Review Due
+          description: 'A reviewed step''s review is over 90 days old. With no reviewed
+            step: its last-verified date is.'
+          default: false
+        tables:
+          items:
+            type: string
+          type: array
+          title: Tables
+          description: connector.table it uses.
+        drifted_tables:
+          items:
+            type: string
+          type: array
+          title: Drifted Tables
+          description: The tables it uses that have drifted from the catalog.
+      additionalProperties: false
+      type: object
+      required:
+      - runbook
+      - title
+      - application
+      - applies_to
+      - owner
+      - last_verified
+      - steps
+      title: RunbookView
+      description: A runbook as the API returns it, each step marked runnable or not.
+    RunsStarted:
+      properties:
+        runs:
+          items:
+            $ref: '#/components/schemas/RunStarted'
+          type: array
+          title: Runs
+      additionalProperties: false
+      type: object
+      required:
+      - runs
+      title: RunsStarted
+      description: Runs that have started, one per picked subject, in the order picked.
+    SaveCheck:
+      properties:
+        check:
+          type: string
+          title: Check
+          description: What was checked, such as 'Read-only SQL'.
+        status:
+          $ref: '#/components/schemas/CheckStatus'
+        message:
+          type: string
+          title: Message
+          description: What was found, or what to change.
+        location:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Location
+          description: The location or identifier it is about, if one.
+        environment:
+          anyOf:
+          - type: string
+            maxLength: 64
+            pattern: ^[a-z][a-z0-9_]*$
+          - type: 'null'
+          title: Environment
+          description: The environment a plan was read in, for plan checks.
+        plan_not_run:
+          type: boolean
+          title: Plan Not Run
+          description: A plan check that could not run, so index use is unknown. It
+            warns.
+          default: false
+      additionalProperties: false
+      type: object
+      required:
+      - check
+      - status
+      - message
+      title: SaveCheck
+      description: One check, such as Read-only SQL or the plan of one lookup.
+    SaveCheckReport:
+      properties:
+        probe:
+          anyOf:
+          - type: string
+            maxLength: 64
+            pattern: ^[a-z][a-z0-9_]*$
+          - type: 'null'
+          title: Probe
+          description: The draft's probe name, if it could be read.
+        entity:
+          anyOf:
+          - type: string
+            maxLength: 64
+            pattern: ^[a-z][a-z0-9_]*$
+          - type: 'null'
+          title: Entity
+        checks:
+          items:
+            $ref: '#/components/schemas/SaveCheck'
+          type: array
+          title: Checks
+        passed:
+          type: integer
+          title: Passed
+        warnings:
+          type: integer
+          title: Warnings
+        failed:
+          type: integer
+          title: Failed
+        can_save:
+          type: boolean
+          title: Can Save
+        plans_not_run:
+          type: integer
+          title: Plans Not Run
+          description: Plan checks that could not run. In Production, saving then
+            needs save_without_plan_check.
+          default: 0
+      additionalProperties: false
+      type: object
+      required:
+      - probe
+      - checks
+      - passed
+      - warnings
+      - failed
+      - can_save
+      title: SaveCheckReport
+      description: Every save check of one draft probe. It can be saved when none
+        failed.
+    SaveEntity:
+      properties:
+        entity:
+          type: string
+          minLength: 1
+          title: Entity
+          description: The entity's YAML.
+        environment:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Environment
+          description: Where plans are read for the index checks.
+        base:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Base
+          description: 'The base of the preview being confirmed. Omitted: nothing
+            is written and the change is returned. Given: written only if the file
+            and the change are still as they were then.'
+        save_without_plan_check:
+          type: boolean
+          title: Save Without Plan Check
+          description: In Production, the person's acknowledgement that plan checks
+            could not run. Recorded in the audit with the actor.
+          default: false
+      additionalProperties: false
+      type: object
+      required:
+      - entity
+      - environment
+      title: SaveEntity
+      description: 'A new entity to save on its own. Without base: preview it. With
+        it: write it.'
+    SaveProbe:
+      properties:
+        probe:
+          type: string
+          minLength: 1
+          title: Probe
+          description: The probe's YAML, as in the editor.
+        entity:
+          anyOf:
+          - type: string
+            minLength: 1
+          - type: 'null'
+          title: Entity
+          description: The entity's YAML, when it was edited with the probe. Both
+            or neither are written.
+        environment:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Environment
+          description: Where plans are read for the index checks.
+        base:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Base
+          description: 'The base of the preview being confirmed. Omitted: nothing
+            is written and the change is returned. Given: written only if the files
+            and the change are still as they were then.'
+        save_without_plan_check:
+          type: boolean
+          title: Save Without Plan Check
+          description: In Production, the person's acknowledgement that plan checks
+            could not run. Recorded in the audit with the actor.
+          default: false
+      additionalProperties: false
+      type: object
+      required:
+      - probe
+      - environment
+      title: SaveProbe
+      description: 'A probe to save. Without base: preview it. With it: write it.'
+    SchemaSnapshot:
+      properties:
+        application:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Application
+        connector:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Connector
+        environment:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Environment
+        imported_at:
+          type: string
+          format: date-time
+          title: Imported At
+        tables:
+          items:
+            $ref: '#/components/schemas/TableSchema'
+          type: array
+          title: Tables
+        truncated:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Truncated
+          description: 'Set when tables were left out: imported 1000 of 1,240 tables.'
+      additionalProperties: false
+      type: object
+      required:
+      - application
+      - connector
+      - environment
+      - imported_at
+      - tables
+      title: SchemaSnapshot
+      description: The schema of one connector's database in one environment, as imported.
+    SetKillSwitch:
+      properties:
+        scope:
+          $ref: '#/components/schemas/KillScope'
+        application:
+          anyOf:
+          - type: string
+            maxLength: 64
+            pattern: ^[a-z][a-z0-9_]*$
+          - type: 'null'
+          title: Application
+          description: For application and connector.
+        connector:
+          anyOf:
+          - type: string
+            maxLength: 64
+            pattern: ^[a-z][a-z0-9_]*$
+          - type: 'null'
+          title: Connector
+          description: For connector.
+        reason:
+          type: string
+          minLength: 1
+          title: Reason
+          description: Why. Recorded in the audit.
+        reference:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+          title: Reference
+          description: Jira key, support case or change ID.
+      additionalProperties: false
+      type: object
+      required:
+      - scope
+      - reason
+      title: SetKillSwitch
+      description: 'Turn one kill switch on or off, and say why: both are audited
+        with the actor.'
+    StartHealthyComparison:
+      properties:
+        narrow:
+          anyOf:
+          - type: string
+            maxLength: 64
+            pattern: ^[a-z][a-z0-9_]*$
+          - type: 'null'
+          title: Narrow
+          description: A closer match from the entity's list.
+        subject:
+          anyOf:
+          - type: string
+            minLength: 1
+          - type: 'null'
+          title: Subject
+          description: A known-good ID a person pasted.
+      additionalProperties: false
+      type: object
+      title: StartHealthyComparison
+      description: 'How to find the known-good subject. Neither field: the newest
+        that passes.'
+    StartRun:
+      properties:
+        application:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Application
+        environment:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Environment
+        probe:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Probe
+        value:
+          type: string
+          minLength: 1
+          title: Value
+          description: The ID entered, such as tp_91f2c7.
+        identifier:
+          anyOf:
+          - type: string
+            maxLength: 128
+            pattern: ^[A-Za-z_][A-Za-z0-9_]*$
+          - type: 'null'
+          title: Identifier
+          description: 'Which identifier the value is. Omitted: detected from patterns.'
+        investigation:
+          $ref: '#/components/schemas/InvestigationRecord'
+          description: Reason always; reference too when the environment is Production.
+      additionalProperties: false
+      type: object
+      required:
+      - application
+      - environment
+      - probe
+      - value
+      - investigation
+      title: StartRun
+      description: Start an inspect or validate run. The probe decides which.
+    StepInRun:
+      properties:
+        id:
+          type: string
+          title: Id
+        filled:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Filled
+          description: Its SQL or query with this run's values. Null if it has none.
+        unfilled:
+          items:
+            $ref: '#/components/schemas/UnfilledParameter'
+          type: array
+          title: Unfilled
+        done:
+          type: boolean
+          title: Done
+          description: A manual step's tick, saved with the run.
+          default: false
+        result:
+          anyOf:
+          - $ref: '#/components/schemas/StepResult'
+          - type: 'null'
+          description: The latest run of a read query.
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      title: StepInRun
+      description: One step of a runbook, as it stands in one run.
+    StepRan:
+      properties:
+        id:
+          type: string
+          title: Id
+        result:
+          anyOf:
+          - $ref: '#/components/schemas/StepResult'
+          - type: 'null'
+        run:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Run
+          description: The run a probe step started.
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      title: StepRan
+      description: 'A step that ran: a read query''s result, or the run a probe step
+        started.'
+    StepResult:
+      properties:
+        outcome:
+          $ref: '#/components/schemas/Outcome'
+        reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Reason
+          description: Why, when the lookup failed.
+        evidence:
+          anyOf:
+          - $ref: '#/components/schemas/Evidence'
+          - type: 'null'
+        warnings:
+          items:
+            type: string
+          type: array
+          title: Warnings
+        actor:
+          type: string
+          title: Actor
+        at:
+          type: string
+          format: date-time
+          title: At
+      additionalProperties: false
+      type: object
+      required:
+      - outcome
+      - actor
+      - at
+      title: StepResult
+      description: What running a read query found. Values are masked, and it is linked
+        to its run.
+    SuggestedRunbook:
+      properties:
+        runbook:
+          $ref: '#/components/schemas/RunbookView'
+        matched:
+          items:
+            type: string
+          type: array
+          title: Matched
+          description: The <location>.<outcome> it matched in this run.
+      additionalProperties: false
+      type: object
+      required:
+      - runbook
+      - matched
+      title: SuggestedRunbook
+      description: A runbook whose applies_to matches a run's outcomes.
+    SuppliedFile:
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          minLength: 1
+          title: Name
+        text:
+          type: string
+          title: Text
+      type: object
+      required:
+      - name
+      - text
+      title: SuppliedFile
+      description: A file or text the person supplied.
+    TableLabel:
+      type: string
+      enum:
+      - transaction
+      - master
+      - audit
+      - log
+      - reference
+      - external_mapping
+      - outbox
+      title: TableLabel
+      description: What kind of table it is. Each label sets defaults for guards,
+        masking and templates.
+    TableReview:
+      properties:
+        connector:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Connector
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Schema
+        table:
+          type: string
+          title: Table
+        label:
+          anyOf:
+          - $ref: '#/components/schemas/TableLabel'
+          - type: 'null'
+          description: The confirmed label in catalog.yaml; null when the table is
+            not in it.
+        suggestion:
+          anyOf:
+          - $ref: '#/components/schemas/LabelSuggestion'
+          - type: 'null'
+          description: Guessed from the first environment it was imported in; null
+            if never.
+        imported_in:
+          items:
+            type: string
+            maxLength: 64
+            pattern: ^[a-z][a-z0-9_]*$
+          type: array
+          title: Imported In
+          description: Environments with an import of this table.
+        drift:
+          items:
+            $ref: '#/components/schemas/Drift'
+          type: array
+          title: Drift
+        used_by:
+          items:
+            type: string
+            maxLength: 64
+            pattern: ^[a-z][a-z0-9_]*$
+          type: array
+          title: Used By
+          description: Probes that read this table.
+      additionalProperties: false
+      type: object
+      required:
+      - connector
+      - table
+      - label
+      - suggestion
+      - imported_in
+      title: TableReview
+      description: 'One table: what the catalog says, what the imports show, and which
+        probes read it.'
+    TableSchema:
+      properties:
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Schema
+          description: 'SQL Server and Oracle: the schema or owner. MariaDB: none
+            (the database).'
+        table:
+          type: string
+          title: Table
+        columns:
+          items:
+            $ref: '#/components/schemas/ColumnSchema'
+          type: array
+          title: Columns
+        primary_key:
+          items:
+            type: string
+          type: array
+          title: Primary Key
+        indexes:
+          items:
+            $ref: '#/components/schemas/IndexSchema'
+          type: array
+          title: Indexes
+        approx_rows:
+          anyOf:
+          - type: integer
+            minimum: 0.0
+          - type: 'null'
+          title: Approx Rows
+          description: The database's own estimate, not a count.
+      additionalProperties: false
+      type: object
+      required:
+      - table
+      - columns
+      title: TableSchema
+      description: 'One table: its columns, primary key, indexes and an estimate of
+        its rows.'
+    TickRunbookStep:
+      properties:
+        done:
+          type: boolean
+          title: Done
+      additionalProperties: false
+      type: object
+      required:
+      - done
+      title: TickRunbookStep
+      description: A manual step's tick.
+    UnfilledParameter:
+      properties:
+        parameter:
+          type: string
+          title: Parameter
+        why:
+          type: string
+          title: Why
+      additionalProperties: false
+      type: object
+      required:
+      - parameter
+      - why
+      title: UnfilledParameter
+      description: A parameter left as :name, and why. A masked value is never filled
+        in.
+    ValueKind:
+      type: string
+      enum:
+      - datetime
+      - date
+      - time
+      - integer
+      - decimal
+      - float
+      - boolean
+      - text
+      title: ValueKind
+      description: What type a value was when it was read, since evidence keeps dates
+        and decimals as text.
+    WriteQueryStepView:
+      properties:
+        kind:
+          type: string
+          const: write_query
+          title: Kind
+        id:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9-]*$
+          title: Id
+          description: Short and unique in its runbook. Results, ticks and the audit
+            key on it.
+        title:
+          type: string
+          minLength: 1
+          title: Title
+        using:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Using
+        sql:
+          type: string
+          minLength: 1
+          title: Sql
+        requires:
+          type: string
+          minLength: 1
+          title: Requires
+          description: The approval needed, such as change approval.
+        runnable:
+          type: boolean
+          const: false
+          title: Runnable
+          description: Write queries are never run by ProbeOwl.
+        relabelled:
+          type: boolean
+          title: Relabelled
+          description: Its author called it a read query; the server overruled that.
+          default: false
+      additionalProperties: false
+      type: object
+      required:
+      - kind
+      - id
+      - title
+      - using
+      - sql
+      - requires
+      - runnable
+      title: WriteQueryStepView
+      description: A write query step. Never runnable.
+    YamlFile:
+      properties:
+        path:
+          type: string
+          title: Path
+          description: Relative to the folder owl serve loaded.
+        text:
+          type: string
+          title: Text
+          description: The file's whole text, unchanged.
+      additionalProperties: false
+      type: object
+      required:
+      - path
+      - text
+      title: YamlFile
+      description: A probe's or an entity's file as it is on disk, comments included,
+        for the editor.
+  securitySchemes:
+    ProbeOwlRequest:
+      type: apiKey
+      in: header
+      name: X-ProbeOwl-Request
+      description: 'Send `X-ProbeOwl-Request: 1` on every request that is not a GET.
+        owl serve also refuses a Host other than 127.0.0.1 or localhost on its port,
+        and an Origin other than its web app''s. It sends no CORS headers.'

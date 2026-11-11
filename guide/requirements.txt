@@ -1,0 +1,4 @@
+# Author: @SaadZarook
+# What builds the guide: uvx --with-requirements requirements.txt --from mkdocs mkdocs build --strict
+mkdocs==1.6.1
+mkdocs-material==9.8.1

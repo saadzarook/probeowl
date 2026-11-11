@@ -1,0 +1,244 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Catalog",
+  "$defs": {
+    "CatalogTable": {
+      "additionalProperties": false,
+      "description": "One table in the catalog, with its label, owner and marked columns.",
+      "properties": {
+        "connector": {
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Connector",
+          "type": "string"
+        },
+        "table": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "title": "Table",
+          "type": "string"
+        },
+        "label": {
+          "$ref": "#/$defs/TableLabel"
+        },
+        "owner": {
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "columns": {
+          "description": "Marked columns only; unmarked columns are not listed.",
+          "patternProperties": {
+            "^[A-Za-z_][A-Za-z0-9_]*$": {
+              "$ref": "#/$defs/Column"
+            }
+          },
+          "propertyNames": {
+            "maxLength": 128
+          },
+          "title": "Columns",
+          "type": "object"
+        },
+        "retention": {
+          "anyOf": [
+            {
+              "description": "A duration such as 2s, 2m, 1h or 7d.",
+              "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "How long rows are kept.",
+          "title": "Retention"
+        },
+        "approx_rows": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Approx Rows"
+        }
+      },
+      "required": [
+        "connector",
+        "table",
+        "label",
+        "owner",
+        "columns"
+      ],
+      "title": "CatalogTable",
+      "type": "object"
+    },
+    "Column": {
+      "additionalProperties": false,
+      "description": "One marked column and its roles.",
+      "properties": {
+        "roles": {
+          "items": {
+            "$ref": "#/$defs/ColumnRole"
+          },
+          "minItems": 1,
+          "title": "Roles",
+          "type": "array"
+        },
+        "indexed": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "For time columns: is it indexed?",
+          "title": "Indexed"
+        },
+        "values": {
+          "description": "For status columns: the values it can hold.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Values",
+          "type": "array"
+        },
+        "links_to": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LinkTarget"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "For link and external key columns."
+        }
+      },
+      "required": [
+        "roles"
+      ],
+      "title": "Column",
+      "type": "object"
+    },
+    "ColumnRole": {
+      "description": "A marked column.",
+      "enum": [
+        "primary_key",
+        "time",
+        "status",
+        "link",
+        "external_key",
+        "pii",
+        "compare",
+        "expected_to_vary"
+      ],
+      "title": "ColumnRole",
+      "type": "string"
+    },
+    "LinkTarget": {
+      "additionalProperties": false,
+      "description": "Where a link or external key column points: a table column, or another system's key.",
+      "properties": {
+        "connector": {
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Connector",
+          "type": "string"
+        },
+        "table": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Table"
+        },
+        "column": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Column"
+        }
+      },
+      "required": [
+        "connector"
+      ],
+      "title": "LinkTarget",
+      "type": "object"
+    },
+    "TableLabel": {
+      "description": "What kind of table it is. Each label sets defaults for guards, masking and templates.",
+      "enum": [
+        "transaction",
+        "master",
+        "audit",
+        "log",
+        "reference",
+        "external_mapping",
+        "outbox"
+      ],
+      "title": "TableLabel",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "An application's table catalog.",
+  "properties": {
+    "catalog": {
+      "description": "The application this catalog belongs to.",
+      "maxLength": 64,
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "title": "Catalog",
+      "type": "string"
+    },
+    "tables": {
+      "items": {
+        "$ref": "#/$defs/CatalogTable"
+      },
+      "minItems": 1,
+      "title": "Tables",
+      "type": "array"
+    }
+  },
+  "required": [
+    "catalog",
+    "tables"
+  ],
+  "type": "object"
+}

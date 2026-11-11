@@ -1,0 +1,9 @@
+# Author: @SaadZarook
+# The payment provider's API; locally the fake-payments app in dev/.
+# The prod binding is that local app, labelled Production for testing.
+connector: checkout_api
+type: rest
+owner: payments-team
+environments:
+  prod: { base_url: "http://127.0.0.1:8081" }
+  uat: { base_url: "http://127.0.0.1:8081" }

@@ -1,0 +1,524 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Entity",
+  "$defs": {
+    "Cardinality": {
+      "description": "How many records a location should return.",
+      "enum": [
+        "one",
+        "optional",
+        "many"
+      ],
+      "title": "Cardinality",
+      "type": "string"
+    },
+    "FanOutLocation": {
+      "additionalProperties": false,
+      "description": "A lookup repeated for each row of a many location. Its lookup uses that row's fields.",
+      "properties": {
+        "title": {
+          "default": "",
+          "description": "How the web app and the run header name it. Omitted: its name with spaces for underscores, so visitor_cards is Visitor cards.",
+          "title": "Title",
+          "type": "string"
+        },
+        "using": {
+          "description": "The connector that does the lookup.",
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Using",
+          "type": "string"
+        },
+        "lookup": {
+          "description": "A single SELECT with bound parameters, or GET <path>.",
+          "minLength": 1,
+          "title": "Lookup",
+          "type": "string"
+        },
+        "fallback": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Tried when the lookup finds nothing.",
+          "title": "Fallback"
+        },
+        "cardinality": {
+          "$ref": "#/$defs/Cardinality",
+          "default": "one"
+        },
+        "exposes": {
+          "description": "Fields other locations and identifiers may use.",
+          "items": {
+            "maxLength": 128,
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+            "type": "string"
+          },
+          "title": "Exposes",
+          "type": "array"
+        },
+        "pii": {
+          "description": "SQL locations: columns masked in every result and in evidence.",
+          "items": {
+            "maxLength": 128,
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+            "type": "string"
+          },
+          "title": "Pii",
+          "type": "array"
+        },
+        "mask": {
+          "description": "REST locations: fields of the JSON response masked in every result and in evidence, as dotted paths such as customer.email.",
+          "items": {
+            "description": "A field, or a dotted path into nested fields: customer.email.",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",
+            "type": "string"
+          },
+          "title": "Mask",
+          "type": "array"
+        },
+        "within": {
+          "anyOf": [
+            {
+              "description": "A duration such as 2s, 2m, 1h or 7d.",
+              "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "How long to report Waiting before Missing.",
+          "title": "Within"
+        },
+        "anchor_time": {
+          "anyOf": [
+            {
+              "description": "A field of a location, written <location>.<field>.",
+              "pattern": "^[a-z][a-z0-9_]*\\.[A-Za-z_][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The record's own timestamp the window starts from.",
+          "title": "Anchor Time"
+        },
+        "compare": {
+          "description": "REST locations: fields of the JSON response a healthy comparison shows. SQL locations mark compare columns in the table catalog instead.",
+          "items": {
+            "description": "A field, or a dotted path into nested fields: customer.email.",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",
+            "type": "string"
+          },
+          "title": "Compare",
+          "type": "array"
+        },
+        "expected_to_vary": {
+          "description": "REST locations: compare fields that normally differ between two healthy records. Shown in the differences, but never highlighted as a likely cause.",
+          "items": {
+            "description": "A field, or a dotted path into nested fields: customer.email.",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",
+            "type": "string"
+          },
+          "title": "Expected To Vary",
+          "type": "array"
+        },
+        "max_fanout": {
+          "description": "The most rows this lookup is repeated for.",
+          "exclusiveMinimum": 0,
+          "title": "Max Fanout",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "using",
+        "lookup",
+        "max_fanout"
+      ],
+      "title": "FanOutLocation",
+      "type": "object"
+    },
+    "HealthyNarrowing": {
+      "additionalProperties": false,
+      "description": "A closer match a person can choose, as a lookup of its own: same payment method, say.",
+      "properties": {
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "lookup": {
+          "description": "As healthy_sample's lookup, with more filters.",
+          "minLength": 1,
+          "title": "Lookup",
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "lookup"
+      ],
+      "title": "HealthyNarrowing",
+      "type": "object"
+    },
+    "HealthySample": {
+      "additionalProperties": false,
+      "description": "How to find known-good subjects to compare a failing one with. SQL connectors only.",
+      "properties": {
+        "using": {
+          "description": "The SQL connector that does the lookup.",
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Using",
+          "type": "string"
+        },
+        "lookup": {
+          "description": "A single SELECT of the root key, newest first, leaving out the failing subject, on an indexed column. Its rows are candidates: each is proved by running the probe.",
+          "minLength": 1,
+          "title": "Lookup",
+          "type": "string"
+        },
+        "parameters": {
+          "description": "Where each :parameter comes from in the failing run: <location>.<field>, from a location with one row, and never a masked field.",
+          "patternProperties": {
+            "^[A-Za-z_][A-Za-z0-9_]*$": {
+              "description": "A field of a location, written <location>.<field>.",
+              "pattern": "^[a-z][a-z0-9_]*\\.[A-Za-z_][A-Za-z0-9_]*$",
+              "type": "string"
+            }
+          },
+          "propertyNames": {
+            "maxLength": 128
+          },
+          "title": "Parameters",
+          "type": "object"
+        },
+        "narrow": {
+          "description": "Closer matches a person can choose.",
+          "patternProperties": {
+            "^[a-z][a-z0-9_]*$": {
+              "$ref": "#/$defs/HealthyNarrowing"
+            }
+          },
+          "propertyNames": {
+            "maxLength": 64
+          },
+          "title": "Narrow",
+          "type": "object"
+        }
+      },
+      "required": [
+        "using",
+        "lookup"
+      ],
+      "title": "HealthySample",
+      "type": "object"
+    },
+    "Identifier": {
+      "additionalProperties": false,
+      "description": "A value that finds a subject. An identifier that matches several subjects is Ambiguous.",
+      "properties": {
+        "pattern": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A regular expression used to detect this identifier's type.",
+          "title": "Pattern"
+        },
+        "via": {
+          "anyOf": [
+            {
+              "description": "A field of a location, written <location>.<field>.",
+              "pattern": "^[a-z][a-z0-9_]*\\.[A-Za-z_][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "<location>.<field> to look this identifier up in. The location must expose the root key. Omitted only for the root key itself.",
+          "title": "Via"
+        },
+        "unique": {
+          "title": "Unique",
+          "type": "boolean"
+        },
+        "pii": {
+          "default": false,
+          "title": "Pii",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "unique"
+      ],
+      "title": "Identifier",
+      "type": "object"
+    },
+    "Location": {
+      "additionalProperties": false,
+      "description": "One place a subject's data lives, with its own key and lookup.",
+      "properties": {
+        "title": {
+          "default": "",
+          "description": "How the web app and the run header name it. Omitted: its name with spaces for underscores, so visitor_cards is Visitor cards.",
+          "title": "Title",
+          "type": "string"
+        },
+        "using": {
+          "description": "The connector that does the lookup.",
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Using",
+          "type": "string"
+        },
+        "lookup": {
+          "description": "A single SELECT with bound parameters, or GET <path>.",
+          "minLength": 1,
+          "title": "Lookup",
+          "type": "string"
+        },
+        "fallback": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Tried when the lookup finds nothing.",
+          "title": "Fallback"
+        },
+        "cardinality": {
+          "$ref": "#/$defs/Cardinality",
+          "default": "one"
+        },
+        "exposes": {
+          "description": "Fields other locations and identifiers may use.",
+          "items": {
+            "maxLength": 128,
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+            "type": "string"
+          },
+          "title": "Exposes",
+          "type": "array"
+        },
+        "pii": {
+          "description": "SQL locations: columns masked in every result and in evidence.",
+          "items": {
+            "maxLength": 128,
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+            "type": "string"
+          },
+          "title": "Pii",
+          "type": "array"
+        },
+        "mask": {
+          "description": "REST locations: fields of the JSON response masked in every result and in evidence, as dotted paths such as customer.email.",
+          "items": {
+            "description": "A field, or a dotted path into nested fields: customer.email.",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",
+            "type": "string"
+          },
+          "title": "Mask",
+          "type": "array"
+        },
+        "within": {
+          "anyOf": [
+            {
+              "description": "A duration such as 2s, 2m, 1h or 7d.",
+              "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "How long to report Waiting before Missing.",
+          "title": "Within"
+        },
+        "anchor_time": {
+          "anyOf": [
+            {
+              "description": "A field of a location, written <location>.<field>.",
+              "pattern": "^[a-z][a-z0-9_]*\\.[A-Za-z_][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The record's own timestamp the window starts from.",
+          "title": "Anchor Time"
+        },
+        "compare": {
+          "description": "REST locations: fields of the JSON response a healthy comparison shows. SQL locations mark compare columns in the table catalog instead.",
+          "items": {
+            "description": "A field, or a dotted path into nested fields: customer.email.",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",
+            "type": "string"
+          },
+          "title": "Compare",
+          "type": "array"
+        },
+        "expected_to_vary": {
+          "description": "REST locations: compare fields that normally differ between two healthy records. Shown in the differences, but never highlighted as a likely cause.",
+          "items": {
+            "description": "A field, or a dotted path into nested fields: customer.email.",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",
+            "type": "string"
+          },
+          "title": "Expected To Vary",
+          "type": "array"
+        },
+        "key_from": {
+          "anyOf": [
+            {
+              "description": "A field of a location, written <location>.<field>.",
+              "pattern": "^[a-z][a-z0-9_]*\\.[A-Za-z_][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "<location>.<field> that gives this location its key. Omitted: the root key.",
+          "title": "Key From"
+        },
+        "max_rows": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Row cap for a many location; results say if cut.",
+          "title": "Max Rows"
+        },
+        "each": {
+          "description": "Lookups repeated per row of a many location.",
+          "patternProperties": {
+            "^[a-z][a-z0-9_]*$": {
+              "$ref": "#/$defs/FanOutLocation"
+            }
+          },
+          "propertyNames": {
+            "maxLength": 64
+          },
+          "title": "Each",
+          "type": "object"
+        }
+      },
+      "required": [
+        "using",
+        "lookup"
+      ],
+      "title": "Location",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "A business subject type, its identifiers and the locations its data lives in.",
+  "properties": {
+    "entity": {
+      "maxLength": 64,
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "title": "Entity",
+      "type": "string"
+    },
+    "title": {
+      "default": "",
+      "description": "How the web app and the run header name it. Omitted: its name with spaces for underscores, so visitor_cards is Visitor cards.",
+      "title": "Title",
+      "type": "string"
+    },
+    "root_key": {
+      "description": "The identifier every other lookup starts from.",
+      "maxLength": 128,
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+      "title": "Root Key",
+      "type": "string"
+    },
+    "owner": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Owner"
+    },
+    "identifiers": {
+      "description": "Every identifier the entity can be found by. The root key is added if absent.",
+      "patternProperties": {
+        "^[A-Za-z_][A-Za-z0-9_]*$": {
+          "$ref": "#/$defs/Identifier"
+        }
+      },
+      "propertyNames": {
+        "maxLength": 128
+      },
+      "title": "Identifiers",
+      "type": "object"
+    },
+    "locations": {
+      "minProperties": 1,
+      "patternProperties": {
+        "^[a-z][a-z0-9_]*$": {
+          "$ref": "#/$defs/Location"
+        }
+      },
+      "propertyNames": {
+        "maxLength": 64
+      },
+      "title": "Locations",
+      "type": "object"
+    },
+    "healthy_sample": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/HealthySample"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "How to find a known-good subject. Omitted: a known-good ID is pasted."
+    }
+  },
+  "required": [
+    "entity",
+    "root_key",
+    "locations"
+  ],
+  "type": "object"
+}

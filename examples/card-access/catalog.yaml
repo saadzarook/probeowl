@@ -1,0 +1,28 @@
+# Author: @SaadZarook
+# Tables the Card access probes read. Only marked columns are listed.
+catalog: card_access
+tables:
+  - connector: access_db
+    table: visitor_profile
+    label: master
+    owner: access-team
+    description: One row per visitor, employee or contractor.
+    columns:
+      id: { roles: [primary_key] }
+      status: { roles: [status, compare], values: [active, inactive] }
+      type: { roles: [compare] }
+      email: { roles: [pii] }
+
+  - connector: access_db
+    table: cards
+    label: master
+    owner: access-team
+    description: Access cards and their validity; the controller holds its own copy of status.
+    columns:
+      card_id: { roles: [primary_key] }
+      visitor_profile_id:
+        roles: [link]
+        links_to: { connector: access_db, table: visitor_profile, column: id }
+      status: { roles: [status, compare], values: [active, revoked] }
+      valid_to: { roles: [compare, expected_to_vary] }
+      access_group: { roles: [compare] }

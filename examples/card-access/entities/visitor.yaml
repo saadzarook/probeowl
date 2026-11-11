@@ -1,0 +1,51 @@
+# Author: @SaadZarook
+# A visitor profile and the cards it holds, found by profile ID, card ID, employee number or email.
+entity: visitor
+title: Visitor
+root_key: visitor_profile_id
+owner: access-team
+
+identifiers:
+  visitor_profile_id: { pattern: '^VP\d{8}$', unique: true }
+  card_id: { pattern: '^C\d{6}$', via: cards.card_id, unique: true }
+  employee_no: { via: profile.employee_no, unique: false }
+  email: { pattern: '^[^@\s]+@[^@\s]+$', via: profile.email, unique: false, pii: true }
+
+locations:
+  profile:
+    title: Visitor profile
+    using: access_db
+    lookup: >
+      SELECT id AS visitor_profile_id, employee_no, email, type, status, created_at
+      FROM visitor_profile WHERE id = :visitor_profile_id
+    exposes: [visitor_profile_id, employee_no, email, type, status, created_at]
+    pii: [email]
+
+  cards:
+    title: Cards
+    using: access_db
+    lookup: >
+      SELECT card_id, visitor_profile_id, status, valid_from, valid_to, access_group
+      FROM cards WHERE visitor_profile_id = :visitor_profile_id
+    cardinality: many
+    max_rows: 50
+    exposes: [card_id, visitor_profile_id, status, valid_from, valid_to, access_group]
+    each:
+      controller:
+        title: Door controller
+        using: door_controller_api
+        lookup: GET /cards/{{card_id}}
+        max_fanout: 10
+        exposes: [status]
+        compare: [status]
+
+# Other active visitors of the same type, newest first.
+healthy_sample:
+  using: access_db
+  lookup: >
+    SELECT id AS visitor_profile_id FROM visitor_profile
+    WHERE status = 'active' AND id <> :visitor_profile_id AND type = :type
+    ORDER BY created_at DESC
+  parameters:
+    visitor_profile_id: profile.visitor_profile_id
+    type: profile.type

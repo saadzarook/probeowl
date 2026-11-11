@@ -1,0 +1,10 @@
+-- Author: @SaadZarook
+-- Read-only for ProbeOwl, read-write for seed scripts. Arguments: schema, read-only login,
+-- read-write login.
+WHENEVER SQLERROR EXIT FAILURE
+ALTER SESSION SET CONTAINER = FREEPDB1;
+GRANT SELECT ON &1..LEDGER_ENTRIES TO &2;
+GRANT SELECT ON &1..FEE_RULES TO &2;
+GRANT SELECT, INSERT, UPDATE, DELETE ON &1..LEDGER_ENTRIES TO &3;
+GRANT SELECT, INSERT, UPDATE, DELETE ON &1..FEE_RULES TO &3;
+EXIT

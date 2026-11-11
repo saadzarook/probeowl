@@ -1,0 +1,26 @@
+# Author: @SaadZarook
+# Python caches
+__pycache__/
+*.py[cod]
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+
+# Virtual environments
+.venv/
+
+# Build outputs
+dist/
+build/
+*.egg-info/
+
+# Node
+node_modules/
+
+# Test reports
+test-results/
+playwright-report/
+
+# Claude Code: each maintainer's own instructions, kept out of the repository
+CLAUDE.local.md

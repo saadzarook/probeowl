@@ -1,0 +1,7 @@
+# Author: @SaadZarook
+application: card_access
+title: Card access
+owner: access-team
+environments:
+  prod: { title: Production, production: true }
+  uat: { title: UAT }

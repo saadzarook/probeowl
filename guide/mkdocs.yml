@@ -1,0 +1,70 @@
+# Author: @SaadZarook
+# The ProbeOwl guide. Build, from guide/: uvx --with-requirements requirements.txt --from mkdocs mkdocs build --strict
+# site_url (https://saadzarook.github.io/probeowl/guide/) is not written here: hooks.py takes it
+# from backend/probeowl/guide.py, the one place the guide's address is defined. The guide is
+# served under /guide/; the landing page, site/index.html, at the root.
+site_name: ProbeOwl guide
+site_description: Validate production data across databases and APIs, safely.
+repo_url: https://github.com/saadzarook/probeowl
+edit_uri: edit/develop/guide/docs/
+copyright: ProbeOwl is by Saad Zarook, under the Apache License 2.0.
+
+hooks:
+  - hooks.py
+
+theme:
+  name: material
+  logo: assets/owl.svg
+  favicon: assets/owl.svg
+  font:
+    text: IBM Plex Sans
+    code: IBM Plex Mono
+  palette:
+    - scheme: default
+      primary: custom
+      accent: custom
+      toggle: { icon: material/weather-night, name: Dark mode }
+    - scheme: slate
+      primary: custom
+      accent: custom
+      toggle: { icon: material/weather-sunny, name: Light mode }
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - search.suggest
+
+extra_css:
+  - assets/probeowl.css
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc: { permalink: true }
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.details
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - Your first application: first-application.md
+  - Concepts: concepts.md
+  - Writing probes: writing-probes.md
+  - Probes across several systems: several-systems.md
+  - Writing runbooks: writing-runbooks.md
+  - Connectors: connectors.md
+  - Using the web app:
+      - web-app/index.md
+      - Inspect: web-app/inspect.md
+      - Validate: web-app/validate.md
+      - Probe editor: web-app/probes.md
+      - Tables: web-app/tables.md
+      - Connectors: web-app/connectors.md
+      - Knowledge base: web-app/knowledge-base.md
+      - Compare files: web-app/compare-files.md
+  - Safety: safety.md
+  - CLI reference: cli.md
+  - Troubleshooting: troubleshooting.md

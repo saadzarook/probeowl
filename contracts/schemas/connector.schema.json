@@ -1,0 +1,324 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ProbeOwl connector",
+  "$defs": {
+    "ConnectorGuards": {
+      "additionalProperties": false,
+      "description": "Limits set on the connector itself, in every environment.",
+      "properties": {
+        "row_ceiling": {
+          "default": 1000,
+          "description": "The most rows one lookup through this connector may return. A location's max_rows above it is refused by owl check and at save, and a lookup never returns more.",
+          "exclusiveMinimum": 0,
+          "title": "Row Ceiling",
+          "type": "integer"
+        }
+      },
+      "title": "ConnectorGuards",
+      "type": "object"
+    },
+    "RestBinding": {
+      "additionalProperties": false,
+      "description": "Where a REST connector points in one environment.",
+      "properties": {
+        "base_url": {
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "title": "Base Url",
+          "type": "string"
+        },
+        "secret": {
+          "anyOf": [
+            {
+              "description": "Where a credential lives: keyring:<service>/<username>, env:<VARIABLE> or vault://<path>. Never the credential itself.",
+              "pattern": "^(keyring:[^/\\s]+/\\S+|env:[A-Za-z_][A-Za-z0-9_]*|vault://\\S+)$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The API token, if one is needed. Written as a reference, never the value: keyring:<service>/<username> reads the system keychain entry for that service and username (add it with `keyring set <service> <username>`); env:<VARIABLE> reads an environment variable; vault://<path> is accepted but not supported yet.",
+          "title": "Secret"
+        }
+      },
+      "required": [
+        "base_url"
+      ],
+      "title": "RestBinding",
+      "type": "object"
+    },
+    "RestConnector": {
+      "additionalProperties": false,
+      "description": "A read-only client for one REST API. Only GET is ever sent.",
+      "properties": {
+        "connector": {
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Connector",
+          "type": "string"
+        },
+        "type": {
+          "const": "rest",
+          "title": "Type",
+          "type": "string"
+        },
+        "owner": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Owner"
+        },
+        "guards": {
+          "$ref": "#/$defs/ConnectorGuards"
+        },
+        "environments": {
+          "description": "One binding per environment; a missing one means Not configured there.",
+          "patternProperties": {
+            "^[a-z][a-z0-9_]*$": {
+              "$ref": "#/$defs/RestBinding"
+            }
+          },
+          "propertyNames": {
+            "maxLength": 64
+          },
+          "title": "Environments",
+          "type": "object"
+        }
+      },
+      "required": [
+        "connector",
+        "type",
+        "environments"
+      ],
+      "title": "RestConnector",
+      "type": "object"
+    },
+    "SqlBinding": {
+      "additionalProperties": false,
+      "description": "Where a SQL connector points in one environment.",
+      "properties": {
+        "host": {
+          "minLength": 1,
+          "title": "Host",
+          "type": "string"
+        },
+        "port": {
+          "anyOf": [
+            {
+              "maximum": 65535,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Port"
+        },
+        "database": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Database name (SQL Server, MariaDB) or service name (Oracle).",
+          "title": "Database"
+        },
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Oracle only: the schema unqualified table names resolve in (CURRENT_SCHEMA). SQL Server and MariaDB use the database instead.",
+          "title": "Schema"
+        },
+        "time_zone": {
+          "anyOf": [
+            {
+              "pattern": "^(?:\\+(?:0\\d|1[0-3]):[0-5]\\d|\\+14:00|-(?:0\\d|1[01]):[0-5]\\d|-12:00)$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Oracle only: the time zone of each session, as an offset from -12:00 to +14:00, such as +04:00. It is what CURRENT_DATE, CURRENT_TIMESTAMP and LOCALTIMESTAMP return in, and how a TIMESTAMP is compared with a TIMESTAMP WITH TIME ZONE. Omitted: the database's own (DBTIMEZONE), never the time zone of the machine running ProbeOwl.",
+          "title": "Time Zone"
+        },
+        "user": {
+          "description": "The read-only login.",
+          "minLength": 1,
+          "title": "User",
+          "type": "string"
+        },
+        "secret": {
+          "description": "The login's password. Written as a reference, never the value: keyring:<service>/<username> reads the system keychain entry for that service and username (add it with `keyring set <service> <username>`); env:<VARIABLE> reads an environment variable; vault://<path> is accepted but not supported yet.",
+          "pattern": "^(keyring:[^/\\s]+/\\S+|env:[A-Za-z_][A-Za-z0-9_]*|vault://\\S+)$",
+          "title": "Secret",
+          "type": "string"
+        },
+        "replica": {
+          "default": false,
+          "description": "This binding points at a read replica. Production bindings must.",
+          "title": "Replica",
+          "type": "boolean"
+        },
+        "max_replica_lag": {
+          "default": "60s",
+          "description": "Replica bindings: when the replica's measured lag is longer, the circuit breaker pauses this connector and runs that need it are skipped.",
+          "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
+          "title": "Max Replica Lag",
+          "type": "string"
+        },
+        "allowed_databases": {
+          "description": "SQL Server and MariaDB: other databases on the same server that probes may name (otherdb.dbo.table, otherdb.table). This binding's own database is always allowed.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Databases",
+          "type": "array"
+        },
+        "encrypt": {
+          "default": true,
+          "description": "MariaDB and Oracle: encrypt the connection with TLS (Oracle connects over tcps). Set false only for a server that cannot offer TLS, such as a local test container. SQL Server connections are always encrypted.",
+          "title": "Encrypt",
+          "type": "boolean"
+        },
+        "encrypt_reason": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Why this binding is not encrypted. Required by `owl check` when a Production binding sets encrypt: false.",
+          "title": "Encrypt Reason"
+        },
+        "trust_server_certificate": {
+          "default": false,
+          "description": "Accept any server certificate, skipping the check that it is signed by a trusted authority and names the host, as on local test containers. Never needed for a properly configured server.",
+          "title": "Trust Server Certificate",
+          "type": "boolean"
+        },
+        "trust_server_certificate_reason": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Why this binding trusts any server certificate. Required by `owl check` when a Production binding sets trust_server_certificate.",
+          "title": "Trust Server Certificate Reason"
+        }
+      },
+      "required": [
+        "host",
+        "user",
+        "secret"
+      ],
+      "title": "SqlBinding",
+      "type": "object"
+    },
+    "SqlConnector": {
+      "additionalProperties": false,
+      "description": "A read-only client for one SQL Server, Oracle or MariaDB database.",
+      "properties": {
+        "connector": {
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Connector",
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "sqlserver",
+            "oracle",
+            "mariadb"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "owner": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Owner"
+        },
+        "guards": {
+          "$ref": "#/$defs/ConnectorGuards"
+        },
+        "environments": {
+          "description": "One binding per environment; a missing one means Not configured there.",
+          "patternProperties": {
+            "^[a-z][a-z0-9_]*$": {
+              "$ref": "#/$defs/SqlBinding"
+            }
+          },
+          "propertyNames": {
+            "maxLength": 64
+          },
+          "title": "Environments",
+          "type": "object"
+        }
+      },
+      "required": [
+        "connector",
+        "type",
+        "environments"
+      ],
+      "title": "SqlConnector",
+      "type": "object"
+    }
+  },
+  "discriminator": {
+    "mapping": {
+      "mariadb": "#/$defs/SqlConnector",
+      "oracle": "#/$defs/SqlConnector",
+      "rest": "#/$defs/RestConnector",
+      "sqlserver": "#/$defs/SqlConnector"
+    },
+    "propertyName": "type"
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/SqlConnector"
+    },
+    {
+      "$ref": "#/$defs/RestConnector"
+    }
+  ]
+}
