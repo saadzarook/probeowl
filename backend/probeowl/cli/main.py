@@ -47,6 +47,7 @@ from probeowl.plugins.registry import (
 from probeowl.reload import ConfigReloader
 from probeowl.runs import RunService
 from probeowl.server_log import configure_server_log, default_log_file
+from probeowl.setup_writes import SetupWrites
 from probeowl.store import migrate
 from probeowl.store.engine import create_store_engine
 
@@ -182,6 +183,8 @@ def serve(
     guide = find_guide()
     if guide is None:
         typer.echo("The guide is not built here: cd backend && uv run python guide_build.py")
+    connectors = ConnectorStatuses(applications, breaker, runs.kill.reason)
+    reloader = ConfigReloader(folder, config_folder, runs)
     try:
         uvicorn.run(
             create_app(
@@ -190,12 +193,13 @@ def serve(
                 port=port,
                 web_origins=origins,
                 probes=ProbeWrites(applications, store, config_folder),
-                connectors=ConnectorStatuses(applications, breaker, runs.kill.reason),
+                connectors=connectors,
                 plugins=plugins,
                 web_app=True,
                 web_build=build,
                 guide_build=guide,
-                reloader=ConfigReloader(folder, config_folder, runs),
+                reloader=reloader,
+                setup=SetupWrites(applications, store, config_folder, reloader, connectors),
             ),
             host=HOST,
             port=port,

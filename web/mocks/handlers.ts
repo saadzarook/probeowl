@@ -2,7 +2,7 @@
 import { stringify } from "yaml";
 import { parse } from "yaml";
 import { delay, http, HttpResponse } from "msw";
-import type { CatalogChange, CatalogReview, CatalogTable, KillSwitch, KillTarget, ProbeChange, SaveEntity, SaveProbe, SetKillSwitch, StartRun } from "../src/api/client";
+import type { CatalogChange, CatalogReview, CatalogTable, DraftConnection, KillSwitch, KillTarget, ProbeChange, SaveApplication, SaveConnector, SaveEntity, SaveProbe, SetKillSwitch, StartRun } from "../src/api/client";
 import type { CompareRequest } from "../../plugins/compare_files/web/types";
 import { compareFilesManifest, compareFilesResult } from "./fixtures/compareFiles";
 import type { HealthyAttempt, HealthyComparison, Run, RunbookView, StepInRun } from "../src/api/client";
@@ -317,6 +317,17 @@ function comparisonOf(id: string, value: string): HealthyComparison {
   };
 }
 
+/** A file's change as a save previews or writes it: written only when the preview's base is sent. */
+function fileChange(path: string, text: string, base: string | null | undefined): CatalogChange {
+  return {
+    path,
+    diff: `--- /dev/null\n+++ b/${path}\n@@ -0,0 +1 @@\n${text.split("\n").map((l) => `+${l}`).join("\n")}`,
+    base: "absent",
+    after: "sha256:mock-after",
+    written: base !== undefined && base !== null,
+  };
+}
+
 export const handlers = [
   // A config folder with no applications, as owl init has not been run yet.
   http.get("/api/applications", () => json(localStorage.getItem("mock-no-applications") ? [] : applications)),
@@ -559,6 +570,52 @@ export const handlers = [
     // payout_db stands for a database that cannot be reached, so that answer can be seen.
     const reason = connector === "payout_db" ? "the connection was refused or could not be made; check the database is up and the binding is right" : null;
     return json({ connector, environment, reachable: reason === null, reason, duration_ms: 42 });
+  }),
+
+  // First run: no applications until one is created; the store is new; the keychain works.
+  http.get("/api/setup", () => {
+    const none = localStorage.getItem("mock-no-applications") !== null;
+    return json({
+      applications: none ? 0 : applications.length,
+      config_folder: "C:/Users/you/probeowl",
+      store: { dialect: "sqlite", created_now: none },
+      keychain: { available: true, reason: null },
+    });
+  }),
+
+  http.put("/api/applications/:application", async ({ params, request }) => {
+    const application = String(params["application"]);
+    const body = (await request.json()) as SaveApplication;
+    if (applications.some((a) => a.name === application) && localStorage.getItem("mock-no-applications") === null) {
+      return problem(409, "Conflict", `an application named ${application} is already loaded`);
+    }
+    const environments = body.environments.map((e) => `  ${e.name}:\n    title: ${e.title}\n    production: ${String(e.production ?? false)}`);
+    const text = `application: ${application}\ntitle: ${body.title}\nowner: ${body.owner}\nenvironments:\n${environments.join("\n")}`;
+    return json(fileChange(`${application}/application.yaml`, text, body.base));
+  }),
+
+  http.put("/api/applications/:application/connectors/:connector", async ({ params, request }) => {
+    const application = String(params["application"]);
+    const connector = String(params["connector"]);
+    const body = (await request.json()) as SaveConnector;
+    const binding = "host" in body.binding
+      ? `    host: ${body.binding.host}\n    port: ${body.binding.port}\n    database: ${body.binding.database}\n    user: ${body.binding.user}\n    secret: keyring:probeowl/${connector}.${body.environment}`
+      : `    base_url: ${body.binding.base_url}`;
+    const text = `connector: ${connector}\ntype: ${body.type}\nenvironments:\n  ${body.environment}:\n${binding}`;
+    return json(fileChange(`${application}/connectors/${connector}.yaml`, text, body.base));
+  }),
+
+  // A draft connects unless its password is "wrong", so a failed test and its fixed reason can be seen.
+  http.post("/api/applications/:application/connectors/test-draft", async ({ request }) => {
+    const body = (await request.json()) as DraftConnection;
+    const sql = "host" in body.binding;
+    if (sql && !body.password && !body.use_saved_password) {
+      return problem(422, "Unprocessable Content", "give the password, or use the one saved on this machine", [
+        { field: "password", message: "required unless use_saved_password is true" },
+      ]);
+    }
+    const reason = body.password === "wrong" ? "authentication failed; check the binding's login and secret" : null;
+    return json({ connector: body.connector, environment: body.environment, reachable: reason === null, reason, duration_ms: 31 });
   }),
 
   http.get("/api/applications/:application/catalog", ({ params }) => {

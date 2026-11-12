@@ -90,6 +90,79 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
+    put:
+      tags:
+      - setup
+      summary: Save Application
+      description: 'Write a new application''s application.yaml into the folder owl
+        serve loaded.
+
+
+        As every save: first without `base`, nothing is written and the response is
+        the change;
+
+        then with that `base` to write exactly that change. Loaded at once, so the
+        next screen
+
+        finds it. 409 if an application of that id is loaded already, if the file
+        changed since
+
+        its preview, or while a run is running. Never commits or pushes; audited.'
+      operationId: save_application
+      parameters:
+      - name: application
+        in: path
+        required: true
+        schema:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Application
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveApplication'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogChange'
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+        '501':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Implemented
+        '409':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Conflict
+        '422':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Unprocessable Entity
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      security:
+      - ProbeOwlRequest: []
   /api/applications/{application}/environments:
     get:
       tags:
@@ -2008,6 +2081,203 @@ paths:
                 $ref: '#/components/schemas/Problem'
       security:
       - ProbeOwlRequest: []
+  /api/setup:
+    get:
+      tags:
+      - setup
+      summary: Get Setup
+      description: 'What first run needs: applications loaded, where new ones go,
+        the store and the keychain.
+
+
+        Never the store''s URL or login.'
+      operationId: get_setup
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SetupState'
+        '500':
+          description: Internal Server Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '501':
+          description: Not Implemented
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/applications/{application}/connectors/{connector}:
+    put:
+      tags:
+      - setup
+      summary: Save Connector
+      description: 'Write a new connector with one binding, or a binding for an environment
+        not bound yet.
+
+
+        Preview, then write, as every save. The binding''s secret is always the keychain
+        reference
+
+        keyring:probeowl/<connector>.<environment>, chosen here: the request never
+        carries one,
+
+        and no password goes into a file. A Production SQL binding must be a replica
+        (422). 409
+
+        if the binding exists already: editing one is done in its file. Loaded at
+        once; audited
+
+        without host, login or URL.'
+      operationId: save_connector
+      parameters:
+      - name: application
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Application
+      - name: connector
+        in: path
+        required: true
+        schema:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Connector
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveConnector'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogChange'
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+        '501':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Implemented
+        '404':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Found
+        '409':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Conflict
+        '422':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Unprocessable Entity
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      security:
+      - ProbeOwlRequest: []
+  /api/applications/{application}/connectors/test-draft:
+    post:
+      tags:
+      - setup
+      summary: Test Draft Connection
+      description: 'Connect once to a binding that is not saved yet, and say how it
+        went. Audited.
+
+
+        With the password given, used for this one connection and never stored, logged
+        or
+
+        returned; or with the one this machine''s keychain has. The same fixed reasons
+        as Test
+
+        connection, never the server''s own text. Reads no data. 403 if a kill switch
+        covers the
+
+        application, or the connector if it exists.'
+      operationId: test_draft_connection
+      parameters:
+      - name: application
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Application
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DraftConnection'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectionTest'
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+        '501':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Implemented
+        '403':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Forbidden
+        '404':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Found
+        '422':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Unprocessable Entity
+      security:
+      - ProbeOwlRequest: []
   /api/applications/{application}/runbooks:
     get:
       tags:
@@ -3383,6 +3653,56 @@ components:
       title: CopiedWriteQuery
       description: A write query to take to a change request. Copying it was recorded
         in the audit.
+    DraftConnection:
+      properties:
+        connector:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Connector
+          description: Its connector, which may not exist yet.
+        type:
+          type: string
+          enum:
+          - sqlserver
+          - oracle
+          - mariadb
+          - rest
+          title: Type
+        environment:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Environment
+        binding:
+          anyOf:
+          - $ref: '#/components/schemas/SqlBindingDraft'
+          - $ref: '#/components/schemas/RestBindingDraft'
+          title: Binding
+        password:
+          anyOf:
+          - type: string
+            maxLength: 1024
+            minLength: 1
+            format: password
+            writeOnly: true
+          - type: 'null'
+          title: Password
+          description: 'Used for this one test only: never stored, logged or returned.'
+        use_saved_password:
+          type: boolean
+          title: Use Saved Password
+          description: Use the password this machine's keychain has for the binding.
+          default: false
+      additionalProperties: false
+      type: object
+      required:
+      - connector
+      - type
+      - environment
+      - binding
+      title: DraftConnection
+      description: A binding that is not saved yet, to connect to once.
     DraftProbe:
       properties:
         probe:
@@ -3564,6 +3884,29 @@ components:
       - report
       title: EntityChange
       description: A new entity's YAML file, and the save checks it passed.
+    EnvironmentDraft:
+      properties:
+        name:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Name
+        title:
+          type: string
+          maxLength: 80
+          minLength: 1
+          title: Title
+        production:
+          type: boolean
+          title: Production
+          default: false
+      additionalProperties: false
+      type: object
+      required:
+      - name
+      - title
+      title: EnvironmentDraft
+      description: One environment of a new application.
     EnvironmentSummary:
       properties:
         name:
@@ -4241,6 +4584,23 @@ components:
       title: InvestigationRecord
       description: Why a person ran an investigation. Reference is mandatory in Production.
     JsonValue: {}
+    KeychainInfo:
+      properties:
+        available:
+          type: boolean
+          title: Available
+        reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Reason
+          description: Why not, when it is not available.
+      additionalProperties: false
+      type: object
+      required:
+      - available
+      title: KeychainInfo
+      description: Whether this machine has a system keychain to keep passwords in.
     KillScope:
       type: string
       enum:
@@ -4907,6 +5267,24 @@ components:
       - proactive_check
       title: Reason
       description: Why an investigation was run.
+    RestBindingDraft:
+      properties:
+        base_url:
+          type: string
+          maxLength: 2048
+          minLength: 1
+          title: Base Url
+        needs_token:
+          type: boolean
+          title: Needs Token
+          description: Whether the API needs a token, kept in the keychain.
+      additionalProperties: false
+      type: object
+      required:
+      - base_url
+      - needs_token
+      title: RestBindingDraft
+      description: Where a REST connector points in one environment.
     Review:
       properties:
         by:
@@ -5351,6 +5729,43 @@ components:
       - runs
       title: RunsStarted
       description: Runs that have started, one per picked subject, in the order picked.
+    SaveApplication:
+      properties:
+        title:
+          type: string
+          maxLength: 80
+          minLength: 1
+          title: Title
+        owner:
+          type: string
+          maxLength: 80
+          minLength: 1
+          title: Owner
+          description: The team responsible for it.
+        environments:
+          items:
+            $ref: '#/components/schemas/EnvironmentDraft'
+          type: array
+          maxItems: 6
+          minItems: 1
+          title: Environments
+        base:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Base
+          description: 'The base of the preview being confirmed. Omitted: nothing
+            is written and the change is returned. Given: written only if the file
+            is still as it was then.'
+      additionalProperties: false
+      type: object
+      required:
+      - title
+      - owner
+      - environments
+      title: SaveApplication
+      description: 'A new application. Without base: preview its file. With it: write
+        exactly that.'
     SaveCheck:
       properties:
         check:
@@ -5443,6 +5858,52 @@ components:
       title: SaveCheckReport
       description: Every save check of one draft probe. It can be saved when none
         failed.
+    SaveConnector:
+      properties:
+        type:
+          type: string
+          enum:
+          - sqlserver
+          - oracle
+          - mariadb
+          - rest
+          title: Type
+          description: An existing connector's type must match.
+        owner:
+          anyOf:
+          - type: string
+            maxLength: 80
+            minLength: 1
+          - type: 'null'
+          title: Owner
+          description: Used for a new connector only.
+        environment:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Environment
+        binding:
+          anyOf:
+          - $ref: '#/components/schemas/SqlBindingDraft'
+          - $ref: '#/components/schemas/RestBindingDraft'
+          title: Binding
+        base:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Base
+          description: 'The base of the preview being confirmed. Omitted: nothing
+            is written and the change is returned. Given: written only if the file
+            is still as it was then.'
+      additionalProperties: false
+      type: object
+      required:
+      - type
+      - environment
+      - binding
+      title: SaveConnector
+      description: A new connector with one binding, or a binding for an environment
+        not bound yet.
     SaveEntity:
       properties:
         entity:
@@ -5602,6 +6063,101 @@ components:
       title: SetKillSwitch
       description: 'Turn one kill switch on or off, and say why: both are audited
         with the actor.'
+    SetupState:
+      properties:
+        applications:
+          type: integer
+          title: Applications
+          description: Applications loaded; none opens the first-run setup.
+        config_folder:
+          type: string
+          title: Config Folder
+          description: Where new applications are written.
+        store:
+          $ref: '#/components/schemas/StoreInfo'
+        keychain:
+          $ref: '#/components/schemas/KeychainInfo'
+      additionalProperties: false
+      type: object
+      required:
+      - applications
+      - config_folder
+      - store
+      - keychain
+      title: SetupState
+      description: What first run needs to know before it asks anything.
+    SqlBindingDraft:
+      properties:
+        host:
+          type: string
+          maxLength: 255
+          minLength: 1
+          title: Host
+        port:
+          type: integer
+          maximum: 65535.0
+          minimum: 1.0
+          title: Port
+        database:
+          type: string
+          maxLength: 128
+          minLength: 1
+          title: Database
+          description: Database (SQL Server, MariaDB) or service name.
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 128
+            minLength: 1
+          - type: 'null'
+          title: Schema
+          description: Oracle only.
+        user:
+          type: string
+          maxLength: 128
+          minLength: 1
+          title: User
+          description: The read-only login.
+        replica:
+          type: boolean
+          title: Replica
+          default: false
+        encrypt:
+          type: boolean
+          title: Encrypt
+          description: MariaDB and Oracle; always on for SQL Server.
+          default: true
+        encrypt_reason:
+          anyOf:
+          - type: string
+            maxLength: 200
+            minLength: 1
+          - type: 'null'
+          title: Encrypt Reason
+        trust_server_certificate:
+          type: boolean
+          title: Trust Server Certificate
+          default: false
+        trust_server_certificate_reason:
+          anyOf:
+          - type: string
+            maxLength: 200
+            minLength: 1
+          - type: 'null'
+          title: Trust Server Certificate Reason
+      additionalProperties: false
+      type: object
+      required:
+      - host
+      - port
+      - database
+      - user
+      title: SqlBindingDraft
+      description: 'Where a SQL connector points in one environment, as the Add connection
+        form asks it.
+
+
+        Never a secret or its reference: the server names the keychain entry itself.'
     StartHealthyComparison:
       properties:
         narrow:
@@ -5756,6 +6312,29 @@ components:
       title: StepResult
       description: What running a read query found. Values are masked, and it is linked
         to its run.
+    StoreInfo:
+      properties:
+        dialect:
+          type: string
+          enum:
+          - sqlite
+          - postgresql
+          - mssql
+          - oracle
+          - mariadb
+          title: Dialect
+        created_now:
+          type: boolean
+          title: Created Now
+          description: owl serve created it when it started.
+      additionalProperties: false
+      type: object
+      required:
+      - dialect
+      - created_now
+      title: StoreInfo
+      description: 'ProbeOwl''s own store, as first run reports it: never its URL
+        or login.'
     SuggestedRunbook:
       properties:
         runbook:

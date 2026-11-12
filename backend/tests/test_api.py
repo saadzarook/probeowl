@@ -103,10 +103,15 @@ def test_no_route_can_execute_a_runbook_step(app: FastAPI) -> None:
         if method != "get"
     ]
     assert sorted(writes) == [
+        # Writes a new application's application.yaml in the loaded folder: config only.
+        ("/api/applications/{application}", "put"),
         ("/api/applications/{application}/catalog/imports", "post"),  # reads schema, never data
         # Writes catalog.yaml in the loaded folder: config, never a probed database.
         ("/api/applications/{application}/catalog/tables/{connector}/{table}", "put"),
         # Connects once to a binding, or GETs a REST API's base URL once; reads no data.
+        ("/api/applications/{application}/connectors/test-draft", "post"),  # the same, unsaved
+        # Writes a connector's YAML in the loaded folder: config, never a password.
+        ("/api/applications/{application}/connectors/{connector}", "put"),
         ("/api/applications/{application}/connectors/{connector}/test", "post"),
         # Writes a new entity's YAML in the loaded folder: config, never a probed database.
         ("/api/applications/{application}/entities/{entity}", "put"),

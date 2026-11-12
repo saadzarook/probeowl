@@ -44,7 +44,7 @@ from probeowl.connector_status import ConnectorStatuses
 from probeowl.errors import NotFoundError, RequestError, unknown_application
 from probeowl.model import Catalog, Entity, Run, RunStatus
 from probeowl.model.check import LoadedApplication
-from probeowl.model.common import humanized
+from probeowl.model.common import Name, humanized
 from probeowl.model.connector_status import ConnectionTest, ConnectorStatus
 from probeowl.model.healthy import HealthyComparison
 from probeowl.model.kill_switch import KillSwitch, KillTarget
@@ -54,11 +54,13 @@ from probeowl.model.run import Actor
 from probeowl.model.runbook_step import CopiedWriteQuery, StepInRun, StepRan
 from probeowl.model.save_check import SaveCheckReport
 from probeowl.model.schema import SchemaSnapshot
+from probeowl.model.setup import DraftConnection, SaveApplication, SaveConnector, SetupState
 from probeowl.plugins.api import PluginManifest
 from probeowl.reload import ConfigReloader
 from probeowl.runbook_steps import RunbookSteps
 from probeowl.runbooks import matching, runbook_view, suggested
 from probeowl.runs import RunService
+from probeowl.setup_writes import SetupWrites
 
 # The media type is set to application/problem+json in app.py.
 _PROBLEM = {"model": Problem}
@@ -670,6 +672,83 @@ def test_connection(
         },
     )
     return result
+
+
+@router.get("/setup", tags=["setup"])
+def get_setup(http: Request) -> SetupState:
+    """What first run needs: applications loaded, where new ones go, the store and the keychain.
+
+    Never the store's URL or login.
+    """
+    return _setup(http).state()
+
+
+@router.put("/applications/{application}", tags=["setup"], responses=_problems(409, 422))
+def save_application(application: Name, body: SaveApplication, http: Request) -> CatalogChange:
+    """Write a new application's application.yaml into the folder owl serve loaded.
+
+    As every save: first without `base`, nothing is written and the response is the change;
+    then with that `base` to write exactly that change. Loaded at once, so the next screen
+    finds it. 409 if an application of that id is loaded already, if the file changed since
+    its preview, or while a run is running. Never commits or pushes; audited.
+    """
+    return CatalogChange(**asdict(_setup(http).save_application(application, body)))
+
+
+@router.put(
+    "/applications/{application}/connectors/{connector}",
+    tags=["setup"],
+    responses=_problems(404, 409, 422),
+)
+def save_connector(
+    application: str, connector: Name, body: SaveConnector, http: Request
+) -> CatalogChange:
+    """Write a new connector with one binding, or a binding for an environment not bound yet.
+
+    Preview, then write, as every save. The binding's secret is always the keychain reference
+    keyring:probeowl/<connector>.<environment>, chosen here: the request never carries one,
+    and no password goes into a file. A Production SQL binding must be a replica (422). 409
+    if the binding exists already: editing one is done in its file. Loaded at once; audited
+    without host, login or URL.
+    """
+    return CatalogChange(**asdict(_setup(http).save_connector(application, connector, body)))
+
+
+@router.post(
+    "/applications/{application}/connectors/test-draft",
+    tags=["setup"],
+    responses=_problems(403, 404, 422),
+)
+def test_draft_connection(application: str, body: DraftConnection, http: Request) -> ConnectionTest:
+    """Connect once to a binding that is not saved yet, and say how it went. Audited.
+
+    With the password given, used for this one connection and never stored, logged or
+    returned; or with the one this machine's keychain has. The same fixed reasons as Test
+    connection, never the server's own text. Reads no data. 403 if a kill switch covers the
+    application, or the connector if it exists.
+    """
+    result = _setup(http).test_draft(application, body)
+    _runs(http).audit(
+        "connection_tested",
+        {
+            "application": application,
+            "connector": body.connector,
+            "environment": body.environment,
+            "reachable": result.reachable,
+            "draft": True,
+        },
+    )
+    return result
+
+
+def _setup(http: Request) -> SetupWrites:
+    setup = getattr(http.app.state, "setup", None)
+    if not isinstance(setup, SetupWrites):
+        raise HTTPException(
+            status.HTTP_501_NOT_IMPLEMENTED,
+            "setting up needs a config folder: start the API with owl serve --config <folder>",
+        )
+    return setup
 
 
 @router.get("/applications/{application}/runbooks", tags=["runbooks"], responses=_problems(404))
