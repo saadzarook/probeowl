@@ -472,3 +472,18 @@ input.mono { font-family: var(--font-mono); }
 .env-choice[data-production]:has(input:checked) { border-color: var(--color-production); box-shadow: inset 0 0 0 1px var(--color-production); }
 .setup-environments { max-width: 48rem; }
 .setup-note { margin: 0 0 0.75rem; }
+
+/* Add connection (/connectors/new) */
+.type-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: 0.6rem; }
+.type-tile { text-align: left; padding: 0.7rem 0.8rem; border: 1px solid var(--color-border); border-radius: 0.6rem; background: var(--color-card); color: var(--color-text); font: inherit; cursor: pointer; }
+.type-tile[aria-pressed="true"] { border-color: var(--color-action-blue); box-shadow: inset 0 0 0 1px var(--color-action-blue); }
+.type-tile:disabled { opacity: 0.45; cursor: not-allowed; }
+.add-connection { max-width: 52rem; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: 0.75rem; }
+.wizard-form label.check { display: flex; gap: 0.5rem; align-items: center; }
+.wizard-form label.check[data-production] { color: var(--color-production); font-weight: 600; }
+.result-ok { padding: 0.6rem 0.8rem; border-radius: 0.5rem; background: var(--chip-found-bg); color: var(--chip-found-fg); }
+.result-bad { padding: 0.6rem 0.8rem; border-radius: 0.5rem; background: var(--color-production-bg); color: var(--color-production); }
+.overwrite { padding: 0.75rem 0.9rem; border: 1px solid var(--color-production); border-radius: 0.6rem; }
+.confirm-suggested { display: grid; gap: 0.6rem; margin-top: 0.5rem; }
+.suggested-list { margin: 0; padding-left: 1.2rem; display: grid; gap: 0.35rem; }

@@ -490,3 +490,39 @@ export async function saveApplication(application: string, body: SaveApplication
   if (data) return data;
   throw problemError(error, "The application could not be created.");
 }
+
+/** Test connection on a binding not saved yet: the password is used for this one connection only. */
+export async function testDraftConnection(application: string, body: DraftConnection): Promise<ConnectionTest> {
+  const { data, error } = await api.POST("/api/applications/{application}/connectors/test-draft", {
+    params: { path: { application } },
+    body,
+  });
+  if (data) return data;
+  throw problemError(error, "The connection could not be tested.");
+}
+
+/** Preview a new connector, or a binding for an environment not bound yet (no base); or write it with the preview's base. */
+export async function saveConnector(application: string, connector: string, body: SaveConnector): Promise<CatalogChange> {
+  const { data, error } = await api.PUT("/api/applications/{application}/connectors/{connector}", {
+    params: { path: { application, connector } },
+    body,
+  });
+  if (data) return data;
+  throw problemError(error, "The connection could not be saved.");
+}
+
+/** A password is already saved under the binding's keychain name, and replacing it wasn't asked. */
+export class SecretExistsError extends Error {}
+
+/** Save a binding's password to this machine's keychain. Nothing comes back: no route reads it. */
+export async function saveSecret(application: string, connector: string, environment: string, password: string, replace: boolean): Promise<void> {
+  const { error, response } = await api.PUT("/api/applications/{application}/connectors/{connector}/environments/{environment}/secret", {
+    params: { path: { application, connector, environment } },
+    body: { password, replace },
+  });
+  if (response.status === 204) return;
+  if (response.status === 409 && error?.type === "urn:probeowl:problem:secret-exists") {
+    throw new SecretExistsError(error.detail ?? "A password is already saved for this connection.");
+  }
+  throw problemError(error, "The password could not be saved.");
+}

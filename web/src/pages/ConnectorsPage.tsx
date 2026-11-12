@@ -1,5 +1,6 @@
 // Author: @SaadZarook
 import { useState } from "react";
+import { Link as RouterLink } from "react-router-dom";
 import type { KillTarget } from "../api/client";
 import { useConnectors } from "../api/useConnectors";
 import { useKillSwitches } from "../api/useKillSwitches";
@@ -56,8 +57,11 @@ export function ConnectorsPage({ item }: { item: NavItem }) {
           </>
         }
       >
+        <RouterLink className="btn" to="/connectors/new">
+          Add connection
+        </RouterLink>
         <p className="cli-command">
-          <code>{command}</code> <CopyButton text={command} label="Copy command" />
+          Or from a terminal: <code>{command}</code> <CopyButton text={command} label="Copy command" />
         </p>
         <GuideLink page="connectors/#adding-a-connector">Adding a connector</GuideLink>
       </EmptyState>
@@ -112,6 +116,11 @@ export function ConnectorsPage({ item }: { item: NavItem }) {
           <p className="hint">Bound per environment · production always uses read replicas</p>
         </div>
         <div className="editor-actions">
+          {application && (
+            <RouterLink className="btn" to="/connectors/new">
+              Add connection
+            </RouterLink>
+          )}
           <button className="btn btn-outline" type="button" disabled={reload.isPending} onClick={() => reload.mutate()}>
             {reload.isPending ? "Reloading…" : "Reload configuration"}
           </button>

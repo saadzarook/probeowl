@@ -70,7 +70,7 @@ test("environments: Dev, UAT and Production suggested, nothing written until Cre
 
   await expect(page.getByRole("heading", { name: "First connection" })).toBeVisible();
   await expect(page.getByRole("status").filter({ hasText: "was created" })).toContainText("Card access was created: card_access/application.yaml");
-  await expect(page.getByRole("link", { name: "Add its first connection" })).toHaveAttribute("href", "/connectors");
+  await expect(page.getByRole("link", { name: "Add its first connection" })).toHaveAttribute("href", "/connectors/new?environment=uat");
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   // The new application is loaded and chosen.
   await page.getByRole("link", { name: "Later" }).click();

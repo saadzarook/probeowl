@@ -43,7 +43,7 @@ export function FirstRunPage() {
   const [editedId, setEditedId] = useState<string>();
   const [chosen, setChosen] = useState<Set<string>>(new Set(SUGGESTED));
   const [preview, setPreview] = useState<{ change: CatalogChange; sent: string }>();
-  const [created, setCreated] = useState<{ change: CatalogChange; id: string; title: string }>();
+  const [created, setCreated] = useState<{ change: CatalogChange; id: string; title: string; environment: string }>();
 
   const id = editedId ?? applicationId(name);
   const problem = applicationIdProblem(id, applications.map((a) => a.name));
@@ -62,7 +62,9 @@ export function FirstRunPage() {
         setPreview({ change, sent });
         return;
       }
-      setCreated({ change, id, title: body.title });
+      // The first connection goes in an environment that isn't Production, if there is one, as owl init imports.
+      const first = body.environments.find((e) => !e.production) ?? body.environments[0];
+      setCreated({ change, id, title: body.title, environment: first?.name ?? "" });
       setPreview(undefined);
       selectApplication(id);
       setStep(2);
@@ -172,7 +174,7 @@ export function FirstRunPage() {
         </p>
         <p className="hint">Next, connect it to a database or API in one of its environments. Passwords go to this machine's keychain, never to a file.</p>
         <div className="wizard-nav">
-          <RouterLink className="btn" to="/connectors">
+          <RouterLink className="btn" to={`/connectors/new?environment=${encodeURIComponent(created.environment)}`}>
             Add its first connection
           </RouterLink>
           <RouterLink className="btn btn-outline" to="/inspect">

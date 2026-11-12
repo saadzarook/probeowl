@@ -26,7 +26,7 @@ export { topUpEntity, walletProbes } from "./entities";
 export { topUpDifferences, afterARestart, allSame, allNotCompared, someNotCompared } from "./healthyComparison";
 export { flaggedRunbook, outboxResult, stepsInRun, topUpNotCredited } from "./runbooks";
 export { walletConnectors, cardAccessConnectors, payoutsConnectors } from "./connectors";
-export { walletCatalog, cardAccessCatalog, schemaSnapshots, truncatedAccessSnapshot, UNIMPORTED } from "./catalog";
+export { walletCatalog, cardAccessCatalog, schemaSnapshots, truncatedAccessSnapshot, UNIMPORTED, addedConnectorSnapshot } from "./catalog";
 export { walletSuggestions, walletReviewTables, cardAccessReview } from "./review";
 export { draftRun, passingReport, piiReport, timeFilterReport, unreadableReport, TIME_FILTER_MESSAGE } from "./probeChecks";
 export { runningValidateRun, failedValidateRun, skippedValidateRun, stoppedValidateRun, lateValidateRun, walletRunPages } from "./runs";
