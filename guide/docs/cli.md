@@ -81,7 +81,7 @@ owl serve --config probeowl
 
 | Option | Default | Meaning |
 | --- | --- | --- |
-| `--config <folder>` | `$PROBEOWL_CONFIG`, else the current folder if it holds applications, else `./probeowl`, or `~/probeowl` when the current folder is a system or program folder or can't be written to; created if missing, and printed with how to choose another | The applications to load |
+| `--config <folder>` | `$PROBEOWL_CONFIG`, else the current folder if it holds ProbeOwl applications (an `application.yaml` with `application:` and `environments:`), else `./probeowl`, or `~/probeowl` when the current folder is a system or program folder or can't be written to; created if missing, and printed with how to choose another | The applications to load |
 | `--port <n>` | 7878 | The port on 127.0.0.1 |
 | `--url <url>` | `$PROBEOWL_STORE_URL`, else `~/.probeowl/store.db`, created on a first run | The store |
 | `--web-origin <url>` | `$PROBEOWL_WEB_ORIGINS` | Where else the web app is served from, on loopback only. Vite on 5173 and 4173 is always accepted. Repeat for several |

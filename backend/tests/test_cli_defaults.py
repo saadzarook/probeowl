@@ -234,3 +234,63 @@ def test_owl_init_takes_a_store_url_and_says_how_when_the_store_is_declined(
     assert "without one it can't set up" in message
     assert "--url <url> or PROBEOWL_STORE_URL" in message
     assert not (tmp_path / "probeowl" / "access").exists()
+
+
+# --- A folder with YAML that isn't ProbeOwl's (#46's retest: v0.1.0 in System32, "205 errors") ---
+
+
+def spring_project(folder: Path) -> None:
+    """A project folder of another kind, with an application.yaml of its own."""
+    (folder / "service").mkdir()
+    (folder / "service" / "application.yaml").write_text(
+        "spring:\n  application:\n    name: wallet\nserver:\n  port: 8080\n", encoding="utf-8"
+    )
+
+
+def test_a_folder_whose_application_yaml_is_not_probeowls_is_not_loaded(nothing_told: Path) -> None:
+    spring_project(nothing_told)
+    choice = choose_config_folder(None)
+    assert choice.folder == nothing_told / "probeowl"
+    assert choice.not_loaded is not None
+    assert "not ProbeOwl's" in choice.not_loaded and "service/application.yaml" in choice.not_loaded
+
+
+@pytest.mark.parametrize(
+    "text",
+    [": not yaml at all\n  - [", "application: [a list]\nenvironments: {}\n", "\xff\xfe binary"],
+)
+def test_broken_or_other_yaml_is_not_probeowls_either(nothing_told: Path, text: str) -> None:
+    (nothing_told / "x").mkdir()
+    (nothing_told / "x" / "application.yaml").write_bytes(text.encode("latin-1"))
+    assert choose_config_folder(None).folder == nothing_told / "probeowl"
+
+
+def test_probeowls_own_applications_are_still_loaded_from_this_folder(nothing_told: Path) -> None:
+    spring_project(nothing_told)  # beside them, harmless
+    shutil.copytree(EXAMPLES / "wallet", nothing_told / "wallet")
+    choice = choose_config_folder(None)
+    assert choice.folder == nothing_told and choice.not_loaded is None
+
+
+def test_owl_serve_says_why_it_did_not_load_this_folder(
+    nothing_told: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(cli.uvicorn, "run", lambda app, **kwargs: None)
+    spring_project(nothing_told)
+    result = CliRunner().invoke(cli.app, ["serve"])
+    assert result.exit_code == 0, result.output
+    assert "Not this folder: its application.yaml files are not ProbeOwl's" in result.output
+    assert f"Config folder: {(nothing_told / 'probeowl').resolve()} (new, empty)" in result.output
+
+
+def test_a_folder_named_explicitly_keeps_its_errors(
+    nothing_told: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(cli.uvicorn, "run", lambda app, **kwargs: None)
+    spring_project(nothing_told)
+    result = CliRunner().invoke(cli.app, ["serve", "--config", str(nothing_told)])
+    assert result.exit_code != 0
+    assert "errors" in str(result.exception)
+    monkeypatch.setenv(CONFIG_VARIABLE, str(nothing_told))
+    named = CliRunner().invoke(cli.app, ["serve"])
+    assert named.exit_code != 0 and "errors" in str(named.exception)
