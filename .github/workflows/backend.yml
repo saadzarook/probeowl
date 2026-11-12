@@ -26,10 +26,14 @@ jobs:
       - run: uv sync --locked
       - name: Lint
         run: |
-          uv run ruff check .
-          uv run ruff format --check .
+          uv run ruff check . ../scripts ../plugins
+          uv run ruff format --check . ../scripts ../plugins
       - name: Types
-        run: uv run mypy probeowl tests
+        # ../plugins on the command line: mypy reads the plugins' source, not the installed copy,
+        # which has no py.typed.
+        run: uv run mypy probeowl tests ../plugins
+      - name: Examples
+        run: uv run owl check ../examples --no-connect
       - name: Tests
         # The store on other databases runs in its own job below. Guards are
         # safety-critical: the plan requires at least 85% coverage on guards/.
