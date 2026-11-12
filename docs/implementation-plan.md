@@ -142,6 +142,11 @@ plugins.
     last, and if the audit fails the keychain entry is put back as it was and the save is refused,
     as file saves and `owl connector add` do since #273. Also in this phase: revisit setup without
     a store (today `owl init` and `owl connector add` carry on with an on-screen warning).
+    Alongside phase (a), outlined in [v0.2.md](v0.2.md):
+    - **Global search**, a command palette (<kbd>Ctrl</kbd>+<kbd>K</kbd> and <kbd>/</kbd>), or
+      v0.2.1 if not ready.
+    - **The MCP server**, `owl mcp`, for drafting configuration with an AI assistant, or v0.2.1 if
+      not ready.
   - **v0.3, phase (b).** The entity graph builder.
   - **v0.4, phase (c).** Blocks, and probe by example.
   - **v0.5, phase (d).** Templates, and the New runbook form.
