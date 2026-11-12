@@ -21,7 +21,7 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v6
       - run: uv sync --locked
       - name: Lint
@@ -51,7 +51,7 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v6
       - run: uv sync --locked
       - name: Store and adapter tests on ${{ matrix.database }}
@@ -62,7 +62,7 @@ jobs:
     # Checked from a clean python:3.12-slim container, since a runner image may carry one.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Start SQL Server 2022
         run: |
           MSSQL_PW="P$(openssl rand -hex 16)!x"
@@ -88,7 +88,7 @@ jobs:
       PYTHON_KEYRING_BACKEND: keyrings.alt.file.PlaintextKeyring
       PROBEOWL_ALLOW_INSECURE_KEYRING: "1"
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v6
       - run: uv sync --locked
       - name: Start the dev stack
@@ -149,7 +149,7 @@ jobs:
       PYTHON_KEYRING_BACKEND: keyrings.alt.file.PlaintextKeyring
       PROBEOWL_ALLOW_INSECURE_KEYRING: "1"
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v6
       - run: uv sync --locked
       - name: Start the dev stack
@@ -208,7 +208,7 @@ jobs:
       PROBEOWL_LEDGER_DB_UAT: ProbeOwl_Ro_Local1
       PROBEOWL_ACCESS_DB_UAT: ProbeOwl_Ro_Local1
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v6
       - run: uv sync --locked
       - name: Start the dev stack
@@ -258,7 +258,7 @@ jobs:
       PROBEOWL_LEDGER_DB_UAT: ProbeOwl_Ro_Local1
       PROBEOWL_ACCESS_DB_UAT: ProbeOwl_Ro_Local1
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v6
       - run: uv sync --locked
       - name: Start the dev stack
