@@ -187,16 +187,36 @@ section.s { padding-block: 88px 0; }
 .faq summary:focus-visible { outline: 2px solid var(--amber-bright); outline-offset: 3px; border-radius: 4px; }
 .faq details p { color: var(--fg-quiet); font-size: 15.5px; padding: 0 0 20px; max-width: 78ch; }
 
-/* Status and roadmap */
-.status { display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: baseline; padding: 18px 20px; border: 1px solid var(--rule); border-left: 3px solid var(--amber); background: var(--surface); border-radius: 8px; }
-.status strong { font-weight: 600; }
-.status nav { display: flex; flex-wrap: wrap; gap: 16px; font-size: 15px; }
-.road { list-style: none; margin: 28px 0 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 28px; }
-.road li { display: grid; gap: 8px; align-content: start; border-top: 2px solid var(--fg); padding-top: 16px; }
-.road .ver { font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: var(--amber); }
-.road p { color: var(--fg-quiet); font-size: 15.5px; }
+/* Tested: four numbers in the outcomes grid's frame, then the safety table and a short list */
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 12px; overflow: hidden; }
+.stats div { background: var(--surface); padding: 18px 20px; display: grid; gap: 4px; align-content: start; }
+.stats .num { font-family: var(--font-display); font-size: 34px; font-weight: 700; line-height: 1.05; }
+.stats .what { color: var(--fg-quiet); font-size: 14.5px; }
+.caught { margin-top: 24px; padding: 18px 20px; border: 1px solid var(--rule); border-left: 3px solid var(--amber); background: var(--surface); border-radius: 8px; }
+.caught ul { margin: 10px 0 0; padding-left: 18px; display: grid; gap: 8px; color: var(--fg-quiet); font-size: 15.5px; }
+.caught strong { color: var(--fg); font-weight: 600; }
+
+/* Status and roadmap: one marker per release on a line; across on wide screens, down on narrow */
+.timeline { list-style: none; margin: 8px 0 0; padding: 0; position: relative; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 20px; }
+.timeline::before { content: ""; position: absolute; top: 11px; left: 12px; right: 12px; height: 2px; background: linear-gradient(to right, var(--found) 0 20%, var(--amber-bright) 20% 30%, var(--rule) 30%); }
+.tl { position: relative; display: grid; grid-template-rows: auto 1fr; gap: 14px; }
+.tl .marker { position: relative; z-index: 1; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--fg-quiet); background: var(--paper); display: grid; place-items: center; }
+.tl.shipped .marker { background: var(--found); border-color: var(--found); }
+.tl.now .marker { background: var(--amber-bright); border-color: var(--amber-bright); box-shadow: 0 0 0 4px rgba(242, 163, 58, .22); }
+.tl .card { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 16px; display: grid; gap: 10px; align-content: start; height: 100%; }
+.tl.now .card { border-color: var(--amber); box-shadow: inset 0 3px 0 var(--amber-bright); }
+.tl-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.tl .ver { font-family: var(--font-mono); font-size: 14px; font-weight: 600; color: var(--amber); }
+.tl h3 { font-size: 16.5px; }
+.tl ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; color: var(--fg-quiet); font-size: 14.5px; }
+.tl .card > a { font-size: 14px; }
+.chip { display: inline-flex; align-items: center; height: 22px; padding: 0 9px; border-radius: 11px; font-size: 12px; font-weight: 600; white-space: nowrap; color: var(--fg-quiet); border: 1px solid var(--rule); }
+.chip-done { background: var(--found-bg); color: var(--found); border-color: transparent; }
+.chip-now { background: var(--waiting-bg); color: var(--waiting); border-color: transparent; }
+.rules-note { margin-top: 22px; color: var(--fg-quiet); font-size: 15px; max-width: 80ch; }
 .measure { margin-top: 40px; display: grid; gap: 12px; max-width: 760px; }
 .measure h3 { margin-bottom: 4px; }
+.measure .unit { font-family: var(--font-mono); font-size: 12px; font-weight: 500; color: var(--fg-quiet); margin-left: 8px; }
 .bar { display: grid; grid-template-columns: 92px minmax(0, 1fr) 64px; gap: 14px; align-items: center; font-size: 14.5px; }
 .bar .lbl { font-family: var(--font-mono); font-size: 13px; color: var(--fg-quiet); }
 .bar .track { height: 12px; background: var(--rule); border-radius: 6px; overflow: hidden; }
@@ -212,11 +232,14 @@ footer { margin-top: 96px; border-top: 1px solid var(--rule); }
 @media (max-width: 920px) {
   .hero, .start { grid-template-columns: minmax(0, 1fr); }
   .steps, .outcomes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .aud, .road { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .aud, .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .timeline { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .timeline::before { top: 12px; bottom: 12px; left: 11px; right: auto; width: 2px; height: auto; background: linear-gradient(to bottom, var(--found) 0 24%, var(--amber-bright) 24% 36%, var(--rule) 36%); }
+  .tl { grid-template-columns: 24px minmax(0, 1fr); grid-template-rows: auto; gap: 14px; }
 }
 @media (max-width: 620px) {
   body { font-size: 16px; }
-  .steps, .outcomes, .tools, .aud, .road { grid-template-columns: minmax(0, 1fr); }
+  .steps, .outcomes, .tools, .aud { grid-template-columns: minmax(0, 1fr); }
   .top nav { gap: 16px; font-size: 14px; }
   .safety th { white-space: normal; width: 34%; }
   .compare thead { display: none; }
@@ -247,6 +270,7 @@ footer { margin-top: 96px; border-top: 1px solid var(--rule); }
   .graph.play .edge { stroke-dasharray: 1; animation: draw .6s ease-out both; animation-delay: calc(var(--d) * .35s); }
   .graph.play .pop { animation: popin .45s cubic-bezier(.2,.9,.3,1.3) both; animation-delay: calc(.55s + var(--d) * .35s); }
   .graph.play .alarm { animation: alarm 1.4s ease both; animation-delay: 1.35s; }
+  .tl.now .marker { animation: inprogress 2.4s ease-in-out infinite; }
 
   .tool svg { transition: transform .2s ease; }
   .tool:hover svg { transform: translateY(-2px) rotate(-3deg); }
@@ -260,6 +284,7 @@ footer { margin-top: 96px; border-top: 1px solid var(--rule); }
 @keyframes owlblink { 0%, 93%, 100% { transform: scaleY(1); } 95%, 97% { transform: scaleY(.08); } }
 @keyframes draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
 @keyframes popin { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: scale(1); } }
+@keyframes inprogress { 0%, 100% { box-shadow: 0 0 0 4px rgba(242, 163, 58, .22); } 50% { box-shadow: 0 0 0 8px rgba(242, 163, 58, .08); } }
 @keyframes alarm { 0%, 100% { stroke-width: 1.6; } 30%, 70% { stroke-width: 3.5; } }
 
 /* Owls beside section headings: decoration only, each with its own small habit. */
@@ -316,6 +341,7 @@ footer { margin-top: 96px; border-top: 1px solid var(--rule); }
         <a href="#how">How it works</a>
         <a href="#stages">Use cases</a>
         <a href="#safety">Safety</a>
+        <a href="#tested">Testing</a>
         <a href="#faq">Questions</a>
         <a href="#roadmap">Roadmap</a>
         <a href="#start">Get started</a>
@@ -613,6 +639,39 @@ footer { margin-top: 96px; border-top: 1px solid var(--rule); }
     </div>
   </section>
 
+  <section class="s" id="tested" aria-labelledby="tested-h">
+    <div class="s-head">
+      <p class="eyebrow">Testing</p>
+      <h2 id="tested-h">Tested like it reads production.</h2>
+      <p class="lede">ProbeOwl reads systems people depend on, so each guard is tested the way it would fail. The numbers are v0.1.0’s, from its CI run and its release checks.</p>
+    </div>
+    <div class="stats">
+      <div><span class="num">2,102</span><span class="what">backend tests</span></div>
+      <div><span class="num">204</span><span class="what">browser tests: 183 on mocks, 21 live</span></div>
+      <div><span class="num">146</span><span class="what">database tests on SQL Server, Oracle, MariaDB and PostgreSQL</span></div>
+      <div><span class="num">4</span><span class="what">end-to-end exit checks</span></div>
+    </div>
+    <div class="safety-wrap" style="margin-top:24px">
+      <table class="safety">
+        <tbody>
+          <tr><th scope="row">Every pull request</th><td>The backend and browser tests; the database tests against SQL Server, Oracle, MariaDB and PostgreSQL in containers, with SQLite as the default store; live browser tests against <code>owl serve</code> and the example databases; and the four end-to-end exit checks, one per milestone.</td></tr>
+          <tr><th scope="row">Before every release</th><td>The same tests and exit checks again on real servers installed on a machine, not containers: SQL Server 2025, Oracle AI Database 26ai Free, MariaDB 11.8 and PostgreSQL 16.</td></tr>
+          <tr><th scope="row">Guards tested by attack</th><td>Writes (inside a CTE too), locks and lock hints, temporary tables, links to other databases, query hints, and comments a database would execute are each refused. Hostile identifiers (quotes, <code>OR '1'='1'</code>, <code>DROP TABLE</code>, <code>xp_cmdshell</code>, 10,000 characters) must reach the driver as one bound value, never as SQL. On a real SQL Server, a test checks that the parallelism cap sits before a trailing comment, so the comment can’t swallow it.</td></tr>
+          <tr><th scope="row">Leak scans</th><td>Tests send a known email or secret through and check it never appears in API responses, the logs or the audit, and that a file comparison masks it. Before a release, a secrets scan covers every commit on every branch.</td></tr>
+          <tr><th scope="row">As users get it</th><td>The release wheel is installed with <code>uv tool install</code> and a fresh dependency resolution, then <code>owl init</code>, <code>owl check</code> and <code>owl serve</code> run on it. Rebuilt from its tag, the v0.1.0 wheel is byte-for-byte the same file, and so is the one on PyPI.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="caught">
+      <h3>Real servers caught what fakes couldn’t</h3>
+      <ul>
+        <li><strong>Oracle’s driver dropped a time’s offset.</strong> Times with an offset are now sent as their exact instant, and a column the driver can’t read with its offset fails the save check instead of returning the wrong rows.</li>
+        <li><strong>A comparison on SQL Server matched rows 4 hours off.</strong> A +04:00 value against a column with no offset. A save check now refuses that comparison until the query converts it.</li>
+        <li><strong>Oracle refused two statements the guard had rewritten.</strong> ProbeOwl now runs the exact text that was reviewed, changing only the parameters and the row cap.</li>
+      </ul>
+    </div>
+  </section>
+
   <section class="s" id="faq" aria-labelledby="faq-h">
     <div class="s-head has-owl">
       <p class="eyebrow">Common questions</p>
@@ -650,26 +709,61 @@ footer { margin-top: 96px; border-top: 1px solid var(--rule); }
       <h2 id="roadmap-h">Where it is, and where it’s going.</h2>
       <p class="lede">Each release makes the first check quicker to set up, without loosening any guard.</p>
     </div>
-    <div class="status">
-      <span><strong>v0.1</strong> released 12 Nov 2026 · pre-release</span>
-      <nav aria-label="Release links">
-        <a href="https://pypi.org/project/probeowl/">PyPI</a>
-        <a href="https://github.com/saadzarook/probeowl/releases/tag/v0.1.0">Release notes</a>
-        <a href="./guide/">Guide</a>
-      </nav>
-    </div>
-    <ol class="road">
-      <li><span class="ver">0.2 · next</span><h3>Set up in the browser</h3><p>First-run setup and an Add connection form, with passwords going straight to the keychain. A command palette to search everything. An AI assistant can draft probes for you to paste, never run them.</p></li>
-      <li><span class="ver">0.3</span><h3>A visual entity builder</h3><p>Start from a table, give a sample ID and follow keys outward, seeing Found or Missing on the sample as you build.</p></li>
-      <li><span class="ver">0.4</span><h3>Blocks and probe by example</h3><p>Checks as sentences with choices instead of typing, and checks proposed from two or three records you know are healthy.</p></li>
-      <li><span class="ver">0.5</span><h3>Templates and runbooks</h3><p>Starter probes for common checks, and a form for writing runbooks.</p></li>
+    <ol class="timeline">
+      <li class="tl shipped">
+        <span class="marker" aria-hidden="true"><svg viewBox="0 0 16 16" width="12" height="12"><path d="M3.5 8.5 6.5 11.5 12.5 4.5" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        <div class="card">
+          <div class="tl-head"><span class="ver">v0.1</span><span class="chip chip-done">Shipped 12 Nov 2026</span></div>
+          <h3>Find what really happened</h3>
+          <ul><li>Inspect and Validate across databases and APIs</li><li>Guards, masking, audit, kill switch</li><li>Healthy comparison and runbooks</li></ul>
+          <a href="https://github.com/saadzarook/probeowl/releases/tag/v0.1.0">Release notes</a>
+        </div>
+      </li>
+      <li class="tl now">
+        <span class="marker" aria-hidden="true"></span>
+        <div class="card">
+          <div class="tl-head"><span class="ver">0.2</span><span class="chip chip-now">In progress</span></div>
+          <h3>Set up in the browser</h3>
+          <ul><li>First-run setup and Add connection</li><li>Search everything with Ctrl+K</li><li>AI assistants draft, you paste</li></ul>
+          <a href="https://github.com/saadzarook/probeowl/milestone/1">Milestone</a>
+        </div>
+      </li>
+      <li class="tl planned">
+        <span class="marker" aria-hidden="true"></span>
+        <div class="card">
+          <div class="tl-head"><span class="ver">0.3</span><span class="chip">Planned</span></div>
+          <h3>Visual entity builder</h3>
+          <ul><li>Start from a table and a sample ID</li><li>Follow keys, see Found or Missing</li></ul>
+          <a href="https://github.com/saadzarook/probeowl/milestone/3">Milestone</a>
+        </div>
+      </li>
+      <li class="tl planned">
+        <span class="marker" aria-hidden="true"></span>
+        <div class="card">
+          <div class="tl-head"><span class="ver">0.4</span><span class="chip">Planned</span></div>
+          <h3>Blocks and probe by example</h3>
+          <ul><li>Checks as sentences, not typing</li><li>Checks proposed from healthy records</li></ul>
+          <a href="https://github.com/saadzarook/probeowl/milestone/4">Milestone</a>
+        </div>
+      </li>
+      <li class="tl planned">
+        <span class="marker" aria-hidden="true"></span>
+        <div class="card">
+          <div class="tl-head"><span class="ver">0.5</span><span class="chip">Planned</span></div>
+          <h3>Templates and runbooks</h3>
+          <ul><li>Starter probes for common checks</li><li>A form for writing runbooks</li></ul>
+          <a href="https://github.com/saadzarook/probeowl/milestone/5">Milestone</a>
+        </div>
+      </li>
     </ol>
-    <div class="measure" role="group" aria-label="Steps from install to a first Validate">
-      <h3>Measured: install to a first Validate</h3>
+    <p class="rules-note">Every release keeps the same rules: read-only, the same guards, tests on every supported database, and a newcomer test by hand before it ships.</p>
+    <div class="measure" role="group" aria-label="Steps from install to a first Validate, lower is better">
+      <h3>Measured: install to a first Validate <span class="unit">steps, lower is better</span></h3>
       <div class="bar"><span class="lbl">v0.1 today</span><span class="track"><span class="fill now" style="--w:100%"></span></span><span class="n">61</span></div>
       <div class="bar"><span class="lbl">0.2 target</span><span class="track"><span class="fill" style="--w:77%"></span></span><span class="n">~47</span></div>
+      <div class="bar"><span class="lbl">0.3 target</span><span class="track"><span class="fill" style="--w:69%"></span></span><span class="n">~42</span></div>
       <div class="bar"><span class="lbl">0.4 target</span><span class="track"><span class="fill" style="--w:49%"></span></span><span class="n">30</span></div>
-      <p class="note">Steps a newcomer takes, from installing ProbeOwl to a first Validate on the card example: every command, answer, click and field. Counted by a scripted run on each release and re-measured after each phase.</p>
+      <p class="note">Every command, answer, click and field a newcomer needs, from installing ProbeOwl to a first Validate on the card example. Counted by a scripted run on each release and re-measured after each phase.</p>
     </div>
   </section>
 
