@@ -2,7 +2,7 @@
 import { stringify } from "yaml";
 import { parse } from "yaml";
 import { delay, http, HttpResponse } from "msw";
-import type { CatalogChange, CatalogReview, CatalogTable, DraftConnection, KillSwitch, KillTarget, ProbeChange, SaveApplication, SaveConnector, SaveEntity, SaveSecret, SaveProbe, SetKillSwitch, StartRun } from "../src/api/client";
+import type { ApplicationSummary, CatalogChange, CatalogReview, CatalogTable, DraftConnection, KillSwitch, KillTarget, ProbeChange, SaveApplication, SaveConnector, SaveEntity, SaveSecret, SaveProbe, SetKillSwitch, StartRun } from "../src/api/client";
 import type { CompareRequest } from "../../plugins/compare_files/web/types";
 import { compareFilesManifest, compareFilesResult } from "./fixtures/compareFiles";
 import type { HealthyAttempt, HealthyComparison, Run, RunbookView, StepInRun } from "../src/api/client";
@@ -328,9 +328,12 @@ function fileChange(path: string, text: string, base: string | null | undefined)
   };
 }
 
+// Applications created through first run in this page's life, listed after the examples.
+const createdApplications: ApplicationSummary[] = [];
+
 export const handlers = [
   // A config folder with no applications, as owl init has not been run yet.
-  http.get("/api/applications", () => json(localStorage.getItem("mock-no-applications") ? [] : applications)),
+  http.get("/api/applications", () => json([...(localStorage.getItem("mock-no-applications") ? [] : applications), ...createdApplications])),
 
   http.get("/api/applications/:application", ({ params }) => {
     const found = applications.find((a) => a.name === params["application"]);
@@ -576,7 +579,7 @@ export const handlers = [
   http.get("/api/setup", () => {
     const none = localStorage.getItem("mock-no-applications") !== null;
     return json({
-      applications: none ? 0 : applications.length,
+      applications: (none ? 0 : applications.length) + createdApplications.length,
       config_folder: "C:/Users/you/probeowl",
       store: { dialect: "sqlite", created_now: none },
       keychain: { available: true, reason: null },
@@ -591,7 +594,16 @@ export const handlers = [
     }
     const environments = body.environments.map((e) => `  ${e.name}:\n    title: ${e.title}\n    production: ${String(e.production ?? false)}`);
     const text = `application: ${application}\ntitle: ${body.title}\nowner: ${body.owner}\nenvironments:\n${environments.join("\n")}`;
-    return json(fileChange(`${application}/application.yaml`, text, body.base));
+    const change = fileChange(`${application}/application.yaml`, text, body.base);
+    if (change.written) {
+      createdApplications.push({
+        name: application,
+        title: body.title,
+        owner: body.owner,
+        environments: body.environments.map((e) => ({ name: e.name, title: e.title, production: e.production ?? false })),
+      });
+    }
+    return json(change);
   }),
 
   http.put("/api/applications/:application/connectors/:connector", async ({ params, request }) => {

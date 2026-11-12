@@ -473,3 +473,20 @@ export async function fetchConnectors(application: string, environment: string):
   if (data) return data;
   throw problemError(error, "The connectors could not be loaded.");
 }
+
+/** What first run needs: how many applications are loaded, where new ones go, the store, the keychain. */
+export async function fetchSetup(): Promise<SetupState> {
+  const { data, error } = await api.GET("/api/setup");
+  if (data) return data;
+  throw problemError(error, "The setup could not be read.");
+}
+
+/** Preview a new application's application.yaml (no base: nothing is written), or write it with the preview's base. */
+export async function saveApplication(application: string, body: SaveApplication): Promise<CatalogChange> {
+  const { data, error } = await api.PUT("/api/applications/{application}", {
+    params: { path: { application } },
+    body,
+  });
+  if (data) return data;
+  throw problemError(error, "The application could not be created.");
+}
