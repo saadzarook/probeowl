@@ -198,9 +198,12 @@ section.s { padding-block: 88px 0; }
 
 /* Status and roadmap: one marker per release on a line; across on wide screens, down on narrow */
 .timeline { list-style: none; margin: 8px 0 0; padding: 0; position: relative; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 20px; }
-.timeline::before { content: ""; position: absolute; top: 11px; left: 12px; right: 12px; height: 2px; background: linear-gradient(to right, var(--found) 0 20%, var(--amber-bright) 20% 30%, var(--rule) 30%); }
+/* One segment per release, from its marker to the next one's, so every marker sits on the line. */
+.tl:not(:last-child)::before { content: ""; position: absolute; z-index: 0; top: 11px; left: 50%; width: calc(100% + 20px); height: 2px; background: var(--rule); }
+.tl.shipped::before { background: var(--found) !important; }
+.tl.now::before { background: linear-gradient(to right, var(--amber-bright), var(--rule)) !important; }
 .tl { position: relative; display: grid; grid-template-rows: auto 1fr; gap: 14px; }
-.tl .marker { position: relative; z-index: 1; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--fg-quiet); background: var(--paper); display: grid; place-items: center; }
+.tl .marker { position: relative; z-index: 1; justify-self: center; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--fg-quiet); background: var(--paper); display: grid; place-items: center; }
 .tl.shipped .marker { background: var(--found); border-color: var(--found); }
 .tl.now .marker { background: var(--amber-bright); border-color: var(--amber-bright); box-shadow: 0 0 0 4px rgba(242, 163, 58, .22); }
 .tl .card { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 16px; display: grid; gap: 10px; align-content: start; height: 100%; }
@@ -234,7 +237,9 @@ footer { margin-top: 96px; border-top: 1px solid var(--rule); }
   .steps, .outcomes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .aud, .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .timeline { grid-template-columns: minmax(0, 1fr); gap: 16px; }
-  .timeline::before { top: 12px; bottom: 12px; left: 11px; right: auto; width: 2px; height: auto; background: linear-gradient(to bottom, var(--found) 0 24%, var(--amber-bright) 24% 36%, var(--rule) 36%); }
+  .tl:not(:last-child)::before { top: 12px; left: 11px; width: 2px; height: calc(100% + 16px); }
+  .tl.now::before { background: linear-gradient(to bottom, var(--amber-bright), var(--rule)) !important; }
+  .tl .marker { justify-self: start; }
   .tl { grid-template-columns: 24px minmax(0, 1fr); grid-template-rows: auto; gap: 14px; }
 }
 @media (max-width: 620px) {
