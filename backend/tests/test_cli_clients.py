@@ -1,11 +1,24 @@
 # Author: @SaadZarook
 """Commands that run through owl serve say so; a --config given to one says where it goes."""
 
+import re
+
 import pytest
 from typer.testing import CliRunner
 
 from probeowl.cli import main as cli
 from probeowl.cli.server import NOT_RUN
+
+# Typer forces a coloured, boxed help when GITHUB_ACTIONS is set, as in CI. Colour codes can
+# fall inside a word (each dash of --config), so they go; box lines become spaces.
+_COLOUR = re.compile(r"\x1b\[[0-9;]*m")
+_BOX = re.compile(r"[\u2500-\u257f]")
+
+
+def _plain(output: str) -> str:
+    """The help's words alone: no colour codes, box lines or line breaks."""
+    return " ".join(_BOX.sub(" ", _COLOUR.sub("", output)).split())
+
 
 CLIENTS = [
     ["validate", "topup", "tp_91f2c7", "--env", "uat", "--reason", "incident"],
@@ -40,5 +53,5 @@ def test_the_hidden_option_is_not_in_a_clients_help() -> None:
 
 def test_the_root_help_says_which_commands_are_clients_of_owl_serve() -> None:
     result = CliRunner().invoke(cli.app, ["--help"])
-    assert "validate, inspect, catalog, kill and reload" in " ".join(result.output.split())
-    assert "start owl serve --config <folder> first" in " ".join(result.output.split())
+    assert "validate, inspect, catalog, kill and reload" in _plain(result.output)
+    assert "start owl serve --config <folder> first" in _plain(result.output)

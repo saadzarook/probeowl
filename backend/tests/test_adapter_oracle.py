@@ -733,16 +733,21 @@ def test_oracle_the_example_v_session_read_step_runs_as_written(database: Databa
     checked = safety.plan_check(app, step.sql, entitled)
     result = entitled.lookup(step.sql, {}, 20)
     entitled.close()
+    # v$session is a fixed view: no table is read, so the plan check passes.
+    assert checked.status is CheckStatus.PASS, checked.message
+    assert result.query.startswith("SELECT sid, blocking_session, event, seconds_in_wait")
+    assert "FROM v$session WHERE blocking_session IS NOT NULL" in result.query
+    if database.admin_user == database.binding.user:
+        pytest.skip(
+            f"ProbeOwl and the checks connect as one login ({ADMIN_URL} is not set), as in CI's "
+            "container, whose one test user can read v$session, so the refusal cannot be shown"
+        )
     probe = database.adapter()
     with pytest.raises(MissingGrant) as refused:
         probe.lookup(step.sql, {}, 20)
     with pytest.raises(MissingGrant) as unplanned:
         probe.explain(step.sql, {})
     probe.close()
-    # v$session is a fixed view: no table is read, so the plan check passes.
-    assert checked.status is CheckStatus.PASS, checked.message
-    assert result.query.startswith("SELECT sid, blocking_session, event, seconds_in_wait")
-    assert "FROM v$session WHERE blocking_session IS NOT NULL" in result.query
     # Oracle names the view it refused, so ProbeOwl names the grant, as for the lag grants.
     assert refused.value.grant == unplanned.value.grant == "SELECT on SYS.V_$SESSION"
     assert str(refused.value) == (
