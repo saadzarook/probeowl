@@ -129,3 +129,20 @@ class DraftConnection(ProbeOwlModel):
         default=False,
         description="Use the password this machine's keychain has for the binding.",
     )
+
+
+class SaveSecret(ProbeOwlModel):
+    """A binding's password or token, for this machine's keychain only."""
+
+    password: SecretStr = Field(
+        min_length=1,
+        max_length=1024,
+        description="Saved to the system keychain; never written to a file, logged or returned.",
+    )
+    replace: bool = Field(
+        default=False,
+        description=(
+            "Overwrite a password already saved under the binding's keychain name. Without it, "
+            "an existing one is a 409 secret-exists, so the person can be asked first."
+        ),
+    )

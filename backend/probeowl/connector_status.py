@@ -15,6 +15,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, replace
 from typing import Protocol
 
+from probeowl import secrets
 from probeowl.connectors.factory import configured_guards, open_connector, open_sql, sql_adapter
 from probeowl.connectors.lookup import ReplicaLag
 from probeowl.connectors.oracle import time_zone_shown
@@ -22,6 +23,7 @@ from probeowl.connectors.rest import RestLimits, rest_guards
 from probeowl.connectors.sql import SqlLimits, transport
 from probeowl.engine.locations import DEFAULT_MAX_ROWS
 from probeowl.errors import (
+    ConfigError,
     KillSwitchEngaged,
     KillSwitchUnknown,
     NotFoundError,
@@ -37,7 +39,9 @@ from probeowl.model.connector_status import (
     ConnectionTest,
     ConnectorStatus,
     PlanAccess,
+    SecretState,
 )
+from probeowl.secrets import keychain_entry
 
 CACHE_S = 60.0
 # As for plan checks: Oracle's EXPLAIN PLAN takes longer than a keyed lookup.
@@ -238,7 +242,8 @@ class ConnectorStatuses:
         if environment not in connector.environments:
             reason = f"{connector.connector} has no binding in {environment}"
             return status.model_copy(update={"reason": reason})
-        status = status.model_copy(update=_from_config(connector, environment))
+        secret = _secret_state(connector, environment)
+        status = status.model_copy(update=_from_config(connector, environment) | {"secret": secret})
         # Asked before anything reads: not even a kept reading is shown as current.
         try:
             stopped = self._stopped(application, connector.connector)
@@ -248,6 +253,10 @@ class ConnectorStatuses:
             )
         if stopped is not None:
             return status.model_copy(update={"health": BindingHealth.STOPPED, "reason": stopped})
+        if status.secret is SecretState.MISSING:
+            # Nothing to try without it: the screen asks for the password instead.
+            reason = f"no password saved on this machine for {environment}"
+            return status.model_copy(update={"reason": reason})
         if isinstance(connector, RestConnector):
             return status.model_copy(
                 update={
@@ -372,3 +381,17 @@ def _with_lag(reading: _Reading, lag: ReplicaLag, max_seconds: float) -> _Readin
         reason = f"{lag.note} (max {max_seconds:g} s)"
         return replace(reading, health=BindingHealth.LAGGING, reason=reason)
     return reading
+
+
+def _secret_state(connector: SqlConnector | RestConnector, environment: str) -> SecretState:
+    """Whether this machine has the binding's secret: asked of the keychain, never shown."""
+    reference = connector.environments[environment].secret
+    if reference is None:
+        return SecretState.NOT_NEEDED
+    if keychain_entry(reference) is None:
+        return SecretState.FROM_ENVIRONMENT
+    try:
+        # Looked up at call time, so tests can stand in for the keychain.
+        return SecretState.SAVED if secrets.secret_saved(reference) else SecretState.MISSING
+    except ConfigError:
+        return SecretState.MISSING
