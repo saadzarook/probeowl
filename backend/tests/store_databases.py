@@ -9,6 +9,7 @@ schema) name contains "test".
 import os
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+from secrets import token_hex
 from typing import Any
 
 import docker
@@ -28,7 +29,9 @@ _CONTAINERS: dict[str, Callable[[], DockerContainer]] = {
     "mssql": lambda: SqlServerContainer(
         "mcr.microsoft.com/mssql/server:2022-latest", dbname="master", dialect="mssql+mssqlpython"
     ),
-    "mariadb": lambda: MySqlContainer("mariadb:11", dialect="pymysql"),
+    # A password of its own each run: the default, "test", is also the user and database name,
+    # so a test that checks a written file holds no password would find it there by accident.
+    "mariadb": lambda: MySqlContainer("mariadb:11", dialect="pymysql", password=token_hex(16)),
     # A user of its own, as a real store would have: SQLAlchemy does not reflect tables in
     # the SYSTEM tablespace, where the default SYSTEM user would put them.
     "oracle": lambda: OracleDbContainer(
