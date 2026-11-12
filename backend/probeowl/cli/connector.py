@@ -9,17 +9,20 @@ Passwords go to the system keychain only, and only once the file is kept.
 """
 
 import getpass
-import io
 from pathlib import Path
 from typing import Annotated, Any
 
 import typer
-import yaml
-from ruamel.yaml import YAML
 from sqlalchemy.engine import make_url
 
 from probeowl.cli import connector_setup as setup
 from probeowl.cli.defaults import config_path, default_store_url
+from probeowl.connector_files import (
+    DEFAULT_ROW_CEILING,
+    file_of,
+    new_connector_text,
+    with_bindings,
+)
 from probeowl.errors import ConfigError, ProbeOwlError, unknown_application
 from probeowl.model.check import LoadedApplication, check_folder, load_applications
 from probeowl.model.connector import RestConnector, SqlConnector
@@ -152,13 +155,13 @@ def _new_connector(app: LoadedApplication, connector: str) -> _Change:
         "owner": app.application.owner,
     }
     if kind != "rest":
-        document["guards"] = {"row_ceiling": 1000}
+        document["guards"] = {"row_ceiling": DEFAULT_ROW_CEILING}
     passwords: dict[str, str] = {}
     document["environments"] = _ask_bindings(
         app, document, list(app.application.environments), {}, passwords
     )
     (RestConnector if kind == "rest" else SqlConnector).model_validate(document)
-    text = HEADER + yaml.safe_dump(document, sort_keys=False, allow_unicode=True)
+    text = new_connector_text(HEADER, document)
     change = _Change(path, None, text, kind, list(document["environments"]))
     change.passwords = passwords
     return change
@@ -176,7 +179,7 @@ def _bind_more(app: LoadedApplication, connector: str) -> _Change:
         f"{connector} ({current.type}) is bound in {', '.join(current.environments) or 'none'}; "
         f"not in {', '.join(missing)}"
     )
-    path = _file_of(app, connector)
+    path = file_of(app, connector)
     before = path.read_text(encoding="utf-8")
     first = next(iter(current.environments.values()), None)
     # The existing binding's answers are the defaults: often only the host or database differs.
@@ -185,40 +188,9 @@ def _bind_more(app: LoadedApplication, connector: str) -> _Change:
     document = {"connector": connector, "type": current.type}
     passwords: dict[str, str] = {}
     bindings = _ask_bindings(app, document, missing, previous, passwords)
-    change = _Change(path, before, _with_bindings(before, bindings), current.type, list(bindings))
+    change = _Change(path, before, with_bindings(before, bindings), current.type, list(bindings))
     change.passwords = passwords
     return change
-
-
-def _file_of(app: LoadedApplication, connector: str) -> Path:
-    """The file that defines the connector; ConfigError if it shares the file with others."""
-    assert app.folder is not None  # loaded from a folder
-    for path in sorted(app.folder.rglob("*.yaml")):
-        documents = list(yaml.safe_load_all(path.read_text(encoding="utf-8")))
-        if any(isinstance(d, dict) and d.get("connector") == connector for d in documents):
-            if len(documents) > 1:
-                raise ConfigError(f"{path} holds more than {connector}; move it to its own file")
-            return path
-    raise ConfigError(f"no file in {app.folder} defines connector {connector}")
-
-
-def _round_trip() -> YAML:
-    # As the examples are written: two-space mappings, list items indented under their key.
-    editor = YAML()
-    editor.width = 100
-    editor.indent(mapping=2, sequence=4, offset=2)
-    return editor
-
-
-def _with_bindings(text: str, bindings: dict[str, dict[str, Any]]) -> str:
-    """The connector's file with the new bindings added, its comments and order kept."""
-    editor = _round_trip()
-    document = editor.load(text)
-    for env, binding in bindings.items():
-        document["environments"][env] = binding
-    out = io.StringIO()
-    editor.dump(document, out)
-    return out.getvalue()
 
 
 def _write(folder: Path, change: _Change) -> None:

@@ -11,6 +11,7 @@ from typing import Any
 import typer
 
 from probeowl.catalog.service import CatalogService
+from probeowl.connector_files import KEYCHAIN_SERVICE, keychain_reference
 from probeowl.connector_status import ConnectorStatuses
 from probeowl.errors import ConfigError, ProbeOwlError
 from probeowl.guards.breaker import CircuitBreaker
@@ -18,7 +19,6 @@ from probeowl.model.check import LoadedApplication
 from probeowl.secrets import save_secret
 from probeowl.store.engine import create_store_engine
 
-KEYCHAIN_SERVICE = "probeowl"
 TYPES = ("sqlserver", "oracle", "mariadb", "rest")
 DEFAULT_PORTS = {"sqlserver": 1433, "oracle": 1521, "mariadb": 3306}
 NAME = re.compile(r"^[a-z][a-z0-9_]*$")
@@ -105,7 +105,7 @@ def _ask_sql(
         guess = name.removesuffix("_db") if name.endswith("_db") else None
         binding["database"] = ask_text("    Database", previous.get("database", guess))
     binding["user"] = ask_text("    Read-only login", previous.get("user"))
-    binding["secret"] = f"keyring:{KEYCHAIN_SERVICE}/{name}.{env}"
+    binding["secret"] = keychain_reference(name, env)
     password = _ask_password(name, passwords, env)
     replica = typer.confirm(
         "    Is this a read replica, readable secondary or Active Data Guard standby?",
@@ -143,7 +143,7 @@ def _ask_rest(
     if not typer.confirm("    Does it need a token?", default="secret" in previous):
         return binding, None
     name = connector["connector"]
-    binding["secret"] = f"keyring:{KEYCHAIN_SERVICE}/{name}.{env}"
+    binding["secret"] = keychain_reference(name, env)
     return binding, _ask_password(name, passwords, env, what="Token")
 
 

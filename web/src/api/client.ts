@@ -450,6 +450,10 @@ export async function reloadConfiguration(): Promise<ConfigReload> {
 }
 
 export type ConnectionTest = components["schemas"]["ConnectionTest"];
+export type SetupState = components["schemas"]["SetupState"];
+export type SaveApplication = components["schemas"]["SaveApplication"];
+export type SaveConnector = components["schemas"]["SaveConnector"];
+export type DraftConnection = components["schemas"]["DraftConnection"];
 
 /** Connect once to one binding, now. A kill switch refuses it with a 403. */
 export async function testConnection(application: string, connector: string, environment: string): Promise<ConnectionTest> {

@@ -78,6 +78,10 @@ class ConnectionSource(Protocol):
 
 StatusOpener = Callable[[SqlConnector, str], StatusSource | None]
 ConnectionOpener = Callable[[SqlConnector | RestConnector, str], ConnectionSource | None]
+# A binding not saved yet: its secret comes from the request, not the keychain.
+DraftOpener = Callable[
+    [SqlConnector | RestConnector, str, Callable[[str], str]], ConnectionSource | None
+]
 
 
 def open_for_status(connector: SqlConnector, environment: str) -> StatusSource | None:
@@ -108,12 +112,14 @@ class ConnectorStatuses:
         opener: StatusOpener = open_for_status,
         clock: Callable[[], float] = time.monotonic,
         connection_opener: ConnectionOpener = open_connector,
+        draft_opener: DraftOpener = open_connector,
     ):
         self._applications = applications
         self._breaker = breaker
         self._stopped = stopped
         self._opener = opener
         self._connection_opener = connection_opener
+        self._draft_opener = draft_opener
         self._clock = clock
         self._lock = threading.Lock()
         self._readings: dict[tuple[str, str, str], tuple[float, _Reading]] = {}
@@ -158,11 +164,46 @@ class ConnectorStatuses:
             duration_ms=round((self._clock() - start) * 1000),
         )
 
+    def test_draft(
+        self,
+        application: str,
+        connector: SqlConnector | RestConnector,
+        environment: str,
+        secrets: Callable[[str], str],
+    ) -> ConnectionTest:
+        """Connect once to a binding that is not saved yet, and say how it went.
+
+        A kill switch on the application, or on the connector if it exists, refuses it before
+        any secret is read. The breaker is left alone: a draft has no readings to pause.
+        """
+        app = self._application(application, environment)
+        stopped = self._stopped(application, connector.connector)
+        if stopped is not None:
+            raise KillSwitchEngaged(stopped)
+        start = self._clock()
+        reason = self._try_connecting(
+            connector, environment, lambda c, env: self._draft_opener(c, env, secrets)
+        )
+        if connector.connector in app.connectors:
+            # What the Connectors screen shows next should not be an older reading.
+            with self._lock:
+                self._readings.pop((application, connector.connector, environment), None)
+        return ConnectionTest(
+            connector=connector.connector,
+            environment=environment,
+            reachable=reason is None,
+            reason=reason,
+            duration_ms=round((self._clock() - start) * 1000),
+        )
+
     def _try_connecting(
-        self, connector: SqlConnector | RestConnector, environment: str
+        self,
+        connector: SqlConnector | RestConnector,
+        environment: str,
+        opener: ConnectionOpener | None = None,
     ) -> str | None:
         try:
-            source = self._connection_opener(connector, environment)
+            source = (opener or self._connection_opener)(connector, environment)
         except ProbeOwlError as err:  # its secret cannot be read
             return str(err)
         assert source is not None  # the caller found the binding

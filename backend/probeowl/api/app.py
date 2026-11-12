@@ -41,6 +41,7 @@ from probeowl.errors import (
 from probeowl.plugins.registry import LoadedPlugin, mount_plugins
 from probeowl.reload import ConfigReloader
 from probeowl.runs import RunService
+from probeowl.setup_writes import SetupWrites
 
 DEFAULT_PORT = 7878
 
@@ -190,6 +191,7 @@ def create_app(
     web_build: Path | None = None,
     guide_build: Path | None = None,
     reloader: ConfigReloader | None = None,
+    setup: SetupWrites | None = None,
 ) -> FastAPI:
     """Create the ProbeOwl API; without runs or the catalog, their routes answer 501.
 
@@ -210,6 +212,7 @@ def create_app(
     app.state.probes = probes
     app.state.connectors = connectors
     app.state.reloader = reloader
+    app.state.setup = setup
     loaded = runs or catalog or connectors
     app.state.redactor = Redactor(loaded.applications if loaded else {})
     app.state.kill = runs.kill if runs else None
