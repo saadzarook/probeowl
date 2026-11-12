@@ -82,7 +82,7 @@ def test_a_sql_server_application_is_written_and_passes_owl_check(
     keychain: Keychain, tmp_path: Path
 ) -> None:
     folder = tmp_path / "probeowl"
-    result = init(sqlserver_answers(folder, "n", "n"))  # no test, no store
+    result = init(sqlserver_answers(folder, "y", "n", "n"))  # the store, no test, no import
     assert result.exit_code == 0, result.output
     application = yaml.safe_load((folder / "wallet" / "application.yaml").read_text("utf-8"))
     assert application == {
@@ -149,8 +149,9 @@ def test_one_environment_and_no_production_taken_with_enter(
         "n",  # not a replica
         "",  # TLS: yes
         "n",  # verify the certificate
-        "n",  # no store
+        "y",  # the store
         "n",  # no test
+        "n",  # no import
     ]
     result = init(answers)
     assert result.exit_code == 0, result.output
@@ -161,7 +162,7 @@ def test_one_environment_and_no_production_taken_with_enter(
 
 
 def test_an_answer_that_is_not_a_choice_is_asked_again(keychain: Keychain, tmp_path: Path) -> None:
-    answers = sqlserver_answers(tmp_path / "probeowl", "n", "n")
+    answers = sqlserver_answers(tmp_path / "probeowl", "y", "n", "n")
     production = answers.index("", 5)  # the Production question, after the environments
     answers[production:production] = ["staging"]
     kind = answers.index("wallet_db") - 1  # the type question, just before the connector id
@@ -195,7 +196,7 @@ def test_a_folder_with_files_in_it_is_refused(keychain: Keychain, tmp_path: Path
 def test_a_name_that_cannot_be_a_file_or_lookup_name_is_asked_again(
     keychain: Keychain, tmp_path: Path
 ) -> None:
-    answers = sqlserver_answers(tmp_path / "probeowl", "n", "n")
+    answers = sqlserver_answers(tmp_path / "probeowl", "y", "n", "n")
     answers.insert(1, "My App")
     result = init(answers)
     assert result.exit_code == 0, result.output
@@ -223,7 +224,7 @@ def test_an_oracle_binding_asks_for_its_service_schema_and_why_it_is_not_encrypt
         str(folder), "ledger", "", "payments-team", "uat", "none", "",
         "oracle", "ledger_db",
         "", "", "", "LEDGER_UAT", "probeowl_ro", PASSWORD, "n", "n", "Oracle Free has no tcps",
-        "n", "n",
+        "y", "n", "n",
     ]  # fmt: skip
     result = init(answers)
     assert result.exit_code == 0, result.output
@@ -249,7 +250,7 @@ def test_a_rest_connector_keeps_its_token_in_the_keychain(
         str(folder), "payments", "", "payments-team", "prod", "", "",
         "rest", "checkout_api",
         "https://checkout.example.com", "y", "token-value-1",
-        "n", "n",
+        "y", "n",
     ]  # fmt: skip
     result = init(answers)
     assert result.exit_code == 0, result.output
@@ -323,7 +324,7 @@ def test_it_tests_each_binding_creates_the_store_and_imports_outside_production(
 def test_the_application_id_has_no_default_and_the_connector_is_named_for_its_type(
     keychain: Keychain, tmp_path: Path
 ) -> None:
-    answers = sqlserver_answers(tmp_path / "probeowl", "n", "n")
+    answers = sqlserver_answers(tmp_path / "probeowl", "y", "n", "n")
     answers[1:2] = ["", "wallet"]  # Enter alone is not an answer: it is asked again
     answers[answers.index("wallet_db")] = ""  # accept the suggested connector id
     # Only an id ending in _db suggests a database name, so this one is typed.
@@ -353,7 +354,7 @@ def test_an_id_without_its_environment_words(typed: str, suggested: str) -> None
 def test_an_application_id_naming_an_environment_is_offered_without_it(
     keychain: Keychain, tmp_path: Path
 ) -> None:
-    answers = sqlserver_answers(tmp_path / "probeowl", "n", "n")
+    answers = sqlserver_answers(tmp_path / "probeowl", "y", "n", "n")
     answers[1:2] = ["wallet_uat_test", ""]  # accept the id without uat and test
     result = init(answers)
     assert result.exit_code == 0, result.output
@@ -436,11 +437,14 @@ def test_a_folder_that_would_not_load_is_removed_and_not_recorded(
     assert recorded(tmp_path) == []
 
 
-def test_without_the_store_it_carries_on_and_says_it_was_not_recorded(
+def test_declining_the_store_stops_before_anything_is_written(
     keychain: Keychain, tmp_path: Path
 ) -> None:
-    result = init(sqlserver_answers(tmp_path / "probeowl", "n", "n"))
-    assert result.exit_code == 0, result.output
-    assert "Not recorded in the audit: no store yet (owl store init creates it)." in result.output
-    assert (tmp_path / "probeowl" / "wallet" / "application.yaml").exists()
+    result = init(sqlserver_answers(tmp_path / "probeowl", "n"))
+    assert result.exit_code != 0
+    assert "ProbeOwl records every setup change in its store; without one it can't" in str(
+        result.exception
+    )
+    assert not (tmp_path / "probeowl" / "wallet").exists()
+    assert keychain.saved == {}
     assert not (tmp_path / "store.db").exists()

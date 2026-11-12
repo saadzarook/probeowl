@@ -79,7 +79,9 @@ the store has no ProbeOwl tables yet; run: owl store init
 the store schema is at <version>, this release needs <version>; run: owl store upgrade
 ```
 
-`owl serve` needs ProbeOwl's own store, at this release's version:
+`owl serve` needs ProbeOwl's own store, at this release's version. It creates the default one,
+`~/.probeowl/store.db`, the first time, so this comes from a store named by `--url` or
+`PROBEOWL_STORE_URL`, or one made by an older release:
 
 ```sh
 owl store init          # creates ~/.probeowl/store.db, or upgrades an existing store

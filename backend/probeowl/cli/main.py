@@ -23,8 +23,10 @@ from probeowl.cli.connector import connector_app
 from probeowl.cli.defaults import (
     CONFIG_VARIABLE,
     STORE_URL_VARIABLE,
-    config_path,
+    choose_config_folder,
+    create_store,
     default_store_url,
+    ensure_default_store,
 )
 from probeowl.cli.inspect import inspect
 from probeowl.cli.kill import kill_app
@@ -34,7 +36,7 @@ from probeowl.cli.validate import validate
 from probeowl.config_folder import ConfigFolder
 from probeowl.connector_status import ConnectorStatuses, unreadable_plans
 from probeowl.connectors.failures import show_raw_driver_errors
-from probeowl.errors import ConfigError, ProbeOwlError
+from probeowl.errors import ProbeOwlError
 from probeowl.guards.breaker import CircuitBreaker
 from probeowl.guards.kill_switch import KillSwitches
 from probeowl.model.check import check_folder, load_applications
@@ -119,7 +121,10 @@ def serve(
     config: Annotated[
         Path | None,
         typer.Option(
-            help=f"Folder of application YAML. Default: ${CONFIG_VARIABLE}, else this folder.",
+            help=(
+                f"Folder of application YAML. Default: ${CONFIG_VARIABLE}, else this folder if it "
+                "holds applications, else ./probeowl"
+            ),
             show_default=False,
         ),
     ] = None,
@@ -164,9 +169,21 @@ def serve(
     unknown = unknown_plugins_message(disabled)
     if unknown is not None:
         typer.echo(f"warning: {unknown}", err=True)
-    folder = config_path(config)
+    choice = choose_config_folder(config)
+    folder = choice.folder
+    created = not folder.exists()
+    if created:
+        # First run: the setup screen writes the first application here.
+        folder.mkdir(parents=True)
+    if choice.by_default:
+        typer.echo(f"Config folder: {folder.resolve()}{' (new, empty)' if created else ''}")
+        if choice.not_here is not None:
+            typer.echo(f"  Not ./probeowl here: {choice.not_here}.")
+        typer.echo(f"  Choose another with --config <folder> or {CONFIG_VARIABLE}.")
     origins = web_origin or os.environ.get(WEB_ORIGINS_VARIABLE, "").split(",")
     applications = load_applications(folder)
+    # So every write from the browser is audited from the first one.
+    store_created = ensure_default_store(url)
     store = create_store_engine(url or default_store_url())
     migrate.check_current(store)
     # One breaker: the Connectors screen shows the pauses runs caused.
@@ -200,7 +217,9 @@ def serve(
                 web_build=build,
                 guide_build=guide,
                 reloader=reloader,
-                setup=SetupWrites(applications, store, config_folder, reloader, connectors),
+                setup=SetupWrites(
+                    applications, store, config_folder, reloader, connectors, store_created
+                ),
                 secrets=SecretWrites(applications, store),
             ),
             host=HOST,
@@ -267,25 +286,25 @@ def check(
 
 
 @app.command()
-def init() -> None:
+def init(url: StoreUrl = None) -> None:
     """Write a config folder for a first application and connector, step by step.
 
     Passwords go to the system keychain, never to a file. It creates the store first, so the
     setup is audited; then it offers to test the connections and import the connector's schema.
     """
-    init_wizard.run(default_store_url(), _migrate)
+    init_wizard.run(url or default_store_url(), create_store)
 
 
 @store_app.command("init")
 def store_init(url: StoreUrl = None) -> None:
     """Create ProbeOwl's tables in the store, or upgrade them to this release."""
-    _migrate(url or default_store_url())
+    create_store(url or default_store_url())
 
 
 @store_app.command("upgrade")
 def store_upgrade(url: StoreUrl = None) -> None:
     """Upgrade the store's tables to this release."""
-    _migrate(url or default_store_url())
+    create_store(url or default_store_url())
 
 
 @store_app.command("ddl")
@@ -296,29 +315,6 @@ def store_ddl(
 ) -> None:
     """Print the SQL that creates the store, for a DBA to run."""
     typer.echo(migrate.ddl(dialect), nl=False)
-
-
-def _migrate(url: str) -> None:
-    parsed = make_url(url)
-    if parsed.get_backend_name() == "sqlite" and parsed.database:
-        _prepare_sqlite_file(Path(parsed.database))
-    engine = create_store_engine(url)
-    try:
-        migrate.upgrade(engine)
-    finally:
-        engine.dispose()
-    typer.echo(f"Store ready: {parsed.render_as_string(hide_password=True)}")
-
-
-def _prepare_sqlite_file(path: Path) -> None:
-    # SQLite on a network share loses writes when several people use it; a team store
-    # belongs in a server database.
-    if str(path).startswith(("\\\\", "//")):
-        raise ConfigError(
-            f"{path} is on a network share; use a server database for a team store "
-            f"(set {STORE_URL_VARIABLE})"
-        )
-    path.parent.mkdir(parents=True, exist_ok=True)
 
 
 def main() -> None:
