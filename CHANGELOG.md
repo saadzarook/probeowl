@@ -12,6 +12,12 @@ v0.2 phase (a) first-run setup and Add connection, v0.3 phase (b) the entity gra
 v0.4 phase (c) blocks and probe by example, v0.5 phase (d) templates and New runbook.
 See docs/implementation-plan.md, Releases. -->
 
+### Fixed
+
+- `owl serve`'s log and owl's own output use colour only where the console shows it: `NO_COLOR`
+  unset, a terminal, and on Windows the console's virtual terminal processing on. An
+  administrator PowerShell without it no longer shows codes such as `←[32mINFO←[0m`.
+
 ## [0.1.0] - 2026-11-12
 
 The first pre-release: phase 1, milestones M0 to M4, verified on test databases only.
