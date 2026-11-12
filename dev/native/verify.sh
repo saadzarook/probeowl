@@ -3,11 +3,13 @@
 # Verifies one commit against the native databases: the database tests, the m1 to m4 exit checks,
 # and inside WSL the Linux-only safety tests and driver job. Run from Git Bash at the repo root:
 #
-#     bash dev/native/verify.sh [--tests] [--exit] [--wsl] [--live] [--dry-run] [--only DBS]
+#     bash dev/native/verify.sh [--tests] [--exit] [--wsl] [--live] [--first-run] [--dry-run] [--only DBS]
 #
 # With no step named it runs --tests, --exit and --wsl. --only mssql,mariadb limits the database
 # tests to those databases, while the rest are still being installed; the exit checks need all of
-# mssql, mariadb and oracle. --dry-run stops before reading a password
+# mssql, mariadb and oracle. --first-run runs the live first-run spec on its own: owl serve started
+# in an empty folder with a home folder of its own, so no store and no applications; --live runs it
+# too, after the live specs on the examples. --dry-run stops before reading a password
 # or touching a database: it exports the commit, writes the configs and checks they are safe.
 #
 # It runs HEAD, exported with LF line endings to a folder of its own, and prints the result as
@@ -25,7 +27,7 @@ source "$HERE/mariadb_root.sh"
 # shellcheck source=dev/native/postgresql.sh
 source "$HERE/postgresql.sh"
 
-RUN_TESTS="" RUN_EXIT="" RUN_WSL="" RUN_LIVE="" DRY_RUN="" ONLY="mssql,mariadb,oracle,postgresql"
+RUN_TESTS="" RUN_EXIT="" RUN_WSL="" RUN_LIVE="" RUN_FIRST_RUN="" DRY_RUN="" ONLY="mssql,mariadb,oracle,postgresql"
 while [ $# -gt 0 ]; do
   flag=$1
   shift
@@ -35,11 +37,12 @@ while [ $# -gt 0 ]; do
     --exit) RUN_EXIT=1 ;;
     --wsl) RUN_WSL=1 ;;
     --live) RUN_LIVE=1 ;;
+    --first-run) RUN_FIRST_RUN=1 ;;
     --dry-run) DRY_RUN=1 ;;
     *) echo "unknown option $flag; see the top of this script" >&2; exit 2 ;;
   esac
 done
-if [ -z "$RUN_TESTS$RUN_EXIT$RUN_WSL$RUN_LIVE" ]; then RUN_TESTS=1 RUN_EXIT=1 RUN_WSL=1; fi
+if [ -z "$RUN_TESTS$RUN_EXIT$RUN_WSL$RUN_LIVE$RUN_FIRST_RUN" ]; then RUN_TESTS=1 RUN_EXIT=1 RUN_WSL=1; fi
 for db in ${ONLY//,/ }; do
   case "$db" in mssql | mariadb | oracle | postgresql) ;; *) echo "unknown database $db" >&2; exit 2 ;; esac
 done
@@ -56,7 +59,7 @@ stop_ports() {
   done
 }
 cleanup() {
-  stop_ports 7878 7879 8081 8082 4173
+  stop_ports 7878 7879 7880 8081 8082 4173 4174
   for pid in ${KEEP_ALIVE[@]+"${KEEP_ALIVE[@]}"}; do kill "$pid" 2>/dev/null; done
 }
 trap cleanup EXIT
@@ -402,6 +405,26 @@ live_e2e() {
   return "$code"
 }
 
+# First run against a real owl serve: an empty folder, a home folder of its own (so no store and
+# none of this machine's applications), its own ports. CI's live run serves the examples instead.
+first_run_e2e() {
+  local home="$WORK/first-run/home" here="$WORK/first-run/work"
+  rm -rf "$WORK/first-run" && mkdir -p "$home" "$here" || return 1
+  (cd "$here" && env -u PROBEOWL_STORE_URL -u PROBEOWL_CONFIG USERPROFILE="$home" HOME="$home"     PROBEOWL_WEB_ORIGINS="http://127.0.0.1:4174,http://localhost:4174"     nohup "$BACKEND/.venv/Scripts/owl" serve --port 7880 --log-file "$WORK/logs/owl-first-run.log"     >"$WORK/logs/serve-7880.log" 2>&1 &)
+  wait_for_port 7880 60 || return 1
+  (
+    cd "$WORK/tree/web" || exit 1
+    [ -d node_modules ] || npm ci --silent || exit 1
+    [ -f dist/index.html ] || npm run -s build || exit 1
+    PROBEOWL_API_URL=http://127.0.0.1:7880 nohup npx vite preview --host 127.0.0.1 --port 4174       --strictPort >"$WORK/logs/preview-first-run.log" 2>&1 &
+    wait_for_port 4174 60 || exit 1
+    PROBEOWL_LIVE_URL=http://127.0.0.1:4174 PROBEOWL_LIVE_FIRST_RUN_FOLDER="$here/probeowl"       npx playwright test -c playwright.live.config.ts e2e-live/first-run.spec.ts --workers=1
+  )
+  local code=$?
+  stop_ports 7880 4174
+  return "$code"
+}
+
 prepare
 if [ -n "$DRY_RUN" ]; then
   echo "dry run: stopping before any password or database"
@@ -431,6 +454,7 @@ if [ -n "$RUN_WSL" ]; then
   step wsl-driver-check wsl_driver_check
 fi
 [ -n "$RUN_LIVE" ] && step live-e2e live_e2e
+[ -n "$RUN_LIVE$RUN_FIRST_RUN" ] && step first-run-e2e first_run_e2e
 
 echo
 echo "commit $COMMIT"
