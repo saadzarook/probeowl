@@ -1,6 +1,7 @@
 # Author: @SaadZarook
 """Where owl looks when not told: the config folder and the default store (#36, decisions 1-3)."""
 
+import os
 import shutil
 from collections.abc import Iterator
 from pathlib import Path
@@ -11,7 +12,13 @@ from typer.testing import CliRunner
 
 from probeowl.cli import defaults
 from probeowl.cli import main as cli
-from probeowl.cli.defaults import CONFIG_VARIABLE, STORE_URL_VARIABLE, config_path
+from probeowl.cli.defaults import (
+    CONFIG_VARIABLE,
+    STORE_URL_VARIABLE,
+    choose_config_folder,
+    config_path,
+    unsuitable_for_config,
+)
 from probeowl.connectors.failures import show_raw_driver_errors
 
 EXAMPLES = Path(__file__).resolve().parents[2] / "examples"
@@ -46,12 +53,72 @@ def test_the_folder_given_comes_first_then_the_variable(
 
 def test_this_folder_when_it_holds_applications(nothing_told: Path) -> None:
     shutil.copytree(EXAMPLES / "wallet", nothing_told / "wallet")
-    assert config_path(None) == Path(".")
+    assert config_path(None) == nothing_told.absolute()
 
 
 def test_otherwise_a_probeowl_folder_not_this_one(nothing_told: Path) -> None:
     (nothing_told / "notes.txt").write_text("a home folder's own files", encoding="utf-8")
-    assert config_path(None) == Path("probeowl")
+    choice = choose_config_folder(None)
+    assert choice.folder == nothing_told.absolute() / "probeowl"
+    assert choice.by_default and choice.not_here is None
+
+
+WINDOWS = {"SystemRoot": r"C:\WINDOWS", "ProgramFiles": r"C:\Program Files"}
+
+
+@pytest.mark.parametrize(
+    ("folder", "why"),
+    [
+        (r"C:\Windows\System32", "system or program folder"),  # PowerShell as administrator
+        (r"c:\windows", "system or program folder"),
+        (r"C:\Program Files\Some App", "system or program folder"),
+        (r"C:\Program Files (x86)", "system or program folder"),
+        (r"C:\ProgramData\somewhere", "system or program folder"),
+        ("C:\\", "root of a drive"),
+        ("D:\\", "root of a drive"),
+    ],
+)
+def test_a_windows_system_folder_or_drive_root_is_never_used(folder: str, why: str) -> None:
+    reason = unsuitable_for_config(Path(folder), windows=True, environ=WINDOWS)
+    assert reason is not None and why in reason
+
+
+@pytest.mark.parametrize("folder", [r"C:\Users\ana", r"C:\Users\ana\work", r"D:\projects"])
+def test_a_windows_user_folder_is_fine(folder: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(defaults.os, "access", lambda path, mode: True)
+    assert unsuitable_for_config(Path(folder), windows=True, environ=WINDOWS) is None
+
+
+@pytest.mark.parametrize("folder", ["/", "/usr", "/usr/local/bin", "/etc", "/System/Library"])
+def test_a_posix_system_folder_is_never_used(folder: str) -> None:
+    assert unsuitable_for_config(Path(folder), windows=False) is not None
+
+
+@pytest.mark.parametrize("folder", ["/home/ana", "/Users/ana/work", "/tmp/x", "/srv/data"])
+def test_a_posix_user_folder_is_fine(folder: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(defaults.os, "access", lambda path, mode: True)
+    assert unsuitable_for_config(Path(folder), windows=False) is None
+
+
+def test_a_folder_that_cannot_be_written_to_is_not_used(
+    nothing_told: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(defaults.os, "access", lambda path, mode: False)
+    reason = unsuitable_for_config(nothing_told, windows=os.name == "nt", environ={})
+    assert reason is not None and "can't be written to" in reason
+
+
+def test_started_in_system32_as_administrator_it_uses_the_home_folder(tmp_path: Path) -> None:
+    # PowerShell run as administrator starts in C:\Windows\System32, and may write there.
+    choice = choose_config_folder(
+        None,
+        here=Path(r"C:\Windows\System32"),
+        home=tmp_path / "home",
+        windows=True,
+        environ={"SystemRoot": r"C:\Windows"},
+    )
+    assert choice.folder == tmp_path / "home" / "probeowl"
+    assert choice.not_here is not None and "System32" in choice.not_here
 
 
 # --- The default store ------------------------------------------------------------------------
@@ -77,6 +144,21 @@ def test_a_store_that_was_named_is_never_created_here(
 # --- owl serve on a first run -----------------------------------------------------------------
 
 
+def test_owl_serve_started_in_a_system_folder_uses_the_home_folder_and_says_so(
+    nothing_told: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(cli.uvicorn, "run", lambda app, **kwargs: None)
+    monkeypatch.setattr(defaults, "unsuitable_for_config", lambda *a, **k: "it is a system folder")
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path / "home"))
+    result = CliRunner().invoke(cli.app, ["serve"])
+    assert result.exit_code == 0, result.output
+    home_folder = tmp_path / "home" / "probeowl"
+    assert home_folder.is_dir() and not (nothing_told / "probeowl").exists()
+    assert f"Config folder: {home_folder.resolve()} (new, empty)" in result.output
+    assert "Not ./probeowl here: it is a system folder." in result.output
+    assert "Choose another with --config <folder> or PROBEOWL_CONFIG." in result.output
+
+
 def test_a_first_owl_serve_makes_its_folder_and_store_and_says_so(
     nothing_told: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -85,7 +167,8 @@ def test_a_first_owl_serve_makes_its_folder_and_store_and_says_so(
     result = CliRunner().invoke(cli.app, ["serve"])
     assert result.exit_code == 0, result.output
     assert (nothing_told / "probeowl").is_dir()
-    assert "(new, empty)" in result.output
+    assert f"Config folder: {(nothing_told / 'probeowl').resolve()} (new, empty)" in result.output
+    assert "Choose another with --config <folder> or PROBEOWL_CONFIG." in result.output
     assert (tmp_path / "home" / ".probeowl" / "store.db").exists()
     [app] = served
     state = app.state.setup.state()
@@ -131,3 +214,23 @@ def test_connector_add_creates_the_default_store_first(
     args = ["connector", "add", "--config", str(folder), "--application", "wallet"]
     CliRunner().invoke(cli.app, args, input="\n")  # stops at the first question: no id
     assert (tmp_path / "home" / ".probeowl" / "store.db").exists()
+
+
+# --- owl init ---------------------------------------------------------------------------------
+
+
+def test_owl_init_takes_a_store_url_and_says_how_when_the_store_is_declined(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("probeowl.cli.init.check_keychain", lambda: None)
+    answers = [str(tmp_path / "probeowl"), "access", "", "access-team", "uat", "", "",
+               "mariadb", "", "", "", "access_uat", "probeowl_ro", "not-a-real-password-3",
+               "n", "", "n", "n"]  # fmt: skip
+    url = f"sqlite:///{tmp_path / 'chosen.db'}"
+    result = CliRunner().invoke(cli.app, ["init", "--url", url], input="\n".join(answers) + "\n")
+    assert result.exit_code != 0
+    assert "chosen.db" in result.output  # the store offered is the one given
+    message = str(result.exception)
+    assert "without one it can't set up" in message
+    assert "--url <url> or PROBEOWL_STORE_URL" in message
+    assert not (tmp_path / "probeowl" / "access").exists()

@@ -23,7 +23,7 @@ from probeowl.cli.connector import connector_app
 from probeowl.cli.defaults import (
     CONFIG_VARIABLE,
     STORE_URL_VARIABLE,
-    config_path,
+    choose_config_folder,
     create_store,
     default_store_url,
     ensure_default_store,
@@ -169,11 +169,17 @@ def serve(
     unknown = unknown_plugins_message(disabled)
     if unknown is not None:
         typer.echo(f"warning: {unknown}", err=True)
-    folder = config_path(config)
-    if not folder.exists():
+    choice = choose_config_folder(config)
+    folder = choice.folder
+    created = not folder.exists()
+    if created:
         # First run: the setup screen writes the first application here.
         folder.mkdir(parents=True)
-        typer.echo(f"Config folder: {folder.resolve()} (new, empty)")
+    if choice.by_default:
+        typer.echo(f"Config folder: {folder.resolve()}{' (new, empty)' if created else ''}")
+        if choice.not_here is not None:
+            typer.echo(f"  Not ./probeowl here: {choice.not_here}.")
+        typer.echo(f"  Choose another with --config <folder> or {CONFIG_VARIABLE}.")
     origins = web_origin or os.environ.get(WEB_ORIGINS_VARIABLE, "").split(",")
     applications = load_applications(folder)
     # So every write from the browser is audited from the first one.
@@ -280,13 +286,13 @@ def check(
 
 
 @app.command()
-def init() -> None:
+def init(url: StoreUrl = None) -> None:
     """Write a config folder for a first application and connector, step by step.
 
     Passwords go to the system keychain, never to a file. It creates the store first, so the
     setup is audited; then it offers to test the connections and import the connector's schema.
     """
-    init_wizard.run(default_store_url(), create_store)
+    init_wizard.run(url or default_store_url(), create_store)
 
 
 @store_app.command("init")

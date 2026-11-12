@@ -442,7 +442,7 @@ def test_declining_the_store_stops_before_anything_is_written(
 ) -> None:
     result = init(sqlserver_answers(tmp_path / "probeowl", "n"))
     assert result.exit_code != 0
-    assert "nothing was written: ProbeOwl records every setup in its store's audit" in str(
+    assert "ProbeOwl records every setup change in its store; without one it can't" in str(
         result.exception
     )
     assert not (tmp_path / "probeowl" / "wallet").exists()

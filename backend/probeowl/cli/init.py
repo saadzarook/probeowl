@@ -64,8 +64,9 @@ def run(store_url: str, create_store: Callable[[str], None]) -> None:
     # Before anything is written: every setup is recorded in the store's audit.
     if not typer.confirm(f"Create the store at {_shown(store_url)}?", default=True):
         raise ConfigError(
-            "nothing was written: ProbeOwl records every setup in its store's audit. Run owl "
-            "init again and create the store, or create it first with owl store init"
+            "nothing was written: ProbeOwl records every setup change in its store; without one "
+            "it can't set up. Run owl init again and create it, or use another store with "
+            "owl init --url <url> or PROBEOWL_STORE_URL"
         )
     create_store(store_url)
     saved, applications = _write_audited(answers, store_url)
