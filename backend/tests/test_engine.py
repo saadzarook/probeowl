@@ -378,3 +378,91 @@ def test_a_waiting_location_reads_as_a_missing_one() -> None:
     assert evaluate(parse("count(webhook) == 0"), data) is True
     with pytest.raises(Unavailable, match="needs webhook, which is Waiting"):
         evaluate(parse("all(webhook, status == 'delivered')"), data)
+
+
+# --- A SQL location keyed from a field a REST location returned -------------------------------
+
+CHAINED = Entity.model_validate(
+    {
+        "entity": "topup",
+        "root_key": "topup_id",
+        "identifiers": {"topup_id": {"unique": True}},
+        "locations": {
+            "record": {
+                "using": "wallet_db",
+                "lookup": "SELECT id AS topup_id, provider_ref FROM topups WHERE id = :topup_id",
+                "exposes": ["topup_id", "provider_ref"],
+            },
+            "payment": {
+                "using": "checkout_api",
+                "key_from": "record.provider_ref",
+                "lookup": "GET /payments/{{provider_ref}}",
+                "exposes": ["status", "ledger_id"],
+            },
+            "ledger": {
+                "using": "ledger_db",
+                "key_from": "payment.ledger_id",
+                "lookup": "SELECT txn_id, amount FROM ledger_entries WHERE txn_id = :ledger_id",
+                "cardinality": "many",
+                "max_rows": 10,
+                "exposes": ["txn_id", "amount"],
+            },
+        },
+    }
+)
+CHAINED_PROBE = Probe.model_validate(
+    {
+        "probe": "chained",
+        "kind": "inspect",
+        "entity": "topup",
+        "owner": "payments-team",
+        "expect": ["count(ledger) == 2"],
+    }
+)
+
+
+def test_a_sql_location_is_keyed_from_a_field_a_rest_location_returned() -> None:
+    # SQL Server row -> the provider's API with the reference it found -> the ledger by the ID
+    # the API returned.
+    wallet = Fake(lambda q, p: [{"topup_id": p["topup_id"], "provider_ref": "pay_77"}])
+    api = Fake(
+        lambda q, p: (
+            [{"status": "captured", "ledger_id": "LT-9"}] if p["provider_ref"] == "pay_77" else []
+        )
+    )
+    ledger_db = Fake(
+        lambda q, p: [
+            {"txn_id": p["ledger_id"], "amount": 10},
+            {"txn_id": p["ledger_id"], "amount": -10},
+        ]
+    )
+    result = run_probe(
+        CHAINED_PROBE,
+        CHAINED,
+        "tp_1",
+        {"wallet_db": wallet, "checkout_api": api, "ledger_db": ledger_db},
+    )
+    assert outcomes(result) == {
+        "record": Outcome.FOUND,
+        "payment": Outcome.FOUND,
+        "ledger": Outcome.FOUND,
+    }
+    assert api.calls[0][1]["provider_ref"] == "pay_77"
+    assert ledger_db.calls[0][1]["ledger_id"] == "LT-9"
+    assert result.status is RunStatus.PASSED
+
+
+def test_an_empty_field_from_the_rest_location_blocks_the_sql_one_with_the_reason() -> None:
+    wallet = Fake(lambda q, p: [{"topup_id": p["topup_id"], "provider_ref": "pay_77"}])
+    api = Fake(lambda q, p: [{"status": "pending", "ledger_id": None}])
+    ledger_db = Fake(lambda q, p: [])
+    result = run_probe(
+        CHAINED_PROBE,
+        CHAINED,
+        "tp_1",
+        {"wallet_db": wallet, "checkout_api": api, "ledger_db": ledger_db},
+    )
+    [ledger] = [r for r in result.locations if r.location == "ledger"]
+    assert ledger.outcome is Outcome.BLOCKED
+    assert ledger.reason is not None and "payment.ledger_id is empty" in ledger.reason
+    assert ledger_db.calls == []
