@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>ProbeOwl</title>
-<meta name="description" content="ProbeOwl follows one record across every database and API it touched, in any environment, read-only and guarded. Anyone on the team can run a check with one identifier.">
+<meta name="description" content="ProbeOwl follows one record across every database and API it touched, in Dev, UAT, Staging and Production, read-only and guarded. Developers, QA, support and new joiners check it with one identifier, without writing SQL.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Condensed:wght@600;700&display=swap">
@@ -161,6 +161,50 @@ section.s { padding-block: 88px 0; }
 .cmd .line code { white-space: nowrap; overflow-x: auto; font-size: 14px; }
 .cmd .line code::before { content: "$ "; color: var(--amber-bright); }
 
+/* Every stage: the audience grid's rules, with a stage label in the steps' mono amber */
+.stages { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 28px; }
+.stage { display: grid; gap: 8px; align-content: start; padding-top: 16px; border-top: 1px solid var(--rule); }
+.stage .when { font-family: var(--font-mono); font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--amber); }
+.stage p { color: var(--fg-quiet); font-size: 15.5px; }
+
+/* How it compares: the safety table, with column heads; rows become cards on a phone */
+.compare { width: 100%; border-collapse: collapse; font-size: 15px; }
+.compare th, .compare td { text-align: left; vertical-align: top; padding: 14px 18px; border-bottom: 1px solid var(--rule); }
+.compare thead th { font-family: var(--font-mono); font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg-quiet); background: var(--paper); }
+.compare tbody th { font-weight: 600; width: 20%; }
+.compare .eg { display: block; margin-top: 4px; font-weight: 400; font-size: 13.5px; color: var(--fg-quiet); }
+.compare td { color: var(--fg-quiet); }
+.compare td.fit { color: var(--fg); }
+.compare tr:last-child th, .compare tr:last-child td { border-bottom: 0; }
+
+/* Common questions */
+.faq { display: grid; gap: 0; border-top: 1px solid var(--rule); }
+.faq details { border-bottom: 1px solid var(--rule); }
+.faq summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; gap: 16px; padding: 18px 0; font-weight: 600; font-size: 17px; }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: "+"; font-family: var(--font-mono); color: var(--amber); font-weight: 600; }
+.faq details[open] summary::after { content: "–"; }
+.faq summary:focus-visible { outline: 2px solid var(--amber-bright); outline-offset: 3px; border-radius: 4px; }
+.faq details p { color: var(--fg-quiet); font-size: 15.5px; padding: 0 0 20px; max-width: 78ch; }
+
+/* Status and roadmap */
+.status { display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: baseline; padding: 18px 20px; border: 1px solid var(--rule); border-left: 3px solid var(--amber); background: var(--surface); border-radius: 8px; }
+.status strong { font-weight: 600; }
+.status nav { display: flex; flex-wrap: wrap; gap: 16px; font-size: 15px; }
+.road { list-style: none; margin: 28px 0 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 28px; }
+.road li { display: grid; gap: 8px; align-content: start; border-top: 2px solid var(--fg); padding-top: 16px; }
+.road .ver { font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: var(--amber); }
+.road p { color: var(--fg-quiet); font-size: 15.5px; }
+.measure { margin-top: 40px; display: grid; gap: 12px; max-width: 760px; }
+.measure h3 { margin-bottom: 4px; }
+.bar { display: grid; grid-template-columns: 92px minmax(0, 1fr) 64px; gap: 14px; align-items: center; font-size: 14.5px; }
+.bar .lbl { font-family: var(--font-mono); font-size: 13px; color: var(--fg-quiet); }
+.bar .track { height: 12px; background: var(--rule); border-radius: 6px; overflow: hidden; }
+.bar .fill { display: block; height: 100%; width: var(--w); background: var(--amber-bright); border-radius: 6px; }
+.bar .fill.now { background: var(--fg-quiet); }
+.bar .n { font-family: var(--font-mono); font-size: 13px; text-align: right; }
+.measure .note { color: var(--fg-quiet); font-size: 14.5px; }
+
 footer { margin-top: 96px; border-top: 1px solid var(--rule); }
 .foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; padding-block: 28px 36px; color: var(--fg-quiet); font-size: 14px; }
 .foot nav { display: flex; gap: 20px; flex-wrap: wrap; }
@@ -168,13 +212,20 @@ footer { margin-top: 96px; border-top: 1px solid var(--rule); }
 @media (max-width: 920px) {
   .hero, .start { grid-template-columns: minmax(0, 1fr); }
   .steps, .outcomes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .aud { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .aud, .road { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 620px) {
   body { font-size: 16px; }
-  .steps, .outcomes, .tools, .aud { grid-template-columns: minmax(0, 1fr); }
+  .steps, .outcomes, .tools, .aud, .road { grid-template-columns: minmax(0, 1fr); }
   .top nav { gap: 16px; font-size: 14px; }
   .safety th { white-space: normal; width: 34%; }
+  .compare thead { display: none; }
+  .compare, .compare tbody, .compare tr, .compare th, .compare td { display: block; width: auto; }
+  .compare tr { padding: 14px 16px; border-bottom: 1px solid var(--rule); }
+  .compare tr:last-child { border-bottom: 0; }
+  .compare th, .compare td, .compare tbody th { padding: 4px 0; border: 0; width: auto; }
+  .compare td::before { content: attr(data-label); display: block; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg-quiet); margin-top: 6px; }
+  .bar { grid-template-columns: 96px minmax(0, 1fr) 40px; gap: 10px; }
   section.s { padding-block: 64px 0; }
 }
 .term pre .row { display: inline-block; }
@@ -263,7 +314,10 @@ footer { margin-top: 96px; border-top: 1px solid var(--rule); }
       </a>
       <nav aria-label="Sections">
         <a href="#how">How it works</a>
+        <a href="#stages">Use cases</a>
         <a href="#safety">Safety</a>
+        <a href="#faq">Questions</a>
+        <a href="#roadmap">Roadmap</a>
         <a href="#start">Get started</a>
         <a href="./guide/">Guide</a>
         <a href="https://github.com/saadzarook/probeowl">GitHub</a>
@@ -272,9 +326,9 @@ footer { margin-top: 96px; border-top: 1px solid var(--rule); }
 
     <div class="hero" id="top">
       <div>
-        <p class="eyebrow" style="color:#F2A33A">Dev · UAT · Production · read-only</p>
+        <p class="eyebrow" style="color:#F2A33A">Dev · UAT · Staging · Production · read&#8209;only</p>
         <h1 style="margin-top:14px">One identifier.<br>Every system it touched.<br><em>What really happened.</em></h1>
-        <p class="sub">ProbeOwl follows a record across your SQL Server, Oracle and MariaDB databases and your REST APIs, in Dev, UAT or Production. It checks that a flow did what it should and shows you the one place it didn't. Anyone on the team can run a check with one identifier, without writing SQL. It never writes, it never locks, and it records who looked and why.</p>
+        <p class="sub">ProbeOwl follows a record across your SQL Server, Oracle and MariaDB databases and your REST APIs, in Dev, UAT, Staging or Production. It checks that a flow did what it should and shows you the one place it didn't. Developers, QA, support and new joiners run the same check with one identifier, without writing SQL. It never writes, it never locks, and it records who looked and why.</p>
         <div class="cta">
           <div class="install">
             <span class="prompt" aria-hidden="true">$</span><code id="install-cmd">uv tool install probeowl</code>
@@ -311,7 +365,7 @@ footer { margin-top: 96px; border-top: 1px solid var(--rule); }
     <div class="s-head">
       <p class="eyebrow">How it works</p>
       <h2 id="how-h">Describe a record once. Check it with one identifier, forever.</h2>
-      <p class="lede">The engineer who knows a system writes a short YAML file: where a record lives, how its keys lead from one system to the next, and what should be true. After that, anyone on the team can check any record of that kind, in any environment, from a web page.</p>
+      <p class="lede">The engineer who knows a system writes a short YAML file: where a record lives, how its keys lead from one system to the next, and what should be true. After that, anyone on the team can check any record of that kind, in any environment, from a web page. It isn’t only for production incidents: the same check runs while a feature is built, while QA tests it, after a release and when a ticket comes in.</p>
     </div>
     <ol class="steps">
       <li><h3>Enter any identifier</h3><p>A top-up ID, a payment reference, a card number, an email. ProbeOwl finds the subject it belongs to, or lists the matches if there are several.</p></li>
@@ -365,6 +419,23 @@ footer { margin-top: 96px; border-top: 1px solid var(--rule); }
       </svg>
       <figcaption class="graph-cap">The run above, as ProbeOwl sees it. Each arrow is a key the probe follows from one system to the next; each location ends in exactly one outcome.</figcaption>
     </figure>
+  </section>
+
+  <section class="s" id="stages" aria-labelledby="stages-h">
+    <div class="s-head">
+      <p class="eyebrow">Use cases</p>
+      <h2 id="stages-h">Use it at every stage.</h2>
+      <p class="lede">A probe is written once, then used wherever a record’s journey needs checking: while it’s built, tested, released, migrated, supported and audited.</p>
+    </div>
+    <div class="stages">
+      <div class="stage"><span class="when">Development</span><h3>Did my feature write the right rows?</h3><p>Run the flow in Dev, then check every table and API it should have touched, not just the one you were looking at.</p></div>
+      <div class="stage"><span class="when">QA · UAT</span><h3>Verify the whole flow</h3><p>Check each downstream system with one identifier and no SQL, and attach the run’s evidence to a defect instead of screenshots.</p></div>
+      <div class="stage"><span class="when">Release checks</span><h3>A few real records after a deploy</h3><p>Run the same probes on a handful of fresh records in Staging or Production, and see at once whether the release changed what gets written.</p></div>
+      <div class="stage"><span class="when">Migrations and fixes</span><h3>Before and after, side by side</h3><p>Check a record before a data fix or migration and again after it, or compare it with a healthy record of the same kind.</p></div>
+      <div class="stage"><span class="when">Support</span><h3>Answer a ticket from its ID</h3><p>Paste the reference from the ticket and see where the record got to, with the team’s runbook for what to do next.</p></div>
+      <div class="stage"><span class="when">Audit and security</span><h3>Evidence instead of screenshots</h3><p>Every answer carries the exact query, parameters and masked result, with who asked and why, in an append-only audit.</p></div>
+      <div class="stage"><span class="when">Onboarding</span><h3>Learn the systems safely</h3><p>New joiners see how a record moves from one system to the next in the key graph, and investigate on day one without database access.</p></div>
+    </div>
   </section>
 
   
@@ -489,6 +560,27 @@ footer { margin-top: 96px; border-top: 1px solid var(--rule); }
     </div>
   </section>
 
+  <section class="s" id="compare" aria-labelledby="compare-h">
+    <div class="s-head">
+      <p class="eyebrow">How it compares</p>
+      <h2 id="compare-h">It covers the gap between the tools you already have.</h2>
+      <p class="lede">Each of these does its own job well, and ProbeOwl replaces none of them. It answers the question they leave open: did this one record end up right in every system it touched?</p>
+    </div>
+    <div class="safety-wrap">
+      <table class="compare">
+        <thead><tr><th scope="col">Tool</th><th scope="col">Built for</th><th scope="col">Not its job</th><th scope="col">Where ProbeOwl fits</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">SQL clients</th><td data-label="Built for">Writing and running any query against a database you can reach.</td><td data-label="Not its job">Following one record across several databases and APIs, limiting what a query may do, or recording who looked.</td><td class="fit" data-label="Where ProbeOwl fits">Reviewed, read-only checks across systems that anyone runs with one identifier.</td></tr>
+          <tr><th scope="row">Observability and APM</th><td data-label="Built for">Logs, metrics and traces: how requests behaved and where time went.</td><td data-label="Not its job">Reading the rows a flow left behind and saying whether they’re right.</td><td class="fit" data-label="Where ProbeOwl fits">Checks the resulting data in each system, record by record. A green trace and a missing ledger entry can both be true.</td></tr>
+          <tr><th scope="row">Data quality tools <span class="eg">such as Great Expectations, Soda or Monte Carlo</span></th><td data-label="Built for">Testing and monitoring datasets and pipelines, in bulk.</td><td data-label="Not its job">Tracing what happened to one top-up or one card across live operational systems.</td><td class="fit" data-label="Where ProbeOwl fits">One subject at a time, in the systems where it lives, when someone asks.</td></tr>
+          <tr><th scope="row">Automated tests</th><td data-label="Built for">Proving code behaves, before it ships, on data the test sets up.</td><td data-label="Not its job">Checking real records in UAT or Production after the fact.</td><td class="fit" data-label="Where ProbeOwl fits">The same check on real records in every environment, alongside your tests.</td></tr>
+          <tr><th scope="row">Admin panels and internal tools <span class="eg">such as Retool</span></th><td data-label="Built for">Screens to view and change business data, built for each need.</td><td data-label="Not its job">Read-only guarantees, checks across systems and evidence for every answer, unless someone builds them.</td><td class="fit" data-label="Where ProbeOwl fits">Never writes, and every answer shows the query, parameters and result behind it.</td></tr>
+          <tr><th scope="row">Asking an AI to write SQL</th><td data-label="Built for">Drafting a query quickly.</td><td data-label="Not its job">Knowing how your systems’ keys join, guarding what runs, or leaving a record of who ran it.</td><td class="fit" data-label="Where ProbeOwl fits">Checks are reviewed once and reused. From 0.2, an assistant can draft a probe that you check and paste.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
   
   <section class="s" id="who" aria-labelledby="who-h">
     <div class="s-head has-owl">
@@ -518,6 +610,66 @@ footer { margin-top: 96px; border-top: 1px solid var(--rule); }
         <ul><li>Run a team-made check with one identifier.</li><li>Follow the knowledge base step by step.</li><li>Learn how systems connect from the key graph.</li></ul></div>
       <div><h3>Security</h3><p class="lede" style="font-size:15.5px">Who looked at Production, and why?</p>
         <ul><li>Fewer people with direct database access.</li><li>Least-privilege, read-only logins, proven by tests.</li><li>Every lookup attributable, with personal data masked.</li></ul></div>
+    </div>
+  </section>
+
+  <section class="s" id="faq" aria-labelledby="faq-h">
+    <div class="s-head has-owl">
+      <p class="eyebrow">Common questions</p>
+      <h2 id="faq-h">Fair questions, straight answers.</h2>
+      <div class="head-owl" aria-hidden="true"><span class="owl-note">good question</span><svg class="owl tilt" viewBox="0 0 64 64" aria-hidden="true">
+  <g class="feet" stroke="#F2A33A" stroke-width="2" stroke-linecap="round"><path d="M27 57 v5 M25 62 h5 M37 57 v5 M35 62 h5"/></g>
+  <g class="bird">
+    <path class="wing wing-l" d="M15 32 C8 38 8 48 14 54 C16 46 17 40 17 34 Z" fill="#1E232B" stroke="#F2A33A" stroke-width="1.4" stroke-linejoin="round"/>
+    <path class="wing wing-r" d="M49 32 C56 38 56 48 50 54 C48 46 47 40 47 34 Z" fill="#1E232B" stroke="#F2A33A" stroke-width="1.4" stroke-linejoin="round"/>
+    <path d="M15 22 L19 9 L26.5 17 H37.5 L45 9 L49 22 V41 C49 52 41.5 58 32 58 C22.5 58 15 52 15 41 Z" fill="#2A303B" stroke="#F2A33A" stroke-width="1.8" stroke-linejoin="round"/>
+    <ellipse cx="32" cy="47" rx="9" ry="8" fill="#343B47"/>
+    <path d="M28 45 q1.5 1.6 3 0 M33 45 q1.5 1.6 3 0 M30.5 49 q1.5 1.6 3 0" fill="none" stroke="#8B94A3" stroke-width="1"/>
+    <g class="eyes"><circle cx="25" cy="30" r="6.5" fill="#FFFFFF"/><circle cx="39" cy="30" r="6.5" fill="#FFFFFF"/>
+      <g class="pupils"><circle cx="25" cy="30" r="3.4" fill="#14171C"/><circle cx="39" cy="30" r="3.4" fill="#14171C"/><circle cx="26.2" cy="28.8" r="1" fill="#FFFFFF"/><circle cx="40.2" cy="28.8" r="1" fill="#FFFFFF"/></g></g>
+    <path d="M32 35.5 L29.6 39.5 H34.4 Z" fill="#F2A33A"/>
+  </g>
+</svg></div>
+    </div>
+    <div class="faq">
+      <details><summary>Why not just give people read-only database access?</summary><p>A read-only login stops writes. It doesn’t stop a full scan on a busy database, a long lock wait, or a customer’s email ending up in a screenshot, and everyone still has to learn where each record lives and how the keys join. ProbeOwl gives anyone the same reviewed check, with guards, masking and an audit around every read.</p></details>
+      <details><summary>We already have observability.</summary><p>Keep it. It shows how a request behaved: the calls, the timings, the errors. ProbeOwl reads what the flow left in each database and API and checks that it’s right. A trace can be green while the ledger never got its two entries.</p></details>
+      <details><summary>Probes are work, and they rot when schemas change.</summary><p>Partly true: someone who knows the system writes each probe once. ProbeOwl helps keep them honest. The Tables screen flags drift when a schema changes, <code>owl check</code> can run on every change in review, and save checks read query plans before a probe is saved. Each release also makes setup cheaper: 0.2 moves first-run setup into the browser, and later releases add a visual builder and probe by example.</p></details>
+      <details><summary>Any access to Production is a risk.</summary><p>Agreed, which is why every lookup is a single SELECT against a replica, parsed and refused if it’s anything else, with row caps, timeouts and lock limits. Personal data is masked, Production needs a reason and a reference, the audit is append-only and a kill switch stops every read. The read-only login stays the last line of defence.</p></details>
+      <details><summary>Shouldn’t our tests catch this?</summary><p>They should, and they catch a lot. But they run on data they set up. ProbeOwl checks real records in UAT, Staging and Production, where configuration, timing and other systems differ. Use both.</p></details>
+      <details><summary>Is this a data quality tool?</summary><p>Not in the warehouse sense. Data quality tools test whole datasets and pipelines. ProbeOwl checks one subject at a time, across the live systems it touched, when someone asks. Scheduled health checks across an application are planned for later.</p></details>
+      <details><summary>It’s a pre-release from a small project.</summary><p>True, so try it on test databases first. It’s open source under Apache 2.0, so you can read every guard and its tests. And it only ever reads: if you stop using it, nothing breaks and nothing needs undoing.</p></details>
+      <details><summary>It runs on laptops?</summary><p>Deliberately. Passwords stay in each person’s system keychain and nothing is hosted for you to secure. Teams share probes through git, and can share one store database for runs and the audit. A hosted option may come later.</p></details>
+      <details><summary>Why not ask an AI?</summary><p>An assistant can write a query quickly. It can’t promise it’s the right one, that it’s safe to run on Production, or record who ran it. 0.2 is planned to let an assistant draft a probe through <code>owl mcp</code>, with placeholders and no credentials. You check the draft, paste it, and ProbeOwl’s checks and guards apply as to any other probe.</p></details>
+    </div>
+  </section>
+
+  <section class="s" id="roadmap" aria-labelledby="roadmap-h">
+    <div class="s-head">
+      <p class="eyebrow">Status and roadmap</p>
+      <h2 id="roadmap-h">Where it is, and where it’s going.</h2>
+      <p class="lede">Each release makes the first check quicker to set up, without loosening any guard.</p>
+    </div>
+    <div class="status">
+      <span><strong>v0.1</strong> released 12 Nov 2026 · pre-release</span>
+      <nav aria-label="Release links">
+        <a href="https://pypi.org/project/probeowl/">PyPI</a>
+        <a href="https://github.com/saadzarook/probeowl/releases/tag/v0.1.0">Release notes</a>
+        <a href="./guide/">Guide</a>
+      </nav>
+    </div>
+    <ol class="road">
+      <li><span class="ver">0.2 · next</span><h3>Set up in the browser</h3><p>First-run setup and an Add connection form, with passwords going straight to the keychain. A command palette to search everything. An AI assistant can draft probes for you to paste, never run them.</p></li>
+      <li><span class="ver">0.3</span><h3>A visual entity builder</h3><p>Start from a table, give a sample ID and follow keys outward, seeing Found or Missing on the sample as you build.</p></li>
+      <li><span class="ver">0.4</span><h3>Blocks and probe by example</h3><p>Checks as sentences with choices instead of typing, and checks proposed from two or three records you know are healthy.</p></li>
+      <li><span class="ver">0.5</span><h3>Templates and runbooks</h3><p>Starter probes for common checks, and a form for writing runbooks.</p></li>
+    </ol>
+    <div class="measure" role="group" aria-label="Steps from install to a first Validate">
+      <h3>Measured: install to a first Validate</h3>
+      <div class="bar"><span class="lbl">v0.1 today</span><span class="track"><span class="fill now" style="--w:100%"></span></span><span class="n">61</span></div>
+      <div class="bar"><span class="lbl">0.2 target</span><span class="track"><span class="fill" style="--w:77%"></span></span><span class="n">~47</span></div>
+      <div class="bar"><span class="lbl">0.4 target</span><span class="track"><span class="fill" style="--w:49%"></span></span><span class="n">30</span></div>
+      <p class="note">Steps a newcomer takes, from installing ProbeOwl to a first Validate on the card example: every command, answer, click and field. Counted by a scripted run on each release and re-measured after each phase.</p>
     </div>
   </section>
 
