@@ -73,7 +73,8 @@ def choose_config_folder(
     named = environ.get(CONFIG_VARIABLE)
     if named:
         return ConfigChoice(Path(named), by_default=False)
-    here = (here or Path.cwd()).absolute()
+    # Path.cwd() is absolute already; a folder given is judged as it is, as on another system.
+    here = here if here is not None else Path.cwd()
     if any(here.glob("*/application.yaml")):
         return ConfigChoice(here, by_default=True)
     reason = unsuitable_for_config(here, windows, environ)
