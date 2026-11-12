@@ -52,7 +52,10 @@ jobs:
         run: |
           # A copy: the probe editor's live test saves into the folder served.
           cp -r ../examples "$RUNNER_TEMP/config"
-          nohup uv run owl serve --config "$RUNNER_TEMP/config" > "$RUNNER_TEMP/owl-serve.log" 2>&1 &
+          # Straight from the venv, not through uv run, which would hold uv's cache lock and
+          # stall setup-uv's cache cleanup at the end of the job; stopped at the end.
+          nohup .venv/bin/owl serve --config "$RUNNER_TEMP/config" > "$RUNNER_TEMP/owl-serve.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/owl-serve.pid"
           for _ in $(seq 1 60); do
             curl -fs http://127.0.0.1:7878/openapi.json > /dev/null && exit 0
             sleep 1
@@ -88,6 +91,9 @@ jobs:
         run: |
           cat "$RUNNER_TEMP/owl-serve.log" || true
           docker compose -f dev/docker-compose.yml logs --no-color
+      - name: Stop owl serve
+        if: always()
+        run: kill "$(cat "$RUNNER_TEMP/owl-serve.pid")" 2>/dev/null || true
       - name: Stop the stack
         if: always()
         run: docker compose -f dev/docker-compose.yml down -v
