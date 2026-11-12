@@ -61,25 +61,25 @@ def run(store_url: str, create_store: Callable[[str], None]) -> None:
     )
     check_keychain()  # before any question: a machine without a keychain cannot finish
     answers = ask()
-    store = None
-    # Before anything is written: with the store, this setup is recorded in its audit.
-    if typer.confirm(f"Create the store at {_shown(store_url)}?", default=True):
-        create_store(store_url)
-        store = store_url
-    else:
-        typer.echo("Not recorded in the audit: no store yet (owl store init creates it).")
-    saved, applications = _write_audited(answers, store)
+    # Before anything is written: every setup is recorded in the store's audit.
+    if not typer.confirm(f"Create the store at {_shown(store_url)}?", default=True):
+        raise ConfigError(
+            "nothing was written: ProbeOwl records every setup in its store's audit. Run owl "
+            "init again and create the store, or create it first with owl store init"
+        )
+    create_store(store_url)
+    saved, applications = _write_audited(answers, store_url)
     bound = list(answers.connector["environments"])
     if typer.confirm("Test the connections now?", default=True):
         setup.test_bindings(applications, answers.name, answers.connector_name, bound)
     imported = answers.connector["type"] == "rest"  # a REST connector has no schema to import
     environment = setup.import_environment(answers.application["environments"], bound)
-    if store is not None and not imported:
+    if not imported:
         title = answers.application["environments"][environment]["title"]
         setup.explain_import(answers.connector_name, title)
         if typer.confirm(f"Import {answers.connector_name}'s schema in {title} now?", default=True):
             imported = setup.import_schema(
-                applications, answers.name, answers.connector_name, environment, store
+                applications, answers.name, answers.connector_name, environment, store_url
             )
     _next_steps(answers, saved, None if imported else environment)
 
@@ -124,19 +124,13 @@ def ask() -> Answers:
     return answers
 
 
-def _write_audited(
-    answers: Answers, store: str | None
-) -> tuple[list[str], dict[str, LoadedApplication]]:
-    """Save the passwords and write the folder; with a store, kept only once audited (#276).
+def _write_audited(answers: Answers, store: str) -> tuple[list[str], dict[str, LoadedApplication]]:
+    """Save the passwords and write the folder, kept only once audited (#276).
 
     The event is written first, in a transaction that commits last: if a password, a file, the
     folder's check or the commit fails, the application's folder is removed and nothing is
     recorded. Returns the keychain entries' names and the folder as owl serve will load it.
     """
-    if store is None:
-        saved = setup.save_passwords(answers.connector_name, answers.passwords)
-        write(answers)
-        return saved, load_applications(answers.folder)
     engine = create_store_engine(store)
     try:
         with engine.begin() as conn:

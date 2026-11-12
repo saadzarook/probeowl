@@ -16,7 +16,7 @@ import typer
 from sqlalchemy.engine import make_url
 
 from probeowl.cli import connector_setup as setup
-from probeowl.cli.defaults import config_path, default_store_url
+from probeowl.cli.defaults import config_path, default_store_url, ensure_default_store
 from probeowl.connector_files import (
     DEFAULT_ROW_CEILING,
     file_of,
@@ -43,7 +43,10 @@ def add(
     config: Annotated[
         Path | None,
         typer.Option(
-            help="Folder of application YAML. Default: $PROBEOWL_CONFIG, else this folder.",
+            help=(
+                "Folder of application YAML. Default: $PROBEOWL_CONFIG, else this folder if it "
+                "holds applications, else ./probeowl"
+            ),
             show_default=False,
         ),
     ] = None,
@@ -56,6 +59,7 @@ def add(
     Passwords go to the system keychain, never to a file. Then it offers to test the new
     bindings and import the connector's schema. owl reload loads the change into owl serve.
     """
+    ensure_default_store(None)  # so the change is audited from a first run on
     run(config_path(config), application, default_store_url())
 
 
@@ -66,6 +70,13 @@ def run(folder: Path, application: str | None, store_url: str) -> None:
         "never in a file."
     )
     check_keychain()  # before any question: without a keychain nothing could be saved
+    if _usable_store(store_url) is None:
+        # Before any question too: nothing is written that the audit could not record.
+        shown = make_url(store_url).render_as_string(hide_password=True)
+        raise ConfigError(
+            f"the store at {shown} has no ProbeOwl tables at this release, so the change could "
+            "not be audited; run: owl store init"
+        )
     # Errors are refused here, as at start, except probes waiting for the binding this may add.
     applications = load_applications(folder, allow_unbound=True)
     app = _pick(applications, application)
@@ -238,12 +249,7 @@ def _write_audited(
     The event is written first, in a transaction that commits last: if the file, a password or
     the commit fails, the file is put back and nothing is recorded. The keychain entries names.
     """
-    store = _usable_store(store_url)
-    if store is None:
-        typer.echo("Not recorded in the audit: no store at this release yet (owl store init).")
-        _write(folder, change)
-        return setup.save_passwords(connector, change.passwords)
-    engine = create_store_engine(store)
+    engine = create_store_engine(store_url)  # run() checked it is at this release
     written = False
     try:
         with engine.begin() as conn:

@@ -61,12 +61,12 @@ your keychain, never to a file.
 
 It writes one file: the new connector's, or the existing one with the new bindings added and its
 comments kept. If the folder wouldn't load with that file, the change is undone and nothing is
-saved. With a store, the change is recorded in the audit. Then it offers to test the new bindings
+saved, and the change is recorded in the audit. With no store at `~/.probeowl/store.db` it creates one first; a store named by `$PROBEOWL_STORE_URL` must already be at this release (`owl store init`). Then it offers to test the new bindings
 and, for a SQL connector, to import its schema.
 
 | Option | Default | Meaning |
 | --- | --- | --- |
-| `--config <folder>` | `$PROBEOWL_CONFIG`, else the current folder | The config folder: the one `owl serve` was started with |
+| `--config <folder>` | `$PROBEOWL_CONFIG`, else the current folder if it holds applications, else `./probeowl` | The config folder: the one `owl serve` was started with |
 | `--application <name>` | Asked, when the folder holds several | The application to add to |
 
 It works on a folder `owl serve` refuses because a probe needs a binding that isn't there, which
@@ -81,9 +81,9 @@ owl serve --config probeowl
 
 | Option | Default | Meaning |
 | --- | --- | --- |
-| `--config <folder>` | `$PROBEOWL_CONFIG`, else the current folder | The applications to load |
+| `--config <folder>` | `$PROBEOWL_CONFIG`, else the current folder if it holds applications, else `./probeowl`, created if missing | The applications to load |
 | `--port <n>` | 7878 | The port on 127.0.0.1 |
-| `--url <url>` | `$PROBEOWL_STORE_URL`, else `~/.probeowl/store.db` | The store |
+| `--url <url>` | `$PROBEOWL_STORE_URL`, else `~/.probeowl/store.db`, created on a first run | The store |
 | `--web-origin <url>` | `$PROBEOWL_WEB_ORIGINS` | Where else the web app is served from, on loopback only. Vite on 5173 and 4173 is always accepted. Repeat for several |
 | `--log-file <path>` | `~/.probeowl/owl-serve.log` | The log, readable only by you |
 | `--debug-driver-errors` | off | Log the drivers' raw error text, which can hold values from statements and personal data |
@@ -174,5 +174,8 @@ owl store ddl --dialect postgresql > store.sql  # for a DBA: sqlite, postgresql,
 ```
 
 The store holds runs, the audit, schema imports and kill switches. It's never a probed database.
+`owl serve` and `owl connector add` create the default SQLite store themselves the first time; a
+store named by `--url` or `$PROBEOWL_STORE_URL` is never created for you, as a server database may
+need a DBA.
 SQLite on a network share loses writes when several people use it, so `owl store init` refuses
 one: use a server database for a team store.

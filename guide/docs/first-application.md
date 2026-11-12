@@ -63,8 +63,7 @@ What to know about the questions:
 Then it asks about the store, before it writes anything: **Create the store**, ProbeOwl's own
 database for runs and audit, at `~/.probeowl/store.db`, or `$PROBEOWL_STORE_URL`. With it, the
 setup itself is recorded in the audit: if that can't be recorded, nothing is written and no
-password is kept. Without it, the setup carries on and says it was not recorded; `owl store init`
-creates the store later.
+password is kept. Every setup is recorded, so answering no stops here, with nothing written.
 
 Then it offers two things:
 
