@@ -12,7 +12,7 @@ v0.2 phase (a) first-run setup and Add connection, v0.3 phase (b) the entity gra
 v0.4 phase (c) blocks and probe by example, v0.5 phase (d) templates and New runbook.
 See docs/implementation-plan.md, Releases. -->
 
-## [0.1.0] - 2026-11-11
+## [0.1.0] - 2026-11-12
 
 The first pre-release: phase 1, milestones M0 to M4, verified on test databases only.
 
