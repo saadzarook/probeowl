@@ -112,6 +112,11 @@ def test_no_route_can_execute_a_runbook_step(app: FastAPI) -> None:
         ("/api/applications/{application}/connectors/test-draft", "post"),  # the same, unsaved
         # Writes a connector's YAML in the loaded folder: config, never a password.
         ("/api/applications/{application}/connectors/{connector}", "put"),
+        # Saves a password to this machine's keychain: never to a file, a probed database or back.
+        (
+            "/api/applications/{application}/connectors/{connector}/environments/{environment}/secret",
+            "put",
+        ),
         ("/api/applications/{application}/connectors/{connector}/test", "post"),
         # Writes a new entity's YAML in the loaded folder: config, never a probed database.
         ("/api/applications/{application}/entities/{entity}", "put"),

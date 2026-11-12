@@ -46,6 +46,7 @@ from probeowl.plugins.registry import (
 )
 from probeowl.reload import ConfigReloader
 from probeowl.runs import RunService
+from probeowl.secret_writes import SecretWrites
 from probeowl.server_log import configure_server_log, default_log_file
 from probeowl.setup_writes import SetupWrites
 from probeowl.store import migrate
@@ -200,6 +201,7 @@ def serve(
                 guide_build=guide,
                 reloader=reloader,
                 setup=SetupWrites(applications, store, config_folder, reloader, connectors),
+                secrets=SecretWrites(applications, store),
             ),
             host=HOST,
             port=port,

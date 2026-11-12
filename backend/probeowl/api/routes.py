@@ -54,12 +54,19 @@ from probeowl.model.run import Actor
 from probeowl.model.runbook_step import CopiedWriteQuery, StepInRun, StepRan
 from probeowl.model.save_check import SaveCheckReport
 from probeowl.model.schema import SchemaSnapshot
-from probeowl.model.setup import DraftConnection, SaveApplication, SaveConnector, SetupState
+from probeowl.model.setup import (
+    DraftConnection,
+    SaveApplication,
+    SaveConnector,
+    SaveSecret,
+    SetupState,
+)
 from probeowl.plugins.api import PluginManifest
 from probeowl.reload import ConfigReloader
 from probeowl.runbook_steps import RunbookSteps
 from probeowl.runbooks import matching, runbook_view, suggested
 from probeowl.runs import RunService
+from probeowl.secret_writes import SecretWrites
 from probeowl.setup_writes import SetupWrites
 
 # The media type is set to application/problem+json in app.py.
@@ -739,6 +746,34 @@ def test_draft_connection(application: str, body: DraftConnection, http: Request
         },
     )
     return result
+
+
+@router.put(
+    "/applications/{application}/connectors/{connector}/environments/{environment}/secret",
+    tags=["setup"],
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    responses=_problems(404, 409, 422, 503),
+)
+def save_secret(
+    application: str, connector: str, environment: str, body: SaveSecret, http: Request
+) -> Response:
+    """Save a binding's password or token in this machine's keychain. 204, with no body.
+
+    Write-only: no route returns it. It is never written to a file, logged, or put in an error
+    or the audit, which records only that it changed. Saved under the name the binding's file
+    gives; 409 secret-exists if one is saved there already and `replace` is false, perhaps for
+    another application's connector of the same id. 422 if the binding reads its secret from
+    an environment variable; 503 if this machine has no system keychain.
+    """
+    writes = getattr(http.app.state, "secrets", None)
+    if not isinstance(writes, SecretWrites):
+        raise HTTPException(
+            status.HTTP_501_NOT_IMPLEMENTED,
+            "saving a password needs owl serve: start it with owl serve --config <folder>",
+        )
+    writes.save(application, connector, environment, body)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 def _setup(http: Request) -> SetupWrites:

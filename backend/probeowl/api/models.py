@@ -39,6 +39,16 @@ class Problem(ProbeOwlModel):
     errors: list[FieldError] | None = Field(
         default=None, description="For a 422: each field that was not accepted, and why."
     )
+    connector: str | None = Field(
+        default=None,
+        description=(
+            "password-missing and secret-exists: the binding's connector, so a client can ask "
+            "for its password where the problem shows."
+        ),
+    )
+    environment: str | None = Field(
+        default=None, description="password-missing and secret-exists: the binding's environment."
+    )
 
 
 class EnvironmentSummary(ProbeOwlModel):

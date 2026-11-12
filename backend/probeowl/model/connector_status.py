@@ -28,6 +28,15 @@ class PlanAccess(StrEnum):
     NOT_CHECKED = "not_checked"
 
 
+class SecretState(StrEnum):
+    """Whether this machine has what a binding signs in with. Never the value."""
+
+    SAVED = "saved"  # its keychain entry exists here
+    MISSING = "missing"  # its keychain entry does not exist here: ask for the password
+    FROM_ENVIRONMENT = "from_environment"  # read from an environment variable when needed
+    NOT_NEEDED = "not_needed"  # a REST API without a token
+
+
 class ConnectorStatus(ProbeOwlModel):
     """One connector in one environment."""
 
@@ -38,6 +47,13 @@ class ConnectorStatus(ProbeOwlModel):
     production: bool
     health: BindingHealth
     reason: str | None = None
+    secret: SecretState | None = Field(
+        default=None,
+        description=(
+            "Whether this machine has the binding's password or token: missing means its "
+            "keychain entry does not exist here, so ask for it. Null with no binding here."
+        ),
+    )
     replica: bool = False
     role: str | None = Field(
         default=None,

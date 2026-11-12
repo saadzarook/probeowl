@@ -2,7 +2,7 @@
 import { stringify } from "yaml";
 import { parse } from "yaml";
 import { delay, http, HttpResponse } from "msw";
-import type { CatalogChange, CatalogReview, CatalogTable, DraftConnection, KillSwitch, KillTarget, ProbeChange, SaveApplication, SaveConnector, SaveEntity, SaveProbe, SetKillSwitch, StartRun } from "../src/api/client";
+import type { CatalogChange, CatalogReview, CatalogTable, DraftConnection, KillSwitch, KillTarget, ProbeChange, SaveApplication, SaveConnector, SaveEntity, SaveSecret, SaveProbe, SetKillSwitch, StartRun } from "../src/api/client";
 import type { CompareRequest } from "../../plugins/compare_files/web/types";
 import { compareFilesManifest, compareFilesResult } from "./fixtures/compareFiles";
 import type { HealthyAttempt, HealthyComparison, Run, RunbookView, StepInRun } from "../src/api/client";
@@ -603,6 +603,28 @@ export const handlers = [
       : `    base_url: ${body.binding.base_url}`;
     const text = `connector: ${connector}\ntype: ${body.type}\nenvironments:\n  ${body.environment}:\n${binding}`;
     return json(fileChange(`${application}/connectors/${connector}.yaml`, text, body.base));
+  }),
+
+  // A password is saved with no body. wallet_db in Production has one already, so the question
+  // before overwriting can be seen.
+  http.put("/api/applications/:application/connectors/:connector/environments/:environment/secret", async ({ params, request }) => {
+    const connector = String(params["connector"]);
+    const environment = String(params["environment"]);
+    const body = (await request.json()) as SaveSecret;
+    if (connector === "wallet_db" && environment === "prod" && !body.replace) {
+      return HttpResponse.json(
+        {
+          type: "urn:probeowl:problem:secret-exists",
+          title: "Conflict",
+          status: 409,
+          detail: `a password is already saved as probeowl/${connector}.${environment}, perhaps for another application's connector named ${connector}; overwrite it only if it is this one's`,
+          connector,
+          environment,
+        },
+        { status: 409, headers: { "Content-Type": "application/problem+json" } },
+      );
+    }
+    return new HttpResponse(null, { status: 204 });
   }),
 
   // A draft connects unless its password is "wrong", so a failed test and its fixed reason can be seen.

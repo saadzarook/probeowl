@@ -731,6 +731,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/applications/{application}/connectors/{connector}/environments/{environment}/secret": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Save Secret
+         * @description Save a binding's password or token in this machine's keychain. 204, with no body.
+         *
+         *     Write-only: no route returns it. It is never written to a file, logged, or put in an error
+         *     or the audit, which records only that it changed. Saved under the name the binding's file
+         *     gives; 409 secret-exists if one is saved there already and `replace` is false, perhaps for
+         *     another application's connector of the same id. 422 if the binding reads its secret from
+         *     an environment variable; 503 if this machine has no system keychain.
+         */
+        put: operations["save_secret"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/applications/{application}/runbooks": {
         parameters: {
             query?: never;
@@ -1355,6 +1381,8 @@ export interface components {
             health: components["schemas"]["BindingHealth"];
             /** Reason */
             reason?: string | null;
+            /** @description Whether this machine has the binding's password or token: missing means its keychain entry does not exist here, so ask for it. Null with no binding here. */
+            secret?: components["schemas"]["SecretState"] | null;
             /**
              * Replica
              * @default false
@@ -2431,6 +2459,16 @@ export interface components {
              * @description For a 422: each field that was not accepted, and why.
              */
             errors?: components["schemas"]["FieldError"][] | null;
+            /**
+             * Connector
+             * @description password-missing and secret-exists: the binding's connector, so a client can ask for its password where the problem shows.
+             */
+            connector?: string | null;
+            /**
+             * Environment
+             * @description password-missing and secret-exists: the binding's environment.
+             */
+            environment?: string | null;
         };
         /**
          * Range
@@ -2937,6 +2975,24 @@ export interface components {
             save_without_plan_check: boolean;
         };
         /**
+         * SaveSecret
+         * @description A binding's password or token, for this machine's keychain only.
+         */
+        SaveSecret: {
+            /**
+             * Password
+             * Format: password
+             * @description Saved to the system keychain; never written to a file, logged or returned.
+             */
+            password: string;
+            /**
+             * Replace
+             * @description Overwrite a password already saved under the binding's keychain name. Without it, an existing one is a 409 secret-exists, so the person can be asked first.
+             * @default false
+             */
+            replace: boolean;
+        };
+        /**
          * SchemaSnapshot
          * @description The schema of one connector's database in one environment, as imported.
          */
@@ -2960,6 +3016,12 @@ export interface components {
              */
             truncated?: string | null;
         };
+        /**
+         * SecretState
+         * @description Whether this machine has what a binding signs in with. Never the value.
+         * @enum {string}
+         */
+        SecretState: "saved" | "missing" | "from_environment" | "not_needed";
         /**
          * SetKillSwitch
          * @description Turn one kill switch on or off, and say why: both are audited with the actor.
@@ -5770,6 +5832,95 @@ export interface operations {
             };
             /** @description Not Implemented */
             501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    save_secret: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application: string;
+                connector: string;
+                environment: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveSecret"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

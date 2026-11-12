@@ -454,6 +454,8 @@ export type SetupState = components["schemas"]["SetupState"];
 export type SaveApplication = components["schemas"]["SaveApplication"];
 export type SaveConnector = components["schemas"]["SaveConnector"];
 export type DraftConnection = components["schemas"]["DraftConnection"];
+export type SaveSecret = components["schemas"]["SaveSecret"];
+export type SecretState = components["schemas"]["SecretState"];
 
 /** Connect once to one binding, now. A kill switch refuses it with a 403. */
 export async function testConnection(application: string, connector: string, environment: string): Promise<ConnectionTest> {

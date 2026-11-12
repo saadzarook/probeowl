@@ -22,6 +22,7 @@ from typing import Any, Protocol, runtime_checkable
 from pydantic import JsonValue
 from sqlalchemy import Connection, Engine
 
+from probeowl import secrets
 from probeowl.api.models import StartRun
 from probeowl.checks.rules import rule_warnings
 from probeowl.checks.time_offsets import imported_types, refuse_typed_time, typed_time
@@ -47,6 +48,7 @@ from probeowl.errors import (
     ConnectorError,
     KillSwitchEngaged,
     NotFoundError,
+    PasswordMissing,
     ProbeOwlError,
     ReadsStopped,
     RequestError,
@@ -84,6 +86,7 @@ from probeowl.model.run import (
     RunStatus,
     RunSummary,
 )
+from probeowl.secrets import keychain_entry
 from probeowl.store.audit import AuditEvent, append_event
 from probeowl.store.runs import get_run, list_runs, running_run_ids, save_run
 from probeowl.store.tables import LOCAL_WORKSPACE
@@ -471,6 +474,8 @@ class RunService:
         application_name = app.application.application
         used = sorted({using for _, using in all_connectors(entity)})
         stopped = [r for name in used if (r := self.kill.reason(application_name, name))]
+        if not stopped:  # a stopped run is skipped before any lookup: no password is needed
+            _refuse_missing_passwords(app, used, request.environment, environment.title)
         connectors = self._open(app, entity, request.environment, stopped=bool(stopped))
         try:
             check_run(probe, entity, connectors)
@@ -1215,3 +1220,20 @@ def _max_lag(
 def _close(connectors: Iterable[OpenConnector]) -> None:
     for connector in connectors:
         connector.close()
+
+
+def _refuse_missing_passwords(
+    app: LoadedApplication, used: list[str], environment: str, title: str
+) -> None:
+    """PasswordMissing for the first binding whose keychain entry this machine lacks.
+
+    Before the run exists, so the person is asked for the password, not shown a failed run.
+    """
+    for name in used:
+        connector = app.connectors.get(name)
+        binding = connector.environments.get(environment) if connector else None
+        if binding is None or binding.secret is None or keychain_entry(binding.secret) is None:
+            continue
+        # Looked up at call time, so tests can stand in for the keychain.
+        if not secrets.secret_saved(binding.secret):
+            raise PasswordMissing(name, environment, title)
