@@ -60,6 +60,8 @@ stop_ports() {
 }
 cleanup() {
   stop_ports 7878 7879 7880 8081 8082 4173 4174
+  # The first-run step's test-only keychain entry, whatever happened to the step.
+  if [ -n "${FIRST_RUN_ENTRY:-}" ]; then keychain delete "$FIRST_RUN_ENTRY" >/dev/null 2>&1; fi
   for pid in ${KEEP_ALIVE[@]+"${KEEP_ALIVE[@]}"}; do kill "$pid" 2>/dev/null; done
 }
 trap cleanup EXIT
@@ -407,21 +409,64 @@ live_e2e() {
 
 # First run against a real owl serve: an empty folder, a home folder of its own (so no store and
 # none of this machine's applications), its own ports. CI's live run serves the examples instead.
+# One entry in this machine's keychain, under ProbeOwl's service: exists, or delete (only that one).
+keychain() {
+  "$BACKEND/.venv/Scripts/python" -I -c "
+import sys, keyring, keyring.errors
+action, username = sys.argv[1], sys.argv[2]
+if action == 'exists':
+    sys.exit(0 if keyring.get_password('probeowl', username) is not None else 1)
+try:
+    keyring.delete_password('probeowl', username)
+except keyring.errors.PasswordDeleteError:
+    pass
+sys.exit(0 if keyring.get_password('probeowl', username) is None else 1)
+" "$1" "$2"
+}
+
 first_run_e2e() {
   local home="$WORK/first-run/home" here="$WORK/first-run/work"
+  # A connector id no real binding has: its keychain entry is probeowl/<id>.uat, made and removed here.
+  local connector="probeowl_test_${COMMIT}_${RANDOM}"
+  FIRST_RUN_ENTRY="$connector.uat"
+  if keychain exists "$FIRST_RUN_ENTRY"; then
+    echo "the keychain already has probeowl/$FIRST_RUN_ENTRY: not touching it" >&2
+    FIRST_RUN_ENTRY=""
+    return 1
+  fi
   rm -rf "$WORK/first-run" && mkdir -p "$home" "$here" || return 1
-  (cd "$here" && env -u PROBEOWL_STORE_URL -u PROBEOWL_CONFIG USERPROFILE="$home" HOME="$home"     PROBEOWL_WEB_ORIGINS="http://127.0.0.1:4174,http://localhost:4174"     nohup "$BACKEND/.venv/Scripts/owl" serve --port 7880 --log-file "$WORK/logs/owl-first-run.log"     >"$WORK/logs/serve-7880.log" 2>&1 &)
+  (cd "$here" && env -u PROBEOWL_STORE_URL -u PROBEOWL_CONFIG USERPROFILE="$home" HOME="$home" \
+    PROBEOWL_WEB_ORIGINS="http://127.0.0.1:4174,http://localhost:4174" \
+    nohup "$BACKEND/.venv/Scripts/owl" serve --port 7880 --log-file "$WORK/logs/owl-first-run.log" \
+    >"$WORK/logs/serve-7880.log" 2>&1 &)
   wait_for_port 7880 60 || return 1
   (
     cd "$WORK/tree/web" || exit 1
     [ -d node_modules ] || npm ci --silent || exit 1
     [ -f dist/index.html ] || npm run -s build || exit 1
-    PROBEOWL_API_URL=http://127.0.0.1:7880 nohup npx vite preview --host 127.0.0.1 --port 4174       --strictPort >"$WORK/logs/preview-first-run.log" 2>&1 &
+    PROBEOWL_API_URL=http://127.0.0.1:7880 nohup npx vite preview --host 127.0.0.1 --port 4174 \
+      --strictPort >"$WORK/logs/preview-first-run.log" 2>&1 &
     wait_for_port 4174 60 || exit 1
-    PROBEOWL_LIVE_URL=http://127.0.0.1:4174 PROBEOWL_LIVE_FIRST_RUN_FOLDER="$here/probeowl"       npx playwright test -c playwright.live.config.ts e2e-live/first-run.spec.ts --workers=1
+    PROBEOWL_LIVE_URL=http://127.0.0.1:4174 PROBEOWL_LIVE_FIRST_RUN_FOLDER="$here/probeowl" \
+      PROBEOWL_LIVE_TEST_CONNECTOR="$connector" PROBEOWL_LIVE_MARIADB_PASSWORD="$PROBEOWL_NATIVE_RO_PASSWORD" \
+      npx playwright test -c playwright.live.config.ts e2e-live/first-run.spec.ts --workers=1
   )
   local code=$?
   stop_ports 7880 4174
+  # The form's Save put the password in the real keychain: check it is there, then remove exactly it.
+  if keychain exists "$FIRST_RUN_ENTRY"; then
+    echo "keychain: probeowl/$FIRST_RUN_ENTRY was saved by the form"
+  else
+    echo "keychain: probeowl/$FIRST_RUN_ENTRY is missing after Save" >&2
+    code=1
+  fi
+  if keychain delete "$FIRST_RUN_ENTRY"; then
+    echo "keychain: probeowl/$FIRST_RUN_ENTRY deleted"
+    FIRST_RUN_ENTRY=""
+  else
+    echo "keychain: probeowl/$FIRST_RUN_ENTRY could not be deleted: remove it by hand" >&2
+    code=1
+  fi
   return "$code"
 }
 

@@ -1,6 +1,7 @@
 # Author: @SaadZarook
 """Oracle through python-oracledb in thin mode: no client libraries, no waiting, no rounding."""
 
+import logging
 import re
 import uuid
 from collections.abc import Generator, Mapping
@@ -10,7 +11,7 @@ from typing import Any
 
 import oracledb
 
-from probeowl.connectors.failures import Failure
+from probeowl.connectors.failures import Failure, failure_message
 from probeowl.connectors.plan import Access, PlanStep
 from probeowl.connectors.schema import ColumnRow, IndexColumnRow, TableKey, assemble
 from probeowl.connectors.sql import (
@@ -24,6 +25,8 @@ from probeowl.guards.dialects import ORACLE
 from probeowl.guards.statement import GuardedQuery, ParameterValue
 from probeowl.model.connector import SqlBinding
 from probeowl.model.schema import TableSchema
+
+log = logging.getLogger(__name__)
 
 DEFAULT_PORT = 1521
 CONNECT_TIMEOUT_S = 5
@@ -105,15 +108,22 @@ class OracleAdapter(SqlAdapter):
 
     def _connect(self) -> Any:
         schema = _schema(self._binding)
-        connection = oracledb.connect(
-            user=self._binding.user,
-            password=self._password,
-            host=self._binding.host,
-            port=self._binding.port or DEFAULT_PORT,
-            service_name=self._binding.database,
-            tcp_connect_timeout=CONNECT_TIMEOUT_S,
-            **_tls(self._binding),
-        )
+        try:
+            connection = oracledb.connect(
+                user=self._binding.user,
+                password=self._password,
+                host=self._binding.host,
+                port=self._binding.port or DEFAULT_PORT,
+                service_name=self._binding.database,
+                tcp_connect_timeout=CONNECT_TIMEOUT_S,
+                **_tls(self._binding),
+            )
+        except OSError as err:
+            # Thin mode lets a host that doesn't resolve escape as socket.gaierror, not an
+            # oracledb.Error: the same fixed reason as any connection that can't be made, never
+            # the system's text, which names the host.
+            log.warning("%s: %s", Failure.CONNECTION, type(err).__name__)
+            raise ConnectorError(failure_message(Failure.CONNECTION, 0)) from None
         # Bounds every round trip, so a long-running statement is cut off by the client
         # even where Resource Manager is not set up.
         connection.call_timeout = self._limits.statement_timeout_s * 1000

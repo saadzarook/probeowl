@@ -56,7 +56,9 @@ def test_a_new_password_is_saved_with_no_body_and_audited_without_it(
     assert missing.entries[ENTRY] == TEST_PASSWORD
     [event] = events(setup)
     assert event.application == "wallet" and event.environment == "prod"
-    assert event.details == {"connector": "ledger_db", "replaced": False}
+    # Exactly these: who is the actor, then the binding and what happened; no value, no length.
+    assert event.details == {"connector": "ledger_db", "result": "saved"}
+    assert event.actor.name and event.actor.kind == "person"
     assert TEST_PASSWORD not in str(event)
 
 
@@ -82,7 +84,7 @@ def test_replace_overwrites_it_and_the_audit_says_so(
     response = client(setup).put(URL, json={"password": TEST_PASSWORD, "replace": True})
     assert response.status_code == 204
     assert machine_keychain.entries[ENTRY] == TEST_PASSWORD
-    assert events(setup)[0].details == {"connector": "ledger_db", "replaced": True}
+    assert events(setup)[0].details == {"connector": "ledger_db", "result": "replaced"}
 
 
 @pytest.mark.parametrize(

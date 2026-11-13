@@ -88,13 +88,18 @@ export function AddConnectionPage() {
   const [saved, setSaved] = useState<{ change: CatalogChange; connector: string; environment: string; sql: boolean }>();
   const [passwordState, setPasswordState] = useState<"saving" | "exists" | "saved" | "kept" | "none">();
 
-  const test = useMutation({ mutationFn: (body: DraftConnection) => testDraftConnection(application?.name ?? "", body) });
+  // No password in a mutation's variables, and each mutation dropped from the cache as the form
+  // goes (gcTime 0): React Query would otherwise keep a mutation, and what it was called with,
+  // for five minutes after the form is gone.
+  const test = useMutation({ gcTime: 0, mutationFn: () => testDraftConnection(application?.name ?? "", draftBody()) });
   const save = useMutation({
+    gcTime: 0,
     mutationFn: ({ body, base }: { body: SaveConnector; base?: string }) =>
       saveConnector(application?.name ?? "", connector, base === undefined ? body : { ...body, base }),
   });
   // The binding is passed in, not read from state: the save runs right after setSaved, before a render.
   const secret = useMutation({
+    gcTime: 0,
     mutationFn: ({ binding, replace }: { binding: { connector: string; environment: string }; replace: boolean }) =>
       saveSecret(application?.name ?? "", binding.connector, binding.environment, password, replace),
     onSuccess: () => setPasswordState("saved"),
@@ -103,6 +108,7 @@ export function AddConnectionPage() {
     },
   });
   const tested = useMutation({
+    gcTime: 0,
     mutationFn: () => testDraftConnection(application?.name ?? "", { ...draftBody(), password: null, use_saved_password: true }),
   });
 
@@ -280,7 +286,7 @@ export function AddConnectionPage() {
               {fields.needsToken && (
                 <label>
                   Token
-                  <input type="password" value={password} autoComplete="off" placeholder="saved to this machine's keychain" onChange={(e) => setPassword(e.target.value)} />
+                  <input type="password" value={password} autoComplete="new-password" placeholder="saved to this machine's keychain" onChange={(e) => setPassword(e.target.value)} />
                 </label>
               )}
             </>
@@ -311,7 +317,7 @@ export function AddConnectionPage() {
                 </label>
                 <label>
                   Password
-                  <input type="password" value={password} autoComplete="off" placeholder="saved to this machine's keychain" onChange={(e) => setPassword(e.target.value)} />
+                  <input type="password" value={password} autoComplete="new-password" placeholder="saved to this machine's keychain" onChange={(e) => setPassword(e.target.value)} />
                 </label>
               </div>
               <label className="check" data-production={env?.production || undefined}>
@@ -345,7 +351,7 @@ export function AddConnectionPage() {
             <p className="hint">Choose a type, or paste a connection string.</p>
           )}
           <div className="wizard-nav">
-            <button className="btn secondary" type="button" disabled={!complete || (needsPassword && password === "") || test.isPending} onClick={() => test.mutate(draftBody())}>
+            <button className="btn secondary" type="button" disabled={!complete || (needsPassword && password === "") || test.isPending} onClick={() => test.mutate()}>
               {test.isPending ? "Testing…" : "Test connection"}
             </button>
             <button className="btn secondary" type="button" disabled={!complete || !body || save.isPending} onClick={() => body && void save.mutateAsync({ body }).then((change) => setPreview({ change, sent }))}>
