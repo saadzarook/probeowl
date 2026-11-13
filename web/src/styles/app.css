@@ -472,6 +472,8 @@ input.mono { font-family: var(--font-mono); }
 .env-choice[data-production]:has(input:checked) { border-color: var(--color-production); box-shadow: inset 0 0 0 1px var(--color-production); }
 .setup-environments { max-width: 48rem; }
 .setup-note { margin: 0 0 0.75rem; }
+.app-new { display: block; margin-top: 0.5rem; padding: 0.5rem 0.6rem; border-top: 1px solid var(--color-border); font-weight: 600; color: var(--color-action-blue); text-decoration: none; }
+.app-new:hover, .app-new:focus-visible { text-decoration: underline; }
 
 /* Add connection (/connectors/new) */
 .type-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: 0.6rem; }

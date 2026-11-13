@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath, PureWindowsPath
 
 import typer
+import yaml
 from sqlalchemy.engine import make_url
 
 from probeowl.errors import ConfigError
@@ -35,11 +36,14 @@ class ConfigChoice:
     folder: Path
     by_default: bool
     not_here: str | None = None  # why not ./probeowl in the folder owl was started in
+    not_loaded: str | None = None  # why the folder owl was started in was not loaded itself
 
 
 # Folders a config folder never goes in, whoever runs owl there, as an administrator may.
 _POSIX_SYSTEM = ("/usr", "/etc", "/bin", "/sbin", "/lib", "/lib64", "/boot", "/dev", "/proc",
                  "/sys", "/System", "/Library", "/Applications")  # fmt: skip
+# Far more than any application.yaml ProbeOwl writes: a larger file is someone else's.
+_LARGEST_APPLICATION_FILE = 256 * 1024
 _WINDOWS_SYSTEM = {
     "SystemRoot": r"C:\Windows",
     "ProgramFiles": r"C:\Program Files",
@@ -65,8 +69,10 @@ def choose_config_folder(
     ~/probeowl.
 
     So a first run from a home folder writes into ./probeowl, not beside everything else there,
-    and one started in C:\\Windows\\System32 writes into the home folder. One level down only:
-    never a walk of a whole home folder.
+    and one started in C:\\Windows\\System32 writes into the home folder. A folder that was not
+    named is loaded only for ProbeOwl's own applications, never for a project's own
+    application.yaml; one that was named is loaded, and its errors are reported. One level down
+    only: never a walk of a whole home folder.
     """
     if config is not None:
         return ConfigChoice(config, by_default=False)
@@ -75,12 +81,34 @@ def choose_config_folder(
         return ConfigChoice(Path(named), by_default=False)
     # Path.cwd() is absolute already; a folder given is judged as it is, as on another system.
     here = here if here is not None else Path.cwd()
-    if any(here.glob("*/application.yaml")):
+    found = sorted(here.glob("*/application.yaml"))
+    if any(_is_probeowl_application(path) for path in found):
         return ConfigChoice(here, by_default=True)
+    not_loaded = (
+        "its application.yaml files are not ProbeOwl's (none has application: and "
+        f"environments:), such as {found[0].relative_to(here).as_posix()}"
+        if found
+        else None
+    )
     reason = unsuitable_for_config(here, windows, environ)
     if reason is None:
-        return ConfigChoice(here / DEFAULT_CONFIG_FOLDER, by_default=True)
-    return ConfigChoice((home or Path.home()) / DEFAULT_CONFIG_FOLDER, True, reason)
+        return ConfigChoice(here / DEFAULT_CONFIG_FOLDER, True, not_loaded=not_loaded)
+    return ConfigChoice((home or Path.home()) / DEFAULT_CONFIG_FOLDER, True, reason, not_loaded)
+
+
+def _is_probeowl_application(path: Path) -> bool:
+    """Whether a file is a ProbeOwl application.yaml: an application name and its environments."""
+    try:
+        if path.stat().st_size > _LARGEST_APPLICATION_FILE:
+            return False
+        document = next(yaml.safe_load_all(path.read_text(encoding="utf-8")), None)
+    except (OSError, UnicodeDecodeError, yaml.YAMLError):
+        return False  # not readable as YAML: not ProbeOwl's to load uninvited
+    return (
+        isinstance(document, dict)
+        and isinstance(document.get("application"), str)
+        and isinstance(document.get("environments"), dict)
+    )
 
 
 def unsuitable_for_config(

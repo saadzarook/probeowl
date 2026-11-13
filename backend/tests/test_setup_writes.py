@@ -417,3 +417,32 @@ def test_an_unknown_application_or_environment_is_a_404(setup: Setup) -> None:
     assert setup.api.post(url, json=draft()).status_code == 404
     url = "/api/applications/card_access/connectors/test-draft"
     assert setup.api.post(url, json=draft(environment="staging")).status_code == 404
+
+
+def test_two_tabs_previewing_then_both_creating_give_one_file_and_one_409(setup: Setup) -> None:
+    # The same check as every save: a base from the preview, and an audit event with the file.
+    url = "/api/applications/billing"
+    second_body = NEW_APP | {"title": "Billing, the second tab"}
+    first = setup.api.put(url, json=NEW_APP).json()
+    second = setup.api.put(url, json=second_body).json()
+    assert first["base"] == second["base"] == "absent"
+    created = setup.api.put(url, json=NEW_APP | {"base": first["base"]})
+    assert created.status_code == 200, created.text
+    refused = setup.api.put(url, json=second_body | {"base": second["base"]})
+    assert refused.status_code == 409
+    assert "already loaded" in refused.json()["detail"]
+    written = yaml.safe_load((setup.root / "billing" / "application.yaml").read_text())
+    assert written["title"] == "Billing"  # the first tab's, untouched by the second
+    assert len(setup.events("application_created")) == 1
+
+
+def test_a_preview_for_a_file_written_since_is_a_409_even_before_it_loads(setup: Setup) -> None:
+    preview = setup.api.put("/api/applications/billing", json=NEW_APP).json()
+    # Another program writes the file, and the configuration has not been reloaded yet.
+    folder = setup.root / "billing"
+    folder.mkdir()
+    (folder / "application.yaml").write_text("application: billing\n", encoding="utf-8")
+    refused = setup.api.put("/api/applications/billing", json=NEW_APP | {"base": preview["base"]})
+    assert refused.status_code == 409
+    assert (folder / "application.yaml").read_text() == "application: billing\n"
+    assert setup.events("application_created") == []
