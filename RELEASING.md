@@ -98,8 +98,9 @@ errors in the console, and its search finds "replica". Stop it, then remove both
 
 Then the release check, on the same commit: `bash dev/release/wheel_check.sh` installs the wheel
 with `uv tool install` and a fresh resolution, runs `owl init` for a personal and a Production
-setup, `owl --version`, `owl check` and `owl serve`, and passes. CI doesn't run it, so run it too
-on any change to packaging or the CLI, and name the commit in the pull request.
+setup, `owl --version`, `owl check` and `owl serve`, and passes. CI runs the same check (the
+`wheel` workflow) on every pull request that changes what goes in the wheel (packaging, the CLI,
+the build hooks, the web app's and the guide's dependencies) and on every push to `main`.
 
 **Every release, v0.1 to v0.5, gets the same three before it goes out:** this wheel check, the
 native runs on each affected dialect (step 1), and the maintainer's newcomer retest on the release
