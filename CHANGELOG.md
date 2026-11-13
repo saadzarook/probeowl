@@ -18,6 +18,9 @@ See docs/implementation-plan.md, Releases. -->
   was started in when that folder's YAML isn't ProbeOwl's, such as `C:\Windows\System32` or a
   project with its own `application.yaml`: it uses `./probeowl` (or `~/probeowl`) instead and says
   why. A folder named with `--config` or `PROBEOWL_CONFIG` is loaded as before, with its errors.
+- `owl serve`'s log and owl's own output use colour only where the console shows it: `NO_COLOR`
+  unset, a terminal, and on Windows the console's virtual terminal processing on. An
+  administrator PowerShell without it no longer shows codes such as `←[32mINFO←[0m`.
 
 ## [0.1.0] - 2026-11-12
 

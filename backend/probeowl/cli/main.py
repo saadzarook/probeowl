@@ -20,6 +20,7 @@ from probeowl.checks.time_offsets import unchecked_without_imports
 from probeowl.cli import init as init_wizard
 from probeowl.cli.catalog import catalog_app
 from probeowl.cli.connector import connector_app
+from probeowl.cli.console import colour_supported, plain_unless_coloured
 from probeowl.cli.defaults import (
     CONFIG_VARIABLE,
     STORE_URL_VARIABLE,
@@ -226,6 +227,8 @@ def serve(
             ),
             host=HOST,
             port=port,
+            # Its log in colour only where the console shows colour, by owl's own rule.
+            use_colors=colour_supported(),
         )
     finally:
         runs.shutdown()
@@ -321,6 +324,7 @@ def store_ddl(
 
 def main() -> None:
     """Run `owl`, turning ProbeOwl errors into a message and exit code 1."""
+    plain_unless_coloured()  # before any output: Typer's help and errors honour NO_COLOR
     try:
         app()
     except ProbeOwlError as err:

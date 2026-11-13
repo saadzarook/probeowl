@@ -212,7 +212,7 @@ def test_serve_binds_to_localhost_with_runs(
     result = owl("serve", "--port", "7979", "--config", str(EXAMPLES), "--url", url)
     assert result.exit_code == 0, result.output
     [(app, kwargs)] = served
-    assert kwargs == {"host": "127.0.0.1", "port": 7979}
+    assert kwargs == {"host": "127.0.0.1", "port": 7979, "use_colors": False}  # no terminal here
     assert app.state.runs is not None
 
 
