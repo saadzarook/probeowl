@@ -198,7 +198,11 @@ def serve(
     # One folder object: its lock covers the catalog's writes and the probes' together.
     config_folder = ConfigFolder(folder)
     build = find_web_app()
-    typer.echo(f"ProbeOwl on http://{HOST}:{port} (API docs at /docs, contract at /openapi.json)")
+    # The version first: the guide's install check is this line, not a separate owl --version.
+    typer.echo(
+        f"ProbeOwl {version('probeowl')} on http://{HOST}:{port} "
+        "(API docs at /docs, contract at /openapi.json)"
+    )
     if build is None:
         typer.echo("The web app is not built here: cd web && npm run build, or npm run dev")
     guide = find_guide()

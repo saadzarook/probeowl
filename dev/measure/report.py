@@ -22,11 +22,11 @@ COMMANDS = {
         "owl init",
         "owl serve --config probeowl",
     ],
-    # From v0.2, owl serve with no folder named opens first-run setup in the browser.
+    # From v0.2, owl serve with no folder named opens first-run setup in the browser, and its first
+    # line shows the version, so the guide has no separate owl --version.
     "first-run": [
         "uv tool install probeowl",
         "uv tool update-shell",
-        "owl --version",
         "owl serve",
     ],
 }

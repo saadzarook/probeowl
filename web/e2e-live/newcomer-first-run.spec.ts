@@ -36,7 +36,6 @@ test("owl serve in an empty folder to first Validate: the browser, counted and t
   await count.click(page.getByRole("button", { name: "Next: Environments" }));
   await count.click(page.getByLabel(/^Dev/));
   await count.click(page.getByLabel(/^Production/));
-  await count.click(page.getByRole("button", { name: "Preview" }));
   await expect(page.getByLabel("Diff of card_baseline/application.yaml")).toBeVisible({ timeout: 60_000 });
   await count.click(page.getByRole("button", { name: "Create Card baseline" }));
   await expect(page.getByRole("status").filter({ hasText: "was created" })).toBeVisible({ timeout: 60_000 });

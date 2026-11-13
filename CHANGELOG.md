@@ -23,6 +23,13 @@ See docs/implementation-plan.md, Releases. -->
 - A run started again after its missing password is saved goes where the first was sent. If the top
   bar's environment changed meanwhile, nothing runs: it asks instead.
 
+### Changed
+
+- First-run setup shows `application.yaml` as a diff on the environments step as you choose, with no
+  Preview button. Create is still the one write, of exactly the diff shown.
+- `owl serve` prints its version on its first line, and the guide no longer has a separate
+  `owl --version` check.
+
 ### Fixed
 
 - First-run setup's "Add its first connection", clicked as soon as it appears, opens Add connection.

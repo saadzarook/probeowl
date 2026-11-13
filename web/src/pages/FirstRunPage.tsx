@@ -1,5 +1,5 @@
 // Author: @SaadZarook
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import { saveApplication, type CatalogChange, type SaveApplication } from "../api/client";
@@ -42,7 +42,6 @@ export function FirstRunPage() {
   const [owner, setOwner] = useState("");
   const [editedId, setEditedId] = useState<string>();
   const [chosen, setChosen] = useState<Set<string>>(new Set(SUGGESTED));
-  const [preview, setPreview] = useState<{ change: CatalogChange; sent: string }>();
   const [created, setCreated] = useState<{ change: CatalogChange; id: string; title: string; environment: string }>();
 
   const id = editedId ?? applicationId(name);
@@ -53,15 +52,24 @@ export function FirstRunPage() {
     environments: ENVIRONMENTS.filter((e) => chosen.has(e.name)).map(({ name: env, title, production }) => ({ name: env, title, production })),
   };
   const sent = JSON.stringify([id, body]);
-  const stale = preview !== undefined && preview.sent !== sent;
+
+  // application.yaml as a diff, live on the environments step: a preview writes nothing. Create
+  // writes exactly the diff shown, by its base, as every other write does; while a new one is
+  // read, the last stays on screen, marked as out of date, and Create waits.
+  const preview = useQuery({
+    queryKey: ["application-preview", sent],
+    queryFn: () => saveApplication(id, body),
+    enabled: step === 1 && chosen.size > 0 && created === undefined,
+    placeholderData: keepPreviousData,
+    staleTime: Infinity,
+    gcTime: 0,
+    retry: false,
+  });
+  const stale = preview.isPlaceholderData || preview.isFetching;
 
   const save = useMutation({
-    mutationFn: (base: string | undefined) => saveApplication(id, base === undefined ? body : { ...body, base }),
+    mutationFn: (base: string) => saveApplication(id, { ...body, base }),
     onSuccess: async (change) => {
-      if (!change.written) {
-        setPreview({ change, sent });
-        return;
-      }
       // The new application is loaded before the next step shows: Add its first connection,
       // clicked at once, would otherwise find no applications and come back here. The save stays
       // pending ("Working…") meanwhile.
@@ -70,7 +78,6 @@ export function FirstRunPage() {
       // The first connection goes in an environment that isn't Production, if there is one, as owl init imports.
       const first = body.environments.find((e) => !e.production) ?? body.environments[0];
       setCreated({ change, id, title: body.title, environment: first?.name ?? "" });
-      setPreview(undefined);
       selectApplication(id);
       setStep(2);
     },
@@ -152,15 +159,30 @@ export function FirstRunPage() {
           </p>
         )}
         <div className="wizard-nav">
-          <button className="btn secondary" type="button" disabled={chosen.size === 0 || save.isPending} onClick={() => save.mutate(undefined)}>
-            Preview
-          </button>
-          <button className="btn" type="button" disabled={!preview || stale || save.isPending} onClick={() => preview && save.mutate(preview.change.base)}>
+          <button
+            className="btn"
+            type="button"
+            disabled={chosen.size === 0 || !preview.data || stale || save.isPending}
+            onClick={() => preview.data && save.mutate(preview.data.base)}
+          >
             Create {body.title || id}
           </button>
         </div>
         {save.isPending && <p role="status">Working…</p>}
-        {preview && <ChangePreview change={preview.change} stale={stale} />}
+        {chosen.size > 0 && stale && (
+          <p role="status" className="hint">
+            Updating the diff…
+          </p>
+        )}
+        {chosen.size > 0 && preview.data && <ChangePreview change={preview.data} stale={false} />}
+        {preview.isError && (
+          <div role="alert" className="error-state">
+            <p>{preview.error.message}</p>
+            <button className="btn" type="button" onClick={() => void preview.refetch()}>
+              Retry
+            </button>
+          </div>
+        )}
         {save.error && (
           <div role="alert" className="error-state">
             <p>{save.error.message}</p>

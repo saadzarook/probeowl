@@ -52,7 +52,7 @@ eval "$exports"
 echo "== build the wheel from $(git -C "$REPO" rev-parse --short HEAD)"
 (cd "$REPO/backend" && uv build --wheel -o "$WORK/dist" >"$WORK/build.log" 2>&1) || { tail -20 "$WORK/build.log"; fail "the wheel did not build"; }
 WHEEL=$(ls "$WORK"/dist/*.whl)
-# The wheel's version is the last release's until develop is bumped: name the commit too.
+# A development version names no single commit: name the commit too.
 VERSION="$(basename "$WHEEL" | cut -d- -f2) (develop at $(git -C "$REPO" rev-parse --short HEAD))"
 
 echo "== install $(basename "$WHEEL") (cold)"
