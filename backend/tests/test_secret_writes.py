@@ -20,7 +20,7 @@ from tests.audit_fails import audit_fails
 from tests.conftest import EXAMPLES, MemoryKeychain, Setup
 from tests.local_client import local_client
 from tests.test_connector_status import Source, statuses, wallet_db
-from tests.test_runs import body, no_lookups, runs_stored
+from tests.test_runs import body, finished, no_lookups, runs_stored
 
 TEST_PASSWORD = "secret-test-password-91c4"  # not a real password: a value to look for
 URL = "/api/applications/wallet/connectors/ledger_db/environments/prod/secret"
@@ -221,3 +221,51 @@ def test_a_run_a_kill_switch_stops_is_skipped_as_before_not_refused(
     engaged = api.post("/api/kill-switches", json={"scope": "global", "reason": "incident"})
     assert engaged.status_code == 200, engaged.text
     assert api.post("/api/runs", json=body()).status_code == 202
+
+
+# --- The run again, once the password is saved ------------------------------------------------
+
+
+def all_events(setup: Setup) -> list[Any]:
+    with setup.store.connect() as conn:
+        return list(list_events(conn, LOCAL_WORKSPACE))
+
+
+def test_the_run_again_after_saving_is_a_run_of_its_own_with_its_own_audit_event(
+    setup: Setup, missing: MemoryKeychain
+) -> None:
+    api = client(setup)
+    assert api.post("/api/runs", json=body()).status_code == 422
+    assert all_events(setup) == []  # refused before it existed: no run, nothing audited
+    assert api.put(URL, json={"password": TEST_PASSWORD}).status_code == 204
+
+    again = api.post("/api/runs", json=body())
+    assert again.status_code == 202, again.text
+    run_id = again.json()["id"]
+    assert finished(api, run_id)["status"] != "running"
+    found = all_events(setup)
+    assert [e.action for e in found] == ["secret_saved", "run_started", "run_finished"]
+    started = found[1]
+    assert started.run_id == run_id
+    assert (started.application, started.environment) == ("wallet", "prod")
+    # The original request's record, as the person gave it.
+    assert started.details["reason"] == "incident"
+    assert started.details["reference"] == "WALLET-482"
+    assert started.details["identifiers"] == {"topup_id": "tp_91f2b9"}
+    assert TEST_PASSWORD not in str(found)
+
+
+def test_a_kill_switch_engaged_while_the_password_was_asked_for_stops_the_run_again(
+    setup: Setup, missing: MemoryKeychain
+) -> None:
+    api = client(setup)
+    assert api.post("/api/runs", json=body()).status_code == 422
+    assert api.put(URL, json={"password": TEST_PASSWORD}).status_code == 204
+    engaged = api.post("/api/kill-switches", json={"scope": "global", "reason": "incident"})
+    assert engaged.status_code == 200, engaged.text
+
+    again = api.post("/api/runs", json=body())
+    assert again.status_code == 202, again.text
+    run = finished(api, again.json()["id"])
+    assert "kill switch" in (run["stop_reason"] or run["skip_reason"] or "")
+    assert no_lookups(setup)

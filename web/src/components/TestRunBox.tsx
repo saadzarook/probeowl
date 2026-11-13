@@ -54,7 +54,11 @@ export function TestRunBox({ probe, entity, rootKey }: TestRunBoxProps) {
   const [reason, setReason] = useState<Reason | "">("");
   const [reference, setReference] = useState("");
   const [started, setStarted] = useState<string>();
-  const start = useMutation({ mutationFn: (body: Parameters<typeof startDraftRun>[1]) => startDraftRun(application?.name ?? "", body), onSuccess: setStarted });
+  // The application travels with the request, so a run again goes where the first was sent.
+  const start = useMutation({
+    mutationFn: ({ application, body }: { application: string; body: Parameters<typeof startDraftRun>[1] }) => startDraftRun(application, body),
+    onSuccess: setStarted,
+  });
 
   const production = environment?.production === true;
   const ready = application !== undefined && environment !== undefined && value.trim() !== "" && reason !== "" && (!production || reference.trim() !== "");
@@ -64,11 +68,14 @@ export function TestRunBox({ probe, entity, rootKey }: TestRunBoxProps) {
     if (!ready) return;
     setStarted(undefined);
     start.mutate({
-      probe,
-      entity,
-      environment: environment.name,
-      value: value.trim(),
-      investigation: { reason, reference: reference.trim() || undefined },
+      application: application.name,
+      body: {
+        probe,
+        entity,
+        environment: environment.name,
+        value: value.trim(),
+        investigation: { reason, reference: reference.trim() || undefined },
+      },
     });
   }
 
@@ -122,7 +129,11 @@ export function TestRunBox({ probe, entity, rootKey }: TestRunBoxProps) {
         {started && <Finished runId={started} />}
       </form>
       {application && (
-        <RunNeedsPassword error={start.error} application={application.name} onSaved={() => start.variables && start.mutate(start.variables)} />
+        <RunNeedsPassword
+          error={start.error}
+          request={start.variables && { application: start.variables.application, environment: start.variables.body.environment }}
+          onRerun={() => start.variables && start.mutate(start.variables)}
+        />
       )}
     </>
   );

@@ -211,7 +211,11 @@ export function ValidateForm({ onStarted }: ValidateFormProps) {
         </button>
       </form>
       {application && (
-        <RunNeedsPassword error={start.error} application={application.name} onSaved={() => start.variables && start.mutate(start.variables)} />
+        <RunNeedsPassword
+          error={start.error}
+          request={start.variables}
+          onRerun={() => start.variables && start.mutate(start.variables)}
+        />
       )}
     </>
   );

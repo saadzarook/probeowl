@@ -90,6 +90,29 @@ test("Validate asks too, and runs again with the same input", async ({ page }) =
   expect(posted.join()).not.toContain(PASSWORD);
 });
 
+test("an environment changed in the top bar while it asked: saved, but nothing runs; it asks instead", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("mock-password-missing", "wallet/wallet_db/uat"));
+  const posted: string[] = [];
+  page.on("request", (r) => {
+    if (r.method() === "POST" && new URL(r.url()).pathname === "/api/runs") posted.push(r.postData() ?? "");
+  });
+  await page.goto("/validate");
+  await expect(page.getByLabel("Probe")).toHaveValue("topup_completed");
+  await page.getByRole("main").getByLabel("Environment").selectOption("uat");
+  await page.getByLabel("Any ID").fill("tp_91f2b9");
+  await page.getByLabel("Reason").selectOption("incident");
+  await page.getByRole("button", { name: "Validate" }).click();
+  const prompt = page.getByRole("form", { name: "This connection needs your password for UAT" });
+  await prompt.getByLabel("Password for wallet_db", { exact: true }).fill(PASSWORD);
+  await page.getByRole("banner").getByLabel("Environment").selectOption("prod");
+  await prompt.getByRole("button", { name: "Save password" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Environment changed; run again?" })).toBeVisible();
+  await expect(prompt).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Run result" })).toHaveCount(0);
+  expect(posted).toHaveLength(1); // the refused one only: nothing ran in Production, or in UAT
+  expect(await kept(page)).not.toContain(PASSWORD);
+});
+
 test("Run draft asks too, beside its form, and runs the draft once it is saved", async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("mock-password-missing", "wallet/wallet_db/uat"));
   await page.goto("/probes");

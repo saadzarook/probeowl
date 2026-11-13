@@ -70,7 +70,11 @@ export function InspectPage({ item }: { item: NavItem }) {
             onSubmit={(request) => start.mutate(request)}
           />
           {application && (
-            <RunNeedsPassword error={start.error} application={application.name} onSaved={() => start.variables && start.mutate(start.variables)} />
+            <RunNeedsPassword
+              error={start.error}
+              request={start.variables}
+              onRerun={() => start.variables && start.mutate(start.variables)}
+            />
           )}
           {/* Switching application or environment clears the results. */}
           {started?.scope === scope ? (
