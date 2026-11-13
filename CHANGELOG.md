@@ -15,11 +15,13 @@ See docs/implementation-plan.md, Releases. -->
 ### Added
 
 - A connection whose password isn't on this machine, as when its file came from a teammate, asks
-  for it: on Connectors, and wherever Inspect, Validate or a test run needs it, which then runs again
-  once it's saved. The password goes straight to this machine's keychain and is never stored by the
-  page.
-- Change password on Connectors replaces a saved password in the keychain, then tests the
-  connection with it.
+  for it: on Connectors, and wherever Inspect, Validate or a test run needs it. The password goes
+  straight to this machine's keychain and is never stored by the page.
+- Change password on Connectors tests the new password on the saved binding first, and replaces the
+  saved one only if it connects. If it doesn't, the old one stays, with the reason, and Save anyway
+  is there for a database that is down.
+- A run started again after its missing password is saved goes where the first was sent. If the top
+  bar's environment changed meanwhile, nothing runs: it asks instead.
 
 ### Fixed
 

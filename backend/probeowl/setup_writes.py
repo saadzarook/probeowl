@@ -187,6 +187,8 @@ class SetupWrites:
     def test_draft(self, application: str, body: DraftConnection) -> ConnectionTest:
         """Connect once to a binding not saved yet, with the password given or the saved one."""
         app = self._loaded(application, body.environment)
+        if body.binding is None:
+            return self._test_new_password(application, app, body)
         production = app.application.environments[body.environment].production
         binding = _binding(body.connector, body.type, body.environment, body.binding, production)
         document = {
@@ -211,6 +213,33 @@ class SetupWrites:
                 {"password": "required unless use_saved_password is true"},
             )
         return self._statuses.test_draft(application, model, body.environment, secrets)
+
+    def _test_new_password(
+        self, application: str, app: LoadedApplication, body: DraftConnection
+    ) -> ConnectionTest:
+        """A saved binding, as saved, with a password not saved yet: Change password's test."""
+        existing = app.connectors.get(body.connector)
+        if existing is None or body.environment not in existing.environments:
+            raise NotFoundError(
+                f"{application} has no connector {body.connector} bound in {body.environment}"
+            )
+        if existing.type != body.type:
+            raise RequestError(
+                f"{body.connector} is a {existing.type} connector, not {body.type}",
+                {"type": existing.type},
+            )
+        if existing.environments[body.environment].secret is None:
+            raise RequestError(
+                f"{body.connector} has no password in {body.environment}",
+                {"password": "this binding has none to change"},
+            )
+        if body.password is None:
+            raise RequestError(
+                "give the new password to test",
+                {"password": "required when no binding is given"},
+            )
+        secrets = _given(body.password.get_secret_value())
+        return self._statuses.test_draft(application, existing, body.environment, secrets)
 
     def _loaded(self, application: str, environment: str) -> LoadedApplication:
         app = self._applications.get(application)

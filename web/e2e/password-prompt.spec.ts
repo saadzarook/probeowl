@@ -142,10 +142,39 @@ test("Change password replaces the saved one, then tests the connection", async 
   await prompt.getByRole("button", { name: "Change password" }).click();
   await expect(page.getByRole("status").filter({ hasText: "Reached in" })).toBeVisible();
   await expect(prompt).toHaveCount(0);
-  expect(sent).toHaveLength(1);
-  expect(sent[0]).toContain('"replace":true');
+  // Tested first on the saved binding (no binding sent), then saved over the old one.
+  expect(sent).toHaveLength(2);
+  expect(sent[0]).toContain("POST /api/applications/wallet/connectors/test-draft");
+  expect(sent[0]).not.toContain('"binding"');
+  expect(sent[1]).toContain("PUT /api/applications/wallet/connectors/wallet_db/environments/prod/secret");
+  expect(sent[1]).toContain('"replace":true');
   expect(await kept(page)).not.toContain(PASSWORD);
   // Opened again, it starts empty: nothing of the last one stays.
   await page.getByRole("button", { name: "Change password" }).click();
   await expect(page.getByLabel("Password for wallet_db", { exact: true })).toHaveValue("");
+});
+
+test("a new password that does not connect is not saved; Save anyway is there for a database that is down", async ({ page }) => {
+  const puts: string[] = [];
+  page.on("request", (r) => {
+    if (r.method() === "PUT" && r.url().endsWith("/secret")) puts.push(r.postData() ?? "");
+  });
+  await choose(page, "/connectors", /Wallet/, "prod");
+  await page.getByRole("button", { name: /^wallet_db/ }).click();
+  await page.getByRole("button", { name: "Change password" }).click();
+  const prompt = page.getByRole("form", { name: "Change the password for wallet_db in Production" });
+  await prompt.getByLabel("Password for wallet_db", { exact: true }).fill("wrong"); // the mock refuses it
+  await prompt.getByRole("button", { name: "Change password" }).click();
+  const refused = prompt.getByRole("alert");
+  await expect(refused).toContainText("Not changed: authentication failed; check the binding's login and secret");
+  await expect(refused).toContainText("The saved password is still in place");
+  await expect(refused).toContainText("stops working in Production");
+  expect(puts).toEqual([]); // the old one is kept
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+
+  await refused.getByRole("button", { name: "Save anyway" }).click();
+  await expect(prompt).toHaveCount(0);
+  expect(puts).toHaveLength(1);
+  expect(puts[0]).toContain('"replace":true');
+  expect(await kept(page)).not.toContain("wrong");
 });

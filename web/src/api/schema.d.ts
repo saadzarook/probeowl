@@ -1443,7 +1443,7 @@ export interface components {
         };
         /**
          * DraftConnection
-         * @description A binding that is not saved yet, to connect to once.
+         * @description A binding that is not saved yet, to connect to once; or a saved one, with a new password.
          */
         DraftConnection: {
             /**
@@ -1458,8 +1458,11 @@ export interface components {
             type: "sqlserver" | "oracle" | "mariadb" | "rest";
             /** Environment */
             environment: string;
-            /** Binding */
-            binding: components["schemas"]["SqlBindingDraft"] | components["schemas"]["RestBindingDraft"];
+            /**
+             * Binding
+             * @description Where it points. Omitted for a connector already bound in environment: its saved binding is tested with the password given, as Change password does before saving.
+             */
+            binding?: components["schemas"]["SqlBindingDraft"] | components["schemas"]["RestBindingDraft"] | null;
             /**
              * Password
              * @description Used for this one test only: never stored, logged or returned.

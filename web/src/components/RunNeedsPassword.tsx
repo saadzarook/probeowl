@@ -60,7 +60,6 @@ export function RunNeedsPassword({ error, request, onRerun }: RunNeedsPasswordPr
       connector={error.connector}
       environment={error.environment}
       environmentTitle={title}
-      replace={false}
       onSaved={saved}
     />
   );

@@ -113,12 +113,18 @@ class SaveConnector(ProbeOwlModel):
 
 
 class DraftConnection(ProbeOwlModel):
-    """A binding that is not saved yet, to connect to once."""
+    """A binding that is not saved yet, to connect to once; or a saved one, with a new password."""
 
     connector: Name = Field(description="Its connector, which may not exist yet.")
     type: ConnectorType
     environment: Name
-    binding: SqlBindingDraft | RestBindingDraft
+    binding: SqlBindingDraft | RestBindingDraft | None = Field(
+        default=None,
+        description=(
+            "Where it points. Omitted for a connector already bound in environment: its saved "
+            "binding is tested with the password given, as Change password does before saving."
+        ),
+    )
     password: SecretStr | None = Field(
         default=None,
         min_length=1,

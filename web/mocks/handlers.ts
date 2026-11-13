@@ -712,7 +712,11 @@ export const handlers = [
   // A draft connects unless its password is "wrong", so a failed test and its fixed reason can be seen.
   http.post("/api/applications/:application/connectors/test-draft", async ({ request }) => {
     const body = (await request.json()) as DraftConnection;
-    const sql = "host" in body.binding;
+    // No binding: a saved one, tested with a new password before Change password saves it.
+    if (!body.binding && !body.password) {
+      return problem(422, "Unprocessable Content", "give the new password to test", [{ field: "password", message: "required when no binding is given" }]);
+    }
+    const sql = !body.binding || "host" in body.binding;
     if (sql && !body.password && !body.use_saved_password) {
       return problem(422, "Unprocessable Content", "give the password, or use the one saved on this machine", [
         { field: "password", message: "required unless use_saved_password is true" },

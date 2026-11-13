@@ -89,20 +89,26 @@ test("an empty owl serve opens setup, and Create writes application.yaml and loa
   await expect(page.getByRole("status").filter({ hasText: "Reached in" })).toBeVisible({ timeout: 30_000 });
   await expect(missing).toHaveCount(0);
 
-  // Change password on the first: a wrong one is saved and fails with the fixed reason, then the
-  // right one connects again. The keychain entry is replaced each time, never read by the page.
+  // Change password on the first. A wrong one is tested on the saved binding first and refused with
+  // the fixed reason: nothing is saved, and the old one still connects. Then the right one is
+  // tested, replaces the saved one and connects. The page never reads the keychain.
   await page.getByRole("button", { name: new RegExp(`^${connector}\\b`) }).click();
-  for (const [given, expected] of [
-    ["not-the-password", "Not reached: authentication failed; check the binding's login and secret"],
-    [password ?? "", "Reached in"],
-  ] as const) {
-    await page.getByRole("button", { name: "Change password" }).click();
-    const change = page.getByRole("form", { name: `Change the password for ${connector} in UAT` });
-    await change.getByLabel(`Password for ${connector}`, { exact: true }).fill(given);
-    await change.getByRole("button", { name: "Change password" }).click();
-    await expect(page.getByRole("status").filter({ hasText: expected })).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByRole("status").filter({ hasText: expected })).not.toContainText("127.0.0.1");
-  }
+  await page.getByRole("button", { name: "Change password" }).click();
+  const change = page.getByRole("form", { name: `Change the password for ${connector} in UAT` });
+  await change.getByLabel(`Password for ${connector}`, { exact: true }).fill("not-the-password");
+  await change.getByRole("button", { name: "Change password" }).click();
+  const notChanged = change.getByRole("alert");
+  await expect(notChanged).toContainText("Not changed: authentication failed; check the binding's login and secret", { timeout: 30_000 });
+  await expect(notChanged).not.toContainText("127.0.0.1");
+  await change.getByRole("button", { name: "Cancel" }).click();
+  await page.getByRole("button", { name: "Test connection" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Reached in" })).toBeVisible({ timeout: 30_000 });
+
+  await page.getByRole("button", { name: "Change password" }).click();
+  await change.getByLabel(`Password for ${connector}`, { exact: true }).fill(password ?? "");
+  await change.getByRole("button", { name: "Change password" }).click();
+  await expect(change).toHaveCount(0, { timeout: 30_000 });
+  await expect(page.getByRole("status").filter({ hasText: "Reached in" })).toBeVisible({ timeout: 30_000 });
   const stored = (await page.evaluate(() => JSON.stringify([location.href, { ...localStorage }, { ...sessionStorage }]))) as string;
   expect(stored).not.toContain(password ?? "");
 });

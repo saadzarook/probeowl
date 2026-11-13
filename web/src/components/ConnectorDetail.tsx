@@ -1,7 +1,7 @@
 // Author: @SaadZarook
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import type { ConnectorStatus, KillTarget } from "../api/client";
+import type { ConnectorStatus, DraftConnection, KillTarget } from "../api/client";
 import { useTestConnection } from "../api/useConnectors";
 import { useKillSwitches } from "../api/useKillSwitches";
 import { broaderSwitch, switchOn, targetText } from "../killSwitches";
@@ -10,6 +10,8 @@ import { PasswordPrompt } from "./PasswordPrompt";
 import { useSelection } from "../selection";
 import { HealthChip } from "./HealthChip";
 import { canTestConnection, lagText, limitsText, needsAttention, planText, typeTitle } from "../connectors";
+
+const DRAFT_TYPES: DraftConnection["type"][] = ["sqlserver", "oracle", "mariadb", "rest"];
 
 /** What one connector's reading says: reason, lag and its limit, plan access and the guards a lookup runs under. */
 export function ConnectorDetail({ status, application }: { status: ConnectorStatus; application: string }) {
@@ -24,6 +26,8 @@ export function ConnectorDetail({ status, application }: { status: ConnectorStat
   const client = useQueryClient();
   const { applications } = useSelection();
   const [changingPassword, setChangingPassword] = useState(false);
+  // Change password tests the saved binding first, which the draft test names by its type.
+  const draftType = DRAFT_TYPES.find((t) => t === status.type);
   const environmentTitle =
     applications.find((a) => a.name === application)?.environments.find((e) => e.name === status.environment)?.title ?? status.environment;
   // Saved: read again (no longer missing), then tried with the password owl serve now reads from the keychain.
@@ -51,7 +55,6 @@ export function ConnectorDetail({ status, application }: { status: ConnectorStat
           connector={status.connector}
           environment={status.environment}
           environmentTitle={environmentTitle}
-          replace={false}
           onSaved={afterSaving}
         />
       )}
@@ -135,14 +138,14 @@ export function ConnectorDetail({ status, application }: { status: ConnectorStat
           </button>
         )}
       </div>
-      {changingPassword && (
+      {changingPassword && draftType && (
         <PasswordPrompt
           key={binding}
           application={application}
           connector={status.connector}
           environment={status.environment}
           environmentTitle={environmentTitle}
-          replace={true}
+          change={{ type: draftType }}
           onSaved={afterSaving}
           onCancel={() => setChangingPassword(false)}
         />

@@ -3780,7 +3780,11 @@ components:
           anyOf:
           - $ref: '#/components/schemas/SqlBindingDraft'
           - $ref: '#/components/schemas/RestBindingDraft'
+          - type: 'null'
           title: Binding
+          description: 'Where it points. Omitted for a connector already bound in
+            environment: its saved binding is tested with the password given, as Change
+            password does before saving.'
         password:
           anyOf:
           - type: string
@@ -3802,9 +3806,9 @@ components:
       - connector
       - type
       - environment
-      - binding
       title: DraftConnection
-      description: A binding that is not saved yet, to connect to once.
+      description: A binding that is not saved yet, to connect to once; or a saved
+        one, with a new password.
     DraftProbe:
       properties:
         probe:
