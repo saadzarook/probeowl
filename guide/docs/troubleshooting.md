@@ -96,12 +96,17 @@ authentication failed; check the binding's login and secret
 ```
 
 The login or its password is wrong. Check the binding's `user`, and that its `secret` names an
-entry that exists:
+entry that exists. Copy it to the clipboard rather than printing it, so it never lands in your
+terminal's scrollback:
 
 ```sh
-uvx keyring get probeowl wallet_db.prod     # prints nothing if there's no such entry
-uvx keyring set probeowl wallet_db.prod     # to save it again
+uvx keyring get probeowl wallet_db.prod | Set-Clipboard              # Windows PowerShell
+uvx keyring get probeowl wallet_db.prod | pbcopy                     # macOS
+uvx keyring get probeowl wallet_db.prod | xclip -selection clipboard # Linux
+uvx keyring set probeowl wallet_db.prod                              # to save it again
 ```
+
+An empty clipboard means there's no such entry.
 
 `no keychain entry for service 'probeowl' and user 'wallet_db.prod'` means the entry is missing.
 On Linux without a desktop keychain, ProbeOwl refuses a keyring that keeps secrets in files.
