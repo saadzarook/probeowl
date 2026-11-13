@@ -25,6 +25,8 @@ See docs/implementation-plan.md, Releases. -->
 
 ### Fixed
 
+- First-run setup's "Add its first connection", clicked as soon as it appears, opens Add connection.
+  It showed before the new application was loaded, and a quick click went back to setup.
 - `owl serve` started without `--config` or `PROBEOWL_CONFIG` no longer tries to load the folder it
   was started in when that folder's YAML isn't ProbeOwl's, such as `C:\Windows\System32` or a
   project with its own `application.yaml`: it uses `./probeowl` (or `~/probeowl`) instead and says

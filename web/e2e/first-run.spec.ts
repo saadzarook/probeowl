@@ -77,6 +77,20 @@ test("environments: Dev, UAT and Production suggested, nothing written until Cre
   await expect(page.getByRole("button", { name: "Application" })).toContainText("Card access");
 });
 
+test("Add its first connection, clicked at once, opens Add connection even while the list is slow", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("mock-slow-applications", "1"));
+  await page.goto("/setup");
+  await nameIt(page, "Card access", "access-team");
+  await page.getByRole("button", { name: "Next: Environments" }).click();
+  await page.getByRole("button", { name: "Preview" }).click();
+  await page.getByRole("button", { name: "Create Card access" }).click();
+  // Shown only once the new application is loaded: before, Add connection would find none and
+  // send the newcomer back to setup.
+  await page.getByRole("link", { name: "Add its first connection" }).click();
+  await expect(page).toHaveURL(/\/connectors\/new\?environment=dev$/); // Dev is kept: the first that isn't Production
+  await expect(page.getByRole("heading", { name: "Add connection", level: 1 })).toBeVisible();
+});
+
 test("no environment chosen: Preview waits until one is", async ({ page }) => {
   await page.goto("/setup");
   await nameIt(page, "Ledger", "finance-team");

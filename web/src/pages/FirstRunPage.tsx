@@ -57,19 +57,22 @@ export function FirstRunPage() {
 
   const save = useMutation({
     mutationFn: (base: string | undefined) => saveApplication(id, base === undefined ? body : { ...body, base }),
-    onSuccess: (change) => {
+    onSuccess: async (change) => {
       if (!change.written) {
         setPreview({ change, sent });
         return;
       }
+      // The new application is loaded before the next step shows: Add its first connection,
+      // clicked at once, would otherwise find no applications and come back here. The save stays
+      // pending ("Working…") meanwhile.
+      await client.invalidateQueries({ queryKey: ["applications"] });
+      void client.invalidateQueries({ queryKey: ["setup"] });
       // The first connection goes in an environment that isn't Production, if there is one, as owl init imports.
       const first = body.environments.find((e) => !e.production) ?? body.environments[0];
       setCreated({ change, id, title: body.title, environment: first?.name ?? "" });
       setPreview(undefined);
       selectApplication(id);
       setStep(2);
-      void client.invalidateQueries({ queryKey: ["applications"] });
-      void client.invalidateQueries({ queryKey: ["setup"] });
     },
   });
 

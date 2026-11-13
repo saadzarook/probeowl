@@ -392,7 +392,11 @@ const createdApplications: ApplicationSummary[] = [];
 
 export const handlers = [
   // A config folder with no applications, as owl init has not been run yet.
-  http.get("/api/applications", () => json([...(localStorage.getItem("mock-no-applications") ? [] : applications), ...createdApplications])),
+  // "mock-slow-applications": the list is slow to come back once one is created, as on a busy machine.
+  http.get("/api/applications", async () => {
+    if (createdApplications.length > 0 && localStorage.getItem("mock-slow-applications")) await delay(1500);
+    return json([...(localStorage.getItem("mock-no-applications") ? [] : applications), ...createdApplications]);
+  }),
 
   http.get("/api/applications/:application", ({ params }) => {
     const found = applications.find((a) => a.name === params["application"]);
