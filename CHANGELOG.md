@@ -12,6 +12,13 @@ v0.2 phase (a) first-run setup and Add connection, v0.3 phase (b) the entity gra
 v0.4 phase (c) blocks and probe by example, v0.5 phase (d) templates and New runbook.
 See docs/implementation-plan.md, Releases. -->
 
+### Fixed
+
+- `owl serve` started without `--config` or `PROBEOWL_CONFIG` no longer tries to load the folder it
+  was started in when that folder's YAML isn't ProbeOwl's, such as `C:\Windows\System32` or a
+  project with its own `application.yaml`: it uses `./probeowl` (or `~/probeowl`) instead and says
+  why. A folder named with `--config` or `PROBEOWL_CONFIG` is loaded as before, with its errors.
+
 ## [0.1.0] - 2026-11-12
 
 The first pre-release: phase 1, milestones M0 to M4, verified on test databases only.
