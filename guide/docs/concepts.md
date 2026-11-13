@@ -114,7 +114,7 @@ Each location ends with one **outcome**:
 | --- | --- |
 | Found | The lookup returned its record or records. |
 | Missing | The lookup worked and returned nothing. |
-| Waiting | Not found yet, but still inside its window (`within`). |
+| Waiting | Planned, not reported yet: not found yet, but still inside its window (`within`). Today `within` is used only to mark a Missing on a lagging replica as Stale. |
 | Blocked | Its key could not be found, because an earlier location failed or a link was empty. |
 | Ambiguous | More records than its cardinality allows. |
 | Error | The lookup itself failed: refused, timed out or unreachable. The reason is in the evidence. |

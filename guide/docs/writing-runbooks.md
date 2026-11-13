@@ -58,7 +58,8 @@ application has no runbooks yet.
 | `steps` | What to do, in order: at least one |
 
 `when` names a location of the entity and an outcome: `found`, `missing`, `waiting`, `blocked`,
-`ambiguous`, `error`, `stale` or `not_configured`. `[ledger.missing]` is suggested by any run whose
+`ambiguous`, `error`, `stale` or `not_configured`. No run reports `waiting` yet: it is accepted so a
+runbook can be ready for it. `[ledger.missing]` is suggested by any run whose
 `ledger` location is Missing. List several to be suggested by any of them.
 
 ## Steps

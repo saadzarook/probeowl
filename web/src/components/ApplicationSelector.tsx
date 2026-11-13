@@ -1,6 +1,7 @@
 // Author: @SaadZarook
 import * as Popover from "@radix-ui/react-popover";
 import { useState } from "react";
+import { Link as RouterLink } from "react-router-dom";
 import type { ApplicationSummary } from "../api/client";
 import { useSelection } from "../selection";
 
@@ -72,6 +73,10 @@ export function ApplicationSelector() {
             {found.map(option)}
           </ul>
           {found.length === 0 && !showAll && <p className="app-empty">No application matches “{query}”.</p>}
+          {/* A fixed path: setup asks for a name not loaded yet. */}
+          <RouterLink className="app-new" to="/setup" onClick={() => setOpen(false)}>
+            + New application
+          </RouterLink>
           <p className="app-note">Your choice carries across every screen</p>
         </Popover.Content>
       </Popover.Portal>

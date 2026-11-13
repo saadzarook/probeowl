@@ -178,6 +178,8 @@ def serve(
         folder.mkdir(parents=True)
     if choice.by_default:
         typer.echo(f"Config folder: {folder.resolve()}{' (new, empty)' if created else ''}")
+        if choice.not_loaded is not None:
+            typer.echo(f"  Not this folder: {choice.not_loaded}.")
         if choice.not_here is not None:
             typer.echo(f"  Not ./probeowl here: {choice.not_here}.")
         typer.echo(f"  Choose another with --config <folder> or {CONFIG_VARIABLE}.")
