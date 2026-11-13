@@ -78,9 +78,10 @@ test("an empty owl serve opens setup, and Create writes application.yaml and loa
   const teammate = `${connector}_b`;
   writeFileSync(join(folder ?? "", "card_access", "connectors", `${teammate}.yaml`), file.replaceAll(connector, teammate));
   await page.goto("/connectors");
+  await page.getByLabel("Environment").first().selectOption("uat");
+  await expect(page.getByRole("button", { name: new RegExp(`^${connector}\\b`) })).toBeVisible({ timeout: 30_000 });
   await page.getByRole("button", { name: "Reload configuration" }).click();
   await expect(page.getByRole("status").filter({ hasText: "Reloaded:" })).toBeVisible();
-  await page.getByLabel("Environment").first().selectOption("uat");
   await page.getByRole("button", { name: new RegExp(`^${teammate}`) }).click();
   const missing = page.getByRole("form", { name: "This connection needs your password for UAT" });
   await missing.getByLabel(`Password for ${teammate}`, { exact: true }).fill(password ?? "");
