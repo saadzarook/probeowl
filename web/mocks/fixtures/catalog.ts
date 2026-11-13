@@ -237,5 +237,11 @@ export const truncatedAccessSnapshot = (environment: string): SchemaSnapshot => 
   truncated: "imported 1000 of 1,240 tables",
 });
 
+/** What importing a connector added through Add connection returns: the card access tables, under its name. */
+export const addedConnectorSnapshot = (application: string, connector: string, environment: string): SchemaSnapshot => ({
+  ...snapshot(application, connector, environment, accessTables),
+  imported_at: new Date().toISOString(),
+});
+
 /** The wallet_db import in UAT is not there until the button is used. */
 export const UNIMPORTED = { application: "wallet", connector: "wallet_db", environment: "uat" };

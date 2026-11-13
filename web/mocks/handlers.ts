@@ -2,7 +2,7 @@
 import { stringify } from "yaml";
 import { parse } from "yaml";
 import { delay, http, HttpResponse } from "msw";
-import type { ApplicationSummary, CatalogChange, CatalogReview, CatalogTable, DraftConnection, KillSwitch, KillTarget, ProbeChange, SaveApplication, SaveConnector, SaveEntity, SaveSecret, SaveProbe, SetKillSwitch, StartRun } from "../src/api/client";
+import type { ApplicationSummary, CatalogChange, CatalogReview, CatalogTable, TableReview, DraftConnection, KillSwitch, KillTarget, ProbeChange, SaveApplication, SaveConnector, SaveEntity, SaveSecret, SaveProbe, SetKillSwitch, StartRun } from "../src/api/client";
 import type { CompareRequest } from "../../plugins/compare_files/web/types";
 import { compareFilesManifest, compareFilesResult } from "./fixtures/compareFiles";
 import type { HealthyAttempt, HealthyComparison, Run, RunbookView, StepInRun } from "../src/api/client";
@@ -42,6 +42,7 @@ import {
   walletCatalog,
   walletProbes,
   walletReviewTables,
+  addedConnectorSnapshot,
   topUpDifferences,
   afterARestart,
   allSame,
@@ -129,6 +130,34 @@ function entityFailures(application: string, text: string): { field: string; mes
 }
 
 function reviewOf(application: string): CatalogReview | undefined {
+  const base = baseReviewOf(application);
+  const added = addedImports.get(application) ?? [];
+  if (!base || added.length === 0) return base;
+  // A connector added through Add connection: its tables suggested, until each is confirmed.
+  const confirmed = catalogOf(application) ?? [];
+  const labelOf = (connector: string, table: string) => confirmed.find((c) => c.connector === connector && c.table === table)?.label ?? null;
+  const tables = added.flatMap(({ connector, environment }): TableReview[] => [
+    {
+      connector,
+      schema: null,
+      table: "visitor_profile",
+      imported_in: [environment],
+      label: labelOf(connector, "visitor_profile"),
+      suggestion: { label: "master", reasons: ["one row per visitor, keyed by id"], columns: { id: ["primary_key"], email: ["pii"] } },
+    },
+    {
+      connector,
+      schema: null,
+      table: "cards",
+      imported_in: [environment],
+      label: labelOf(connector, "cards"),
+      suggestion: { label: "transaction", reasons: ["many rows per visitor", "valid_to looks like its time column"], columns: { card_id: ["primary_key"], valid_to: ["time"] } },
+    },
+  ]);
+  return { ...base, tables: [...base.tables, ...tables], unconfirmed: base.unconfirmed + tables.filter((t) => t.label === null).length };
+}
+
+function baseReviewOf(application: string): CatalogReview | undefined {
   if (application === "card_access") return cardAccessReview;
   // As owl serve answers: an application with nothing imported or confirmed has an empty review.
   if (application !== "wallet") return applications.some((a) => a.name === application) ? { application, tables: [], unconfirmed: 0, drifted: 0 } : undefined;
@@ -327,6 +356,10 @@ function fileChange(path: string, text: string, base: string | null | undefined)
     written: base !== undefined && base !== null,
   };
 }
+
+// Connectors written through Add connection, and their imports, in this page's life.
+const addedConnectors = new Set<string>();
+const addedImports = new Map<string, { connector: string; environment: string }[]>();
 
 // Applications created through first run in this page's life, listed after the examples.
 const createdApplications: ApplicationSummary[] = [];
@@ -614,7 +647,9 @@ export const handlers = [
       ? `    host: ${body.binding.host}\n    port: ${body.binding.port}\n    database: ${body.binding.database}\n    user: ${body.binding.user}\n    secret: keyring:probeowl/${connector}.${body.environment}`
       : `    base_url: ${body.binding.base_url}`;
     const text = `connector: ${connector}\ntype: ${body.type}\nenvironments:\n  ${body.environment}:\n${binding}`;
-    return json(fileChange(`${application}/connectors/${connector}.yaml`, text, body.base));
+    const change = fileChange(`${application}/connectors/${connector}.yaml`, text, body.base);
+    if (change.written) addedConnectors.add(`${application}/${connector}`);
+    return json(change);
   }),
 
   // A password is saved with no body. wallet_db in Production has one already, so the question
@@ -713,6 +748,12 @@ export const handlers = [
     }
     if (connector === "checkout_api") {
       return problem(422, "Unprocessable Content", "checkout_api is a REST connector; only SQL connectors can be imported.");
+    }
+    if (addedConnectors.has(`${application}/${connector}`)) {
+      const added = addedConnectorSnapshot(application, connector, environment);
+      imported.set(importKey(application, connector, environment), added);
+      addedImports.set(application, [...(addedImports.get(application) ?? []), { connector, environment }]);
+      return json(added, { status: 201 });
     }
     const found =
       connector === "access_db" && application === "card_access"
