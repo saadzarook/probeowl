@@ -47,7 +47,11 @@ class SecretWrites:
             actor=self._actor,
             application=application,
             environment=environment,
-            details={"connector": connector, "replaced": previous is not None},
+            # Who (the actor), which binding, and what happened: never the value, nor its length.
+            details={
+                "connector": connector,
+                "result": "replaced" if previous is not None else "saved",
+            },
         )
         saved = False
         try:

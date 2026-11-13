@@ -137,3 +137,66 @@ test("a link that names an environment, as first run's does, chooses it in the t
   await expect(page.getByLabel("Environment").first()).toHaveValue("uat");
   await expect(page.getByText("the environment in the top bar")).toContainText("For UAT");
 });
+
+// --- Where a password may not end up (#57's follow-up) --------------------------------------
+
+async function fillDraft(page: Page) {
+  await open(page, /Orders/, "uat");
+  await page.getByRole("button", { name: /^MariaDB/ }).click();
+  await page.getByLabel("Host").fill("db.example.test");
+  await page.getByLabel("Database").fill("orders_uat");
+  await page.getByLabel("Read-only login").fill("probeowl_ro");
+  await page.getByLabel("Password").fill(PASSWORD);
+}
+
+/** Everything the page keeps beyond its inputs: the URL, both storages, and React Query's mutation cache. */
+async function kept(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    const mutations = (window as unknown as { probeowlMutations?: () => unknown[] }).probeowlMutations?.() ?? ["no hook"];
+    return JSON.stringify([location.href, { ...localStorage }, { ...sessionStorage }, mutations]);
+  });
+}
+
+test("the password is never in the URL, either storage, or the mutation cache, and is gone after leaving", async ({ page }) => {
+  await fillDraft(page);
+  await page.getByRole("button", { name: "Test connection" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Connected" })).toBeVisible();
+  expect(await kept(page)).not.toContain(PASSWORD);
+  expect(await kept(page)).not.toContain("no hook"); // the hook is there, so the cache was read
+  // Leave the form, then come back: nothing of it survives.
+  await page.getByRole("link", { name: "Inspect", exact: true }).click();
+  expect(await kept(page)).not.toContain(PASSWORD);
+  await page.goBack();
+  await expect(page.getByRole("heading", { name: "Add connection" })).toBeVisible();
+  await page.getByRole("button", { name: /^MariaDB/ }).click();
+  await expect(page.getByLabel("Password")).toHaveValue("");
+});
+
+test("a pasted string never sits in the field: pasted, read, cleared, the password in its own field", async ({ page }) => {
+  await open(page, /Orders/, "uat");
+  const field = page.getByLabel("Paste a connection string (optional)");
+  // A real paste event: the string is read from the clipboard data and never put in the field.
+  await field.evaluate((input, text) => {
+    const data = new DataTransfer();
+    data.setData("text", text);
+    input.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+  }, `mariadb://probeowl_ro:${PASSWORD}@db.example.test:3306/orders_uat`);
+  await expect(page.getByLabel("Password")).toHaveValue(PASSWORD);
+  await expect(field).toHaveValue("");
+  // One that can't be read is cleared too, and says nothing was kept.
+  await field.fill(`not a connection string ${PASSWORD}`);
+  await field.press("Enter");
+  await expect(field).toHaveValue("");
+  await expect(page.getByRole("status").filter({ hasText: "Nothing was kept" })).toBeVisible();
+});
+
+test("password inputs ask the browser not to fill them, and start empty", async ({ page }) => {
+  await open(page, /Orders/, "uat");
+  await page.getByRole("button", { name: /^SQL Server/ }).click();
+  await expect(page.getByLabel("Password")).toHaveAttribute("autocomplete", "new-password");
+  await expect(page.getByLabel("Password")).toHaveValue("");
+  await page.getByRole("button", { name: /^REST API/ }).click();
+  await page.getByLabel("It needs a token").check();
+  await expect(page.getByLabel("Token", { exact: true })).toHaveAttribute("autocomplete", "new-password");
+  await expect(page.getByLabel("Token", { exact: true })).toHaveValue("");
+});
