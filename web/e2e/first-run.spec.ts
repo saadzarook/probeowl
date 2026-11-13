@@ -85,3 +85,23 @@ test("no environment chosen: Preview waits until one is", async ({ page }) => {
   await expect(page.getByRole("alert")).toContainText("Choose at least one environment.");
   await expect(page.getByRole("button", { name: "Preview" })).toBeDisabled();
 });
+
+test.describe("with applications loaded", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => localStorage.removeItem("mock-no-applications"));
+  });
+
+  test("New application in the picker opens setup, for a name not loaded yet", async ({ page }) => {
+    await page.goto("/inspect");
+    await page.getByRole("button", { name: "Application" }).click();
+    await page.getByRole("link", { name: "+ New application" }).click();
+    await expect(page).toHaveURL(/\/setup$/);
+    await expect(page.getByText("A new application · owl init does the same from a terminal")).toBeVisible();
+    await nameIt(page, "Card access", "access-team");
+    await expect(page.getByRole("alert")).toContainText("an application named card_access already exists");
+    await expect(page.getByRole("button", { name: "Next: Environments" })).toBeDisabled();
+    await nameIt(page, "Ledger", "finance-team");
+    await expect(page.getByRole("button", { name: "Next: Environments" })).toBeEnabled();
+    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  });
+});
