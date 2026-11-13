@@ -419,6 +419,81 @@ def test_an_unknown_application_or_environment_is_a_404(setup: Setup) -> None:
     assert setup.api.post(url, json=draft(environment="staging")).status_code == 404
 
 
+# --- Change password: a saved binding, tested with a new password before it is saved ----------
+
+DRAFT_URL = "/api/applications/card_access/connectors/test-draft"
+
+
+def new_password(**change: Any) -> dict[str, Any]:
+    body = {"connector": "access_db", "type": "mariadb", "environment": "prod"}
+    return body | {"password": TEST_PASSWORD} | change
+
+
+def test_a_saved_binding_is_tested_as_saved_with_the_new_password(
+    setup: Setup, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Never the keychain: the password given is the one tried, and nothing is saved.
+    monkeypatch.setattr(probeowl.setup_writes, "resolve_secret", lambda ref: "the saved one")
+    response = setup.api.post(DRAFT_URL, json=new_password())
+    assert response.status_code == 200, response.text
+    assert response.json()["reachable"] is True
+    assert setup.secrets_seen == [TEST_PASSWORD]
+    assert TEST_PASSWORD not in response.text
+    [event] = setup.events("connection_tested")
+    assert event.details == {
+        "application": "card_access",
+        "connector": "access_db",
+        "environment": "prod",
+        "reachable": True,
+        "draft": True,
+    }
+    assert setup.events("secret_saved") == []
+
+
+def test_a_new_password_that_fails_says_the_fixed_reason(setup: Setup) -> None:
+    setup.reason = "authentication failed; check the binding's login and secret"
+    response = setup.api.post(DRAFT_URL, json=new_password())
+    assert response.status_code == 200
+    assert response.json()["reachable"] is False
+    assert response.json()["reason"] == setup.reason
+
+
+def test_a_kill_switch_refuses_a_new_password_test_before_the_password_is_used(
+    setup: Setup,
+) -> None:
+    engaged = setup.api.post(
+        "/api/kill-switches",
+        json={"scope": "connector", "application": "card_access", "connector": "access_db"}
+        | {"reason": "incident"},
+    )
+    assert engaged.status_code == 200, engaged.text
+    assert setup.api.post(DRAFT_URL, json=new_password()).status_code == 403
+    assert setup.secrets_seen == []
+
+
+@pytest.mark.parametrize(
+    ("change", "status", "says"),
+    [
+        ({"connector": "access_reports"}, 404, "no connector access_reports bound in prod"),
+        ({"environment": "staging"}, 404, "no environment staging"),
+        ({"type": "oracle"}, 422, "is a mariadb connector, not oracle"),
+        ({"password": None}, 422, "give the new password"),
+        (
+            {"connector": "door_controller_api", "type": "rest", "environment": "uat"},
+            422,
+            "no password",
+        ),
+    ],
+)
+def test_a_new_password_test_without_a_saved_binding_to_test_is_refused(
+    setup: Setup, change: dict[str, Any], status: int, says: str
+) -> None:
+    response = setup.api.post(DRAFT_URL, json=new_password(**change))
+    assert response.status_code == status, response.text
+    assert says in response.json()["detail"]
+    assert setup.secrets_seen == []
+
+
 def test_two_tabs_previewing_then_both_creating_give_one_file_and_one_409(setup: Setup) -> None:
     # The same check as every save: a base from the preview, and an audit event with the file.
     url = "/api/applications/billing"

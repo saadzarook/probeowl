@@ -1,5 +1,5 @@
 // Author: @SaadZarook
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 import { parse } from "yaml";
@@ -44,7 +44,8 @@ test("an empty owl serve opens setup, and Create writes application.yaml and loa
   }
 
   // Then its first connection, on the native MariaDB, with the password to the real keychain under
-  // a test-only connector id; verify.sh checks the entry exists, then deletes exactly it.
+  // a test-only connector id (and later a second, <id>_b); verify.sh checks both entries exist,
+  // then deletes exactly them, and sweeps any probeowl_test_* a run killed hard left behind.
   await page.getByRole("link", { name: "Add its first connection" }).click();
   await expect(page.getByLabel("Environment").first()).toHaveValue("uat");
   await page.getByRole("button", { name: /^MariaDB/ }).click();
@@ -71,4 +72,43 @@ test("an empty owl serve opens setup, and Create writes application.yaml and loa
   await expect(page.getByRole("status").filter({ hasText: "Connected" })).toBeVisible({ timeout: 30_000 });
   const file = readFileSync(join(folder ?? "", "card_access", "connectors", `${connector}.yaml`), "utf-8");
   expect(file).not.toContain(password ?? "");
+
+  // A teammate's file: the same connection under a second test-only id, with nothing in this
+  // machine's keychain for it. Connectors asks for its password; saving it connects.
+  const teammate = `${connector}_b`;
+  writeFileSync(join(folder ?? "", "card_access", "connectors", `${teammate}.yaml`), file.replaceAll(connector, teammate));
+  await page.goto("/connectors");
+  await page.getByLabel("Environment").first().selectOption("uat");
+  await expect(page.getByRole("button", { name: new RegExp(`^${connector}\\b`) })).toBeVisible({ timeout: 30_000 });
+  await page.getByRole("button", { name: "Reload configuration" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Reloaded:" })).toBeVisible();
+  await page.getByRole("button", { name: new RegExp(`^${teammate}`) }).click();
+  const missing = page.getByRole("form", { name: "This connection needs your password for UAT" });
+  await missing.getByLabel(`Password for ${teammate}`, { exact: true }).fill(password ?? "");
+  await missing.getByRole("button", { name: "Save password" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Reached in" })).toBeVisible({ timeout: 30_000 });
+  await expect(missing).toHaveCount(0);
+
+  // Change password on the first. A wrong one is tested on the saved binding first and refused with
+  // the fixed reason: nothing is saved, and the old one still connects. Then the right one is
+  // tested, replaces the saved one and connects. The page never reads the keychain.
+  await page.getByRole("button", { name: new RegExp(`^${connector}\\b`) }).click();
+  await page.getByRole("button", { name: "Change password" }).click();
+  const change = page.getByRole("form", { name: `Change the password for ${connector} in UAT` });
+  await change.getByLabel(`Password for ${connector}`, { exact: true }).fill("not-the-password");
+  await change.getByRole("button", { name: "Change password" }).click();
+  const notChanged = change.getByRole("alert");
+  await expect(notChanged).toContainText("Not changed: authentication failed; check the binding's login and secret", { timeout: 30_000 });
+  await expect(notChanged).not.toContainText("127.0.0.1");
+  await change.getByRole("button", { name: "Cancel" }).click();
+  await page.getByRole("button", { name: "Test connection" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Reached in" })).toBeVisible({ timeout: 30_000 });
+
+  await page.getByRole("button", { name: "Change password" }).click();
+  await change.getByLabel(`Password for ${connector}`, { exact: true }).fill(password ?? "");
+  await change.getByRole("button", { name: "Change password" }).click();
+  await expect(change).toHaveCount(0, { timeout: 30_000 });
+  await expect(page.getByRole("status").filter({ hasText: "Reached in" })).toBeVisible({ timeout: 30_000 });
+  const stored = (await page.evaluate(() => JSON.stringify([location.href, { ...localStorage }, { ...sessionStorage }]))) as string;
+  expect(stored).not.toContain(password ?? "");
 });

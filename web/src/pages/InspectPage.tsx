@@ -1,7 +1,8 @@
 // Author: @SaadZarook
 import { useMutation } from "@tanstack/react-query";
 import { Fragment, useState } from "react";
-import { pickMatches, splitError, startRun } from "../api/client";
+import { PasswordMissingError, pickMatches, splitError, startRun } from "../api/client";
+import { RunNeedsPassword } from "../components/RunNeedsPassword";
 import { useEntities } from "../api/useEntities";
 import { EmptyState } from "../components/EmptyState";
 import { HealthyComparisonSection } from "../components/HealthyComparison";
@@ -64,10 +65,17 @@ export function InspectPage({ item }: { item: NavItem }) {
           <InspectForm
             entity={entity}
             pending={start.isPending || pick.isPending}
-            error={splitError(start.error ?? pick.error, "value").rest}
+            error={start.error instanceof PasswordMissingError ? undefined : splitError(start.error ?? pick.error, "value").rest}
             valueError={splitError(start.error ?? pick.error, "value").field}
             onSubmit={(request) => start.mutate(request)}
           />
+          {application && (
+            <RunNeedsPassword
+              error={start.error}
+              request={start.variables}
+              onRerun={() => start.variables && start.mutate(start.variables)}
+            />
+          )}
           {/* Switching application or environment clears the results. */}
           {started?.scope === scope ? (
             started.ids.map((id) => (

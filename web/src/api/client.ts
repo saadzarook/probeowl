@@ -90,6 +90,23 @@ export function splitError(error: Error | null | undefined, field: string): { fi
   return { rest: error.message };
 }
 
+/** A run needs a password this machine's keychain doesn't have: ask for it, then run again. */
+export class PasswordMissingError extends Error {
+  constructor(
+    message: string,
+    readonly connector: string,
+    readonly environment: string,
+  ) {
+    super(message);
+  }
+}
+
+/** The PasswordMissingError a 422 password-missing problem means, or undefined for any other. */
+function passwordMissing(problem: components["schemas"]["Problem"] | undefined): PasswordMissingError | undefined {
+  if (problem?.type !== "urn:probeowl:problem:password-missing" || !problem.connector || !problem.environment) return undefined;
+  return new PasswordMissingError(problem.detail ?? "This connection needs your password.", problem.connector, problem.environment);
+}
+
 /** List the applications, each with its environments. */
 export async function fetchApplications(): Promise<ApplicationSummary[]> {
   const { data, error } = await api.GET("/api/applications");
@@ -101,7 +118,7 @@ export async function fetchApplications(): Promise<ApplicationSummary[]> {
 export async function startRun(body: StartRun): Promise<string> {
   const { data, error } = await api.POST("/api/runs", { body });
   if (data) return data.id;
-  throw problemError(error, "The run could not be started.");
+  throw passwordMissing(error) ?? problemError(error, "The run could not be started.");
 }
 
 export type RunbookView = components["schemas"]["RunbookView"];
@@ -395,6 +412,8 @@ export async function startDraftRun(application: string, body: DraftRun): Promis
     body,
   });
   if (data) return data.id;
+  const missing = passwordMissing(error);
+  if (missing) throw missing;
   if (response.status === 422 && (error?.errors ?? []).length > 0) {
     throw new DraftRefusedError(error?.detail ?? "The draft failed its save checks.", error?.errors ?? []);
   }

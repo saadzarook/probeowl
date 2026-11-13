@@ -357,6 +357,32 @@ function fileChange(path: string, text: string, base: string | null | undefined)
   };
 }
 
+// A binding whose password this machine lacks, as a teammate's would: opt in with localStorage
+// "mock-password-missing" = "<application>/<connector>/<environment>"; saving it fills it.
+const savedPasswords = new Set<string>();
+function passwordMissing(application: string, connector: string, environment: string): boolean {
+  const key = `${application}/${connector}/${environment}`;
+  return localStorage.getItem("mock-password-missing") === key && !savedPasswords.has(key);
+}
+function missingFor(application: string, environment: string): { connector: string; environment: string } | undefined {
+  const [app, connector, env] = (localStorage.getItem("mock-password-missing") ?? "").split("/");
+  if (app !== application || env !== environment || !connector) return undefined;
+  return passwordMissing(application, connector, environment) ? { connector, environment } : undefined;
+}
+function passwordMissingProblem(connector: string, environment: string) {
+  return HttpResponse.json(
+    {
+      type: "urn:probeowl:problem:password-missing",
+      title: "Unprocessable Content",
+      status: 422,
+      detail: `${connector} needs your password for ${environment === "prod" ? "Production" : environment.toUpperCase()}: save it on this machine first`,
+      connector,
+      environment,
+    },
+    { status: 422, headers: { "Content-Type": "application/problem+json" } },
+  );
+}
+
 // Connectors written through Add connection, and their imports, in this page's life.
 const addedConnectors = new Set<string>();
 const addedImports = new Map<string, { connector: string; environment: string }[]>();
@@ -412,6 +438,8 @@ export const handlers = [
     const body = (await request.json()) as DraftBody;
     if (!applications.some((a) => a.name === application)) return problem(404, "Not Found", "No such application.");
     if (!knownEnvironment(application, body.environment)) return problem(404, "Not Found", "No such environment.");
+    const missing = missingFor(application, body.environment ?? "");
+    if (missing) return passwordMissingProblem(missing.connector, missing.environment);
     return json(checksOf(body));
   }),
 
@@ -420,6 +448,8 @@ export const handlers = [
     const body = (await request.json()) as DraftBody & Pick<StartRun, "value" | "identifier" | "investigation"> & { environment: string };
     if (!applications.some((a) => a.name === application)) return problem(404, "Not Found", "No such application.");
     if (!knownEnvironment(application, body.environment)) return problem(404, "Not Found", "No such environment.");
+    const missing = missingFor(application, body.environment);
+    if (missing) return passwordMissingProblem(missing.connector, missing.environment);
     const failed = checksOf(body).checks.filter((c) => c.status === "fail");
     if (failed.length > 0) {
       return problem(422, "Unprocessable Content", `${failed[0]?.check ?? "Probe"}: ${failed[0]?.message ?? ""}`, failed.map((c) => ({ field: c.location ? `${c.check}: ${c.location}` : c.check, message: c.message })));
@@ -590,7 +620,11 @@ export const handlers = [
     return json(
       statuses.map((status) => {
         const reason = stoppedBy(application.name, status.connector);
-        return reason ? { ...status, health: "stopped" as const, reason } : status;
+        if (reason) return { ...status, health: "stopped" as const, reason };
+        if (passwordMissing(application.name, status.connector, environment.name)) {
+          return { ...status, secret: "missing" as const, health: "not_configured" as const, reason: `no password saved on this machine for ${environment.name}` };
+        }
+        return { ...status, secret: status.type === "rest" ? ("not_needed" as const) : ("saved" as const) };
       }),
     );
   }),
@@ -671,13 +705,18 @@ export const handlers = [
         { status: 409, headers: { "Content-Type": "application/problem+json" } },
       );
     }
+    savedPasswords.add(`${String(params["application"])}/${connector}/${environment}`);
     return new HttpResponse(null, { status: 204 });
   }),
 
   // A draft connects unless its password is "wrong", so a failed test and its fixed reason can be seen.
   http.post("/api/applications/:application/connectors/test-draft", async ({ request }) => {
     const body = (await request.json()) as DraftConnection;
-    const sql = "host" in body.binding;
+    // No binding: a saved one, tested with a new password before Change password saves it.
+    if (!body.binding && !body.password) {
+      return problem(422, "Unprocessable Content", "give the new password to test", [{ field: "password", message: "required when no binding is given" }]);
+    }
+    const sql = !body.binding || "host" in body.binding;
     if (sql && !body.password && !body.use_saved_password) {
       return problem(422, "Unprocessable Content", "give the password, or use the one saved on this machine", [
         { field: "password", message: "required unless use_saved_password is true" },
@@ -771,6 +810,8 @@ export const handlers = [
     if (!applications.some((a) => a.name === body.application)) {
       return problem(404, "Not Found", "No such application.");
     }
+    const missing = missingFor(body.application, body.environment);
+    if (missing) return passwordMissingProblem(missing.connector, missing.environment);
     // As the server does when the value is a time typed with an offset and its column stores none.
     const offset = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?\s*(Z|[+-]\d{2}(?::?\d{2})?)$/i.exec(body.value)?.[1];
     if (offset !== undefined) {
