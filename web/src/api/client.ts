@@ -234,6 +234,18 @@ export async function pickMatchesByNumber(runId: string, value: string, picks: n
   throw problemError(error, "The matches could not be inspected.");
 }
 
+export type SearchResults = components["schemas"]["SearchResults"];
+export type SearchGroup = components["schemas"]["SearchGroup"];
+export type SearchItem = components["schemas"]["SearchItem"];
+export type SearchKind = components["schemas"]["SearchKind"];
+
+/** Global search: one application's matches, or every application's when application is omitted. */
+export async function searchAll(q: string, application: string | undefined, limit?: number): Promise<SearchResults> {
+  const { data, error } = await api.GET("/api/search", { params: { query: { q, application, limit } } });
+  if (data) return data;
+  throw problemError(error, "Search could not be run.");
+}
+
 /** A page of runs in one application and environment, newest first; before is the last page's next. */
 export async function fetchRuns(application: string, environment: string, before: string | undefined): Promise<RunList> {
   const { data, error } = await api.GET("/api/runs", { params: { query: { application, environment, before } } });

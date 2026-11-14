@@ -478,6 +478,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search Everything
+         * @description Global search: names and titles, imported tables and columns, and runs. Not audited.
+         *
+         *     Prefix matches rank before substring matches, names before titles. A run is found by its
+         *     id (4 or more characters) or by its subject or identifier as stored: exactly, or by a
+         *     prefix of 4 or more characters when it isn't PII. A masked value matches nothing. Never
+         *     matched: run results, evidence, lookups' SQL, runbook steps, hosts, URLs, logins or
+         *     keychain names. application: omitted, every application. limit: per group.
+         */
+        get: operations["search_everything"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runs/{run_id}": {
         parameters: {
             query?: never;
@@ -3038,6 +3064,68 @@ export interface components {
             truncated?: string | null;
         };
         /**
+         * SearchGroup
+         * @description The matches of one kind, best first.
+         */
+        SearchGroup: {
+            kind: components["schemas"]["SearchKind"];
+            /** Items */
+            items: components["schemas"]["SearchItem"][];
+            /**
+             * More
+             * @description Matches beyond the limit.
+             */
+            more: number;
+        };
+        /**
+         * SearchItem
+         * @description One match: enough to show it and to build its link.
+         */
+        SearchItem: {
+            kind: components["schemas"]["SearchKind"];
+            /**
+             * Application
+             * @description Its application; null only for an application.
+             */
+            application: string | null;
+            /**
+             * Id
+             * @description entity: visitor; location: visitor.cards; table: <connector>.<table>; column: <connector>.<table>.<column>; run: its id; otherwise its name.
+             */
+            id: string;
+            /**
+             * Title
+             * @description The human title, or the id when there is none.
+             */
+            title: string;
+            /**
+             * Detail
+             * @description entity: its root key; probe: Validate · visitor; connector: mariadb · uat, prod; run: Failed · 12 Nov 14:02 · visitor_cards.
+             */
+            detail?: string | null;
+            /**
+             * Labels
+             * @description table: its catalog label, or the suggested one and 'suggested'; column: its roles.
+             */
+            labels?: string[];
+        };
+        /**
+         * SearchKind
+         * @description What a result is. Groups come back in this order.
+         * @enum {string}
+         */
+        SearchKind: "application" | "entity" | "probe" | "location" | "connector" | "runbook" | "table" | "column" | "run";
+        /**
+         * SearchResults
+         * @description Every group with a match, in SearchKind's order; a kind with none is left out.
+         */
+        SearchResults: {
+            /** Query */
+            query: string;
+            /** Groups */
+            groups: components["schemas"]["SearchGroup"][];
+        };
+        /**
          * SecretState
          * @description Whether this machine has what a binding signs in with. Never the value.
          * @enum {string}
@@ -5078,6 +5166,75 @@ export interface operations {
             };
             /** @description Service Unavailable */
             503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    search_everything: {
+        parameters: {
+            query: {
+                q: string;
+                application?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchResults"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
                 headers: {
                     [name: string]: unknown;
                 };

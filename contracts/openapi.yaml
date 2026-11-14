@@ -1538,6 +1538,94 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
+  /api/search:
+    get:
+      tags:
+      - search
+      summary: Search Everything
+      description: 'Global search: names and titles, imported tables and columns,
+        and runs. Not audited.
+
+
+        Prefix matches rank before substring matches, names before titles. A run is
+        found by its
+
+        id (4 or more characters) or by its subject or identifier as stored: exactly,
+        or by a
+
+        prefix of 4 or more characters when it isn''t PII. A masked value matches
+        nothing. Never
+
+        matched: run results, evidence, lookups'' SQL, runbook steps, hosts, URLs,
+        logins or
+
+        keychain names. application: omitted, every application. limit: per group.'
+      operationId: search_everything
+      parameters:
+      - name: q
+        in: query
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+          title: Q
+      - name: application
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 64
+            pattern: ^[a-z][a-z0-9_]*$
+          - type: 'null'
+          title: Application
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 20
+          minimum: 1
+          default: 8
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResults'
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+        '501':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Implemented
+        '404':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Found
+        '422':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Unprocessable Entity
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
   /api/runs/{run_id}:
     get:
       tags:
@@ -6202,6 +6290,104 @@ components:
       - tables
       title: SchemaSnapshot
       description: The schema of one connector's database in one environment, as imported.
+    SearchGroup:
+      properties:
+        kind:
+          $ref: '#/components/schemas/SearchKind'
+        items:
+          items:
+            $ref: '#/components/schemas/SearchItem'
+          type: array
+          title: Items
+        more:
+          type: integer
+          minimum: 0.0
+          title: More
+          description: Matches beyond the limit.
+      additionalProperties: false
+      type: object
+      required:
+      - kind
+      - items
+      - more
+      title: SearchGroup
+      description: The matches of one kind, best first.
+    SearchItem:
+      properties:
+        kind:
+          $ref: '#/components/schemas/SearchKind'
+        application:
+          anyOf:
+          - type: string
+            maxLength: 64
+            pattern: ^[a-z][a-z0-9_]*$
+          - type: 'null'
+          title: Application
+          description: Its application; null only for an application.
+        id:
+          type: string
+          title: Id
+          description: 'entity: visitor; location: visitor.cards; table: <connector>.<table>;
+            column: <connector>.<table>.<column>; run: its id; otherwise its name.'
+        title:
+          type: string
+          title: Title
+          description: The human title, or the id when there is none.
+        detail:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Detail
+          description: 'entity: its root key; probe: Validate · visitor; connector:
+            mariadb · uat, prod; run: Failed · 12 Nov 14:02 · visitor_cards.'
+        labels:
+          items:
+            type: string
+          type: array
+          title: Labels
+          description: 'table: its catalog label, or the suggested one and ''suggested'';
+            column: its roles.'
+      additionalProperties: false
+      type: object
+      required:
+      - kind
+      - application
+      - id
+      - title
+      title: SearchItem
+      description: 'One match: enough to show it and to build its link.'
+    SearchKind:
+      type: string
+      enum:
+      - application
+      - entity
+      - probe
+      - location
+      - connector
+      - runbook
+      - table
+      - column
+      - run
+      title: SearchKind
+      description: What a result is. Groups come back in this order.
+    SearchResults:
+      properties:
+        query:
+          type: string
+          title: Query
+        groups:
+          items:
+            $ref: '#/components/schemas/SearchGroup'
+          type: array
+          title: Groups
+      additionalProperties: false
+      type: object
+      required:
+      - query
+      - groups
+      title: SearchResults
+      description: Every group with a match, in SearchKind's order; a kind with none
+        is left out.
     SecretState:
       type: string
       enum:
