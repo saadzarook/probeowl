@@ -16,7 +16,6 @@ from pydantic import JsonValue
 from probeowl.checks.plans import PlanOpener, PlanSource, plan_checks
 from probeowl.checks.rules import read_step_statement
 from probeowl.connectors.plan import PlanStep
-from probeowl.engine.identifiers import detect
 from probeowl.engine.locations import DEFAULT_MAX_ROWS
 from probeowl.engine.masking import (
     MASKED,
@@ -59,7 +58,7 @@ from probeowl.model.runbook_step import (
 )
 from probeowl.model.save_check import CheckStatus
 from probeowl.runbooks import is_write_step, why_copy_only
-from probeowl.runs import RunService
+from probeowl.runs import RunService, check_pasted_subject
 from probeowl.store.runbook_steps import save_step, step_states
 
 # A parameter, skipping what is inside a quoted string and a PostgreSQL-style :: cast.
@@ -125,14 +124,24 @@ def parameter_value(run: Run, entity: Entity, name: str) -> _Value | str:
     return NOT_IN_RUN
 
 
-def _with_pasted_subject(run: Run, entity: Entity, subject: str | None) -> Run:
-    """The run with its real subject for one step, when its key is PII; refused without one."""
+def _with_pasted_subject(
+    run: Run, app: LoadedApplication, entity: Entity, subject: str | None
+) -> tuple[Run, bool]:
+    """The run with its real subject for one step, when its key is PII; refused without one.
+
+    And whether it was pasted. A pasted subject is checked as a new lookup (check_pasted_subject).
+    """
     if run.subject != MASKED:
-        return run
+        return run, False
     if subject is None:
         raise RequestError(masked_key_reason(entity), {"subject": masked_key_reason(entity)})
-    detect(entity, subject, entity.root_key)  # a value that can't be its root key is refused
-    return run.model_copy(update={"subject": subject})
+    check_pasted_subject(run, app, entity, subject)
+    return run.model_copy(update={"subject": subject}), True
+
+
+def _pasted_detail(pasted: bool) -> dict[str, str]:
+    # The step used a pasted subject: audited as such, never its value.
+    return {"subject": MASKED} if pasted else {}
 
 
 def _sql_literal(found: _Value, backslash_escapes: bool) -> str:
@@ -211,10 +220,11 @@ class RunbookSteps:
                 "a write query is never run by ProbeOwl: copy it for a change request",
                 {"step": f"step {step} is a write query"},
             )
+        pasted = False
         if isinstance(chosen, (ProbeStep, ReadQueryStep)):
-            run = _with_pasted_subject(run, entity, subject)
+            run, pasted = _with_pasted_subject(run, app, entity, subject)
         if isinstance(chosen, ProbeStep):
-            return self._run_probe(run, app, runbook, step, chosen)
+            return self._run_probe(run, app, runbook, step, chosen, pasted)
         if not isinstance(chosen, ReadQueryStep):
             raise RequestError(
                 "ProbeOwl does not run this step", {"step": f"step {step} is {chosen.kind}"}
@@ -222,7 +232,9 @@ class RunbookSteps:
         why = why_copy_only(app, chosen)
         if why is not None:
             raise RequestError(f"this step is copy only: {why}", {"step": why})
-        return self._run_read(run, app, entity, runbook_name, step, chosen, without_plan_check)
+        return self._run_read(
+            run, app, entity, runbook_name, step, chosen, without_plan_check, pasted
+        )
 
     def tick(self, run_id: str, runbook_name: str, step: str, done: bool) -> None:
         """Save a manual step's tick with the run. Audited."""
@@ -300,7 +312,13 @@ class RunbookSteps:
         return run, app, entity, runbook
 
     def _run_probe(
-        self, run: Run, app: LoadedApplication, runbook: Runbook, step: str, chosen: ProbeStep
+        self,
+        run: Run,
+        app: LoadedApplication,
+        runbook: Runbook,
+        step: str,
+        chosen: ProbeStep,
+        pasted: bool,
     ) -> StepRan:
         probe = app.probes.get(chosen.probe)
         if probe is None:
@@ -312,7 +330,13 @@ class RunbookSteps:
         self._runs.record(
             "runbook_step_run",
             run,
-            {"runbook": runbook.runbook, "step": step, "title": chosen.title, "run": started},
+            {
+                "runbook": runbook.runbook,
+                "step": step,
+                "title": chosen.title,
+                "run": started,
+                **_pasted_detail(pasted),
+            },
         )
         return StepRan(id=step, run=started)
 
@@ -325,6 +349,7 @@ class RunbookSteps:
         step: str,
         chosen: ReadQueryStep,
         without_plan_check: bool,
+        pasted: bool,
     ) -> StepRan:
         if run.status is RunStatus.RUNNING or run.subject is None:
             raise RequestError(
@@ -349,6 +374,7 @@ class RunbookSteps:
                     "rows": len(result.evidence.rows) if result.evidence else 0,
                     "run_without_plan_check": bool(skipped),
                     "plans_not_run": skipped,
+                    **_pasted_detail(pasted),
                 },
                 conn,
             )

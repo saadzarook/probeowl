@@ -352,6 +352,10 @@ def store_mask_pii(
             f"{counted(held, 'audit event')} of these runs still hold the value: the audit is "
             "append-only, so they are kept as they are"
         )
+        typer.echo(
+            "These audit events can't be changed. To remove them, delete the store outside "
+            "ProbeOwl; see the guide."
+        )
     if skipped:
         typer.echo(f"{counted(skipped, 'run')} skipped: their entities aren't in {folder}")
     if not changed:

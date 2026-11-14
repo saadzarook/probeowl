@@ -656,8 +656,10 @@ class RunService:
                 "choose a closer match or paste an ID, not both",
                 {"narrow": "leave this out when pasting an ID"},
             )
-        if failing.subject == MASKED and failing_subject is not None:
-            detect(entity, failing_subject, entity.root_key)
+        pasted_failing = failing.subject == MASKED and failing_subject is not None
+        if pasted_failing:
+            assert failing_subject is not None  # as pasted_failing says
+            check_pasted_subject(failing, app, entity, failing_subject)
             failing = failing.model_copy(update={"subject": failing_subject})
         plan = None
         if subject is None:
@@ -698,6 +700,8 @@ class RunService:
             details = {
                 "narrow": narrow,
                 "pasted": subject is not None,
+                # This run's own subject, pasted for the sample: audited as used, never its value.
+                **({"subject": MASKED} if pasted_failing else {}),
                 "replaced_run": earlier.healthy_run if earlier else None,
             }
             self._save_and_audit(
@@ -1148,6 +1152,26 @@ def _could_not_run(attempt: HealthyAttempt, reason: str) -> HealthyAttempt:
     return attempt.model_copy(
         update={"status": HealthyAttemptStatus.COULD_NOT_RUN, "message": reason}
     )
+
+
+PASTED_IN_PRODUCTION = (
+    "in Production a pasted ID is a new lookup and needs a reason and a reference; this run has "
+    "none: start a new run with them"
+)
+
+
+def check_pasted_subject(run: Run, app: LoadedApplication, entity: Entity, subject: str) -> None:
+    """A subject pasted because the run stores it masked is a new lookup, so checked as one (#66).
+
+    It must look like the entity's root key. In Production it needs a reason and a reference, as
+    a run does: the run's own are reused, and a run without a reference is refused. The action
+    it is pasted for writes its own audit event, with the subject masked.
+    """
+    detect(entity, subject, entity.root_key)
+    production = app.application.environments[run.environment].production
+    record = run.investigation
+    if production and (record is None or not record.reference):
+        raise RequestError(PASTED_IN_PRODUCTION, {"subject": PASTED_IN_PRODUCTION})
 
 
 def _picked(ambiguous: Run, subjects: list[str] | None) -> list[str]:

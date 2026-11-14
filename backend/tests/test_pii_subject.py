@@ -13,11 +13,13 @@ from typer.testing import CliRunner
 
 from probeowl.cli import main as cli
 from probeowl.cli import server
+from probeowl.runs import PASTED_IN_PRODUCTION
 from probeowl.store.audit import list_events
 from probeowl.store.runs import get_run
 from probeowl.store.tables import LOCAL_WORKSPACE
 from probeowl.stored_masking import mask_stored_runs
 from tests.conftest import EXAMPLES, Setup
+from tests.test_run_list import stored
 from tests.test_run_steps import PROBE, REVIEWED_READ, outbox, step_url
 from tests.test_runs import finished, start
 
@@ -291,6 +293,10 @@ def test_owl_store_mask_pii_is_a_dry_run_unless_applied_and_prints_no_value(
     assert f"{run_id}: subject, identifier" in dry.output
     assert "1 run to mask. Nothing written: run with --apply." in dry.output
     assert "2 audit events of these runs still hold the value" in dry.output
+    assert (
+        "These audit events can't be changed. To remove them, delete the store outside "
+        "ProbeOwl; see the guide."
+    ) in dry.output
     assert TOPUP not in dry.output
     applied = CliRunner().invoke(
         cli.app, ["store", "mask-pii", str(folder), "--url", url, "--apply"]
@@ -319,3 +325,90 @@ def test_owl_validate_prints_the_subject_masked(
     assert result.exit_code == 1, result.output  # tp_91f2c7 fails, as planted
     assert "on [masked]" in result.output
     assert TOPUP not in result.output
+
+
+# --- A pasted subject is a new lookup: pattern, Production record, its own audit event -------
+
+
+def stored_masked(setup: Setup, run_id: str, environment: str, reference: str | None) -> None:
+    """A finished run stored with a PII key, as v0.2 stores it, with or without a reference."""
+    record: dict[str, Any] = {"reason": "incident"}
+    if reference is not None:
+        record["reference"] = reference
+    stored(
+        setup,
+        run_id,
+        0,
+        environment=environment,
+        subject="[masked]",
+        identifier_value="[masked]",
+        investigation=record,
+    )
+
+
+@pytest.mark.parametrize(
+    ("action", "body"),
+    [
+        ("step", {"subject": TOPUP}),
+        ("healthy", {"failing_subject": TOPUP}),
+    ],
+)
+def test_in_production_a_pasted_subject_needs_the_runs_reason_and_reference(
+    setup: Setup, action: str, body: dict[str, Any]
+) -> None:
+    key_is_pii(setup)
+    outbox(setup)
+    api = setup.client()
+    stored_masked(setup, "prod-no-ref", "prod", None)
+    url = (
+        step_url("prod-no-ref", REVIEWED_READ)
+        if action == "step"
+        else "/api/runs/prod-no-ref/healthy-comparison"
+    )
+    refused = api.post(url, json=body)
+    assert refused.status_code == 422, refused.text
+    assert refused.json()["detail"] == PASTED_IN_PRODUCTION
+    assert not [c for c in setup.fakes["wallet_db"].calls if "outbox_events" in c[0]]
+
+
+def test_outside_production_a_run_without_a_reference_may_paste(setup: Setup) -> None:
+    key_is_pii(setup)
+    outbox(setup)
+    stored_masked(setup, "uat-no-ref", "uat", None)
+    ran = setup.client().post(step_url("uat-no-ref", REVIEWED_READ), json={"subject": TOPUP})
+    assert ran.status_code == 200, ran.text
+
+
+def test_a_healthy_comparison_checks_the_pasted_value_is_the_key(setup: Setup) -> None:
+    key_is_pii(setup)
+    api = setup.client()
+    run_id = a_run(api)["id"]
+    url = f"/api/runs/{run_id}/healthy-comparison"
+    refused = api.post(url, json={"failing_subject": "not-a-topup"})
+    assert refused.status_code == 422
+    assert "does not look like a topup_id" in refused.json()["detail"]
+
+
+def test_each_pasted_lookup_writes_its_own_audit_event_with_the_subject_masked(
+    setup: Setup,
+) -> None:
+    key_is_pii(setup)
+    outbox(setup)
+    api = setup.client()
+    run_id = a_run(api)["id"]
+    assert api.post(step_url(run_id, REVIEWED_READ), json={"subject": TOPUP}).status_code == 200
+    assert api.post(step_url(run_id, PROBE), json={"subject": TOPUP}).status_code == 200
+    started = api.post(f"/api/runs/{run_id}/healthy-comparison", json={"failing_subject": TOPUP})
+    assert started.status_code in (200, 202), started.text
+    with setup.store.connect() as conn:
+        events = list_events(conn, LOCAL_WORKSPACE, run_id)
+    # The run's own run_finished shows its subject [masked] too; these are the pasted lookups'.
+    actions = [e for e in events if e.action not in ("run_started", "run_finished")]
+    pasted = [e for e in actions if e.details.get("subject") == "[masked]"]
+    assert len(pasted) == len(actions)  # each pasted lookup says so
+    assert sorted(e.action for e in pasted) == [
+        "healthy_comparison_started",
+        "runbook_step_run",
+        "runbook_step_run",
+    ]
+    assert TOPUP not in str(events)
