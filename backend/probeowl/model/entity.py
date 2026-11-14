@@ -270,7 +270,15 @@ class Entity(ProbeOwlModel):
             if location.cardinality is Cardinality.MANY:
                 raise ValueError(f"{used_by}: {source} can have many rows, so {ref} has no value")
             # A run keeps only the masked value, so there is nothing true to bind.
-            if field.lower() in {name.lower() for name in [*location.pii, *location.mask]}:
+            # A PII identifier is masked wherever it shows (#66), so it cannot be one either. The
+            # root key can: it is bound from the run's subject, pasted when stored masked.
+            pii = {
+                part.lower()
+                for name, identifier in self.identifiers.items()
+                if identifier.pii and name != self.root_key
+                for part in (name, *(split_field_ref(identifier.via)[1:] if identifier.via else ()))
+            }
+            if field.lower() in {name.lower() for name in [*location.pii, *location.mask]} | pii:
                 raise ValueError(f"{used_by}: {ref} is masked, so it cannot be a parameter")
 
     def _check_no_cycle(self, start: str) -> None:

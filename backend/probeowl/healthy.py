@@ -16,7 +16,7 @@ from sqlglot.errors import ParseError
 
 from probeowl.checks.sql_shape import parameters_of, selected, shape
 from probeowl.comparison import ArrayMatch, Options, compare
-from probeowl.engine.masking import to_json
+from probeowl.engine.masking import MASKED, masked_fields, to_json
 from probeowl.engine.typed_values import restore
 from probeowl.errors import RequestError
 from probeowl.guards.dialects import RULES_BY_CONNECTOR_TYPE
@@ -127,7 +127,7 @@ def masked_compare_fields(
     """For each lookup a run can send, the (location, field) to fingerprint from its rows."""
     found: dict[str, list[tuple[str, str]]] = {}
     for name, location in _locations(entity):
-        masked = {field.lower() for field in [*location.pii, *location.mask]}
+        masked = masked_fields(entity, location)
         fields = [f for f in compare_fields(app, location).fields if f.lower() in masked]
         for lookup in filter(None, (location.lookup, location.fallback)):
             found.setdefault(lookup, []).extend((name, field) for field in fields)
@@ -167,6 +167,10 @@ def _sample_parameter(run: Run, entity: Entity, ref: str, name: str) -> Paramete
     if found is None or found.evidence is None or len(found.evidence.rows) != 1:
         raise RequestError(paste, {name: f"the sample needs {ref}, which this run did not read"})
     [value] = field_values(found.evidence.rows, field)
+    if field.lower() == entity.root_key.lower() and run.subject not in (None, MASKED):
+        # The key is the run's subject: stored masked when it is PII, and pasted for the
+        # comparison (#66), where the rows show it masked.
+        value = run.subject
     if value is None:
         raise RequestError(paste, {name: f"the sample needs {ref}, which is empty in this run"})
     kinds = {column.lower(): kind for column, kind in found.evidence.column_types.items()}
@@ -197,7 +201,7 @@ def compare_runs(
         theirs = _results(healthy, name)
         compared.append(_outcomes(name, location.using, ours, theirs))
         fields = compare_fields(app, location)
-        masked = {field.lower() for field in [*location.pii, *location.mask]}
+        masked = masked_fields(entity, location)
         for field in fields.fields:
             if field.lower() in masked:
                 result = fingerprints.compare(failing.id, healthy.id, name, field)

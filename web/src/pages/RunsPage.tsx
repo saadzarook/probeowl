@@ -111,18 +111,19 @@ function OpenedRun({ runId }: { runId: string }) {
   const navigate = useNavigate();
   const run = useRun(runId);
   const entity = useEntity(run.data?.application, run.data?.kind === "inspect" ? run.data.entity : undefined);
+  const openFirst = (ids: string[]) => {
+    const [first] = ids;
+    if (first !== undefined) void navigate(`/runs?run=${encodeURIComponent(first)}`);
+  };
   const pick = useMutation({
     mutationFn: ({ id, subjects }: { id: string; subjects: string[] }) => pickMatches(id, subjects),
-    onSuccess: (ids) => {
-      const [first] = ids;
-      if (first !== undefined) void navigate(`/runs?run=${encodeURIComponent(first)}`);
-    },
+    onSuccess: openFirst,
   });
   const production = application?.environments.find((e) => e.name === run.data?.environment)?.production === true;
   let result;
   if (run.data?.kind === "inspect") {
     result = entity.data ? (
-      <InspectResult runId={runId} entity={entity.data} onInspect={(id, subjects) => pick.mutate({ id, subjects })} />
+      <InspectResult runId={runId} entity={entity.data} onInspect={(id, subjects) => pick.mutate({ id, subjects })} onStarted={openFirst} />
     ) : (
       <p aria-busy="true">Loading run…</p>
     );

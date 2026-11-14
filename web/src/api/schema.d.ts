@@ -2309,14 +2309,27 @@ export interface components {
         Outcome: "found" | "missing" | "waiting" | "blocked" | "ambiguous" | "error" | "stale" | "not_configured";
         /**
          * PickMatches
-         * @description Subjects picked from an Ambiguous run's matches, to run its probe for.
+         * @description Matches picked from an Ambiguous run, to run its probe for: by subject, or by number.
+         *
+         *     By number when the entity's key is PII, so its matches show [masked]: the value searched
+         *     for is pasted again, and the same lookup runs again to find them (#66).
          */
         PickMatches: {
             /**
              * Subjects
              * @description Root key values from the run's matches; up to 5 run together.
              */
-            subjects: string[];
+            subjects?: string[] | null;
+            /**
+             * Value
+             * @description With picks: the value the Ambiguous run searched for, pasted again. Never stored, logged, audited or returned.
+             */
+            value?: string | null;
+            /**
+             * Picks
+             * @description With value: the matches' numbers as the run lists them, from 1.
+             */
+            picks?: number[] | null;
         };
         /**
          * PlanAccess
@@ -2667,7 +2680,7 @@ export interface components {
         };
         /**
          * RunRunbookStep
-         * @description Run a step, named in the path. It carries no SQL and no values: the server has both.
+         * @description Run a step, named in the path. It carries no SQL: the server has it, and the run's values.
          */
         RunRunbookStep: {
             /**
@@ -2676,6 +2689,11 @@ export interface components {
              * @default false
              */
             run_without_plan_check: boolean;
+            /**
+             * Subject
+             * @description The run's subject, pasted when its entity's key is PII and so stored masked. Used for this step only: never stored, logged, audited or returned.
+             */
+            subject?: string | null;
         };
         /**
          * RunStarted
@@ -3132,6 +3150,11 @@ export interface components {
              * @description A known-good ID a person pasted.
              */
             subject?: string | null;
+            /**
+             * Failing Subject
+             * @description This run's subject, pasted when its entity's key is PII and so stored masked: the sample needs it to leave this run out. Never stored, logged, audited or returned.
+             */
+            failing_subject?: string | null;
         };
         /**
          * StartRun

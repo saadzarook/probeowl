@@ -93,7 +93,9 @@ def test_no_route_can_execute_a_runbook_step(app: FastAPI) -> None:
     parameters = {p["name"] for p in run_step["post"]["parameters"]}
     assert parameters == {"run_id", "runbook", "step"}
     schemas = app.openapi()["components"]["schemas"]
-    assert set(schemas["RunRunbookStep"]["properties"]) == {"run_without_plan_check"}
+    # subject: the run's own subject, pasted when its key is PII and so stored masked (#66). It
+    # is bound only as the root key's parameter, checked against the key's pattern, never SQL.
+    assert set(schemas["RunRunbookStep"]["properties"]) == {"run_without_plan_check", "subject"}
     assert set(schemas["TickRunbookStep"]["properties"]) == {"done"}
     # Everything else that is not a GET starts probe runs or writes config, and takes no SQL.
     writes = [

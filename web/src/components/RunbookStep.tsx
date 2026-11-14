@@ -57,14 +57,30 @@ function ReadStep({ runbook, step, run, state }: StepProps & { step: Extract<Run
   );
 }
 
+/** "[masked]": the run's key is PII, so a step that needs its subject asks for it (#66). */
+export const MASKED = "[masked]";
+
+/** The subject's ID, pasted for one step when the run stores it masked; kept in this form only. */
+function PastedSubject({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  return (
+    <label className="runbook-pasted">
+      This run's key is PII and stored masked: paste its ID to run this step
+      <input value={value} autoComplete="off" spellCheck={false} onChange={(e) => onChange(e.target.value.trim())} />
+    </label>
+  );
+}
+
 function RunRead({ run, runbook, step, result }: { run: Run; runbook: string; step: string; result: StepInRun["result"] | undefined }) {
-  const running = useRunStep(run.id, runbook, step);
+  const masked = run.subject === MASKED;
+  const [subject, setSubject] = useState("");
+  const running = useRunStep(run.id, runbook, step, masked ? subject : undefined);
   const [acknowledged, setAcknowledged] = useState(false);
   const asks = running.isError && needsPlanAcknowledgement(running.error.message);
   const found: Pick<LocationResult, "evidence" | "reason"> | undefined = result ? { reason: result.reason, evidence: result.evidence } : undefined;
   return (
     <div className="runbook-run">
-      <button className="btn" type="button" disabled={running.isPending || (asks && !acknowledged)} onClick={() => running.mutate(acknowledged, { onSuccess: () => setAcknowledged(false) })}>
+      {masked && <PastedSubject value={subject} onChange={setSubject} />}
+      <button className="btn" type="button" disabled={running.isPending || (asks && !acknowledged) || (masked && subject === "")} onClick={() => running.mutate(acknowledged, { onSuccess: () => setAcknowledged(false) })}>
         {running.isPending ? "Running…" : "Run read-only"}
       </button>
       {running.isError && <p className="error-state" role="alert">{running.error.message}</p>}
@@ -179,10 +195,12 @@ function Tick({ run, runbook, step, done }: { run: Run; runbook: string; step: s
 function ProbeStepBody({ runbook, step, run }: StepProps & { step: Extract<RunbookStepView, { kind: "probe" }> }) {
   const [started, setStarted] = useState<string>();
   const [problem, setProblem] = useState<string>();
+  const [subject, setSubject] = useState("");
+  const masked = run?.subject === MASKED;
   const again = useRun(started);
   function start(id: string) {
     setProblem(undefined);
-    runStep(id, runbook, step.id, false).then(
+    runStep(id, runbook, step.id, false, masked ? subject : undefined).then(
       (ran) => setStarted(ran.run ?? undefined),
       (error: unknown) => setProblem(error instanceof Error ? error.message : "The probe could not be started."),
     );
@@ -193,8 +211,9 @@ function ProbeStepBody({ runbook, step, run }: StepProps & { step: Extract<Runbo
         <code>{step.probe}</code>
         {run?.subject ? <span className="hint"> on {run.subject}</span> : null}
       </p>
+      {run && step.runnable && masked && <PastedSubject value={subject} onChange={setSubject} />}
       {run && step.runnable ? (
-        <button className="btn" type="button" disabled={started !== undefined && again.data?.status === "running"} onClick={() => start(run.id)}>
+        <button className="btn" type="button" disabled={(started !== undefined && again.data?.status === "running") || (masked && subject === "")} onClick={() => start(run.id)}>
           {run.kind === "validate" ? "Validate again" : "Inspect again"}
         </button>
       ) : (

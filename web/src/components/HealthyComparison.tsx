@@ -52,7 +52,8 @@ function Comparison({ runId, production }: { runId: string; production: boolean 
   const query = useHealthyComparison(runId);
   const failing = useRun(runId);
   const titles = new Map((failing.data?.locations ?? []).map((l) => [l.location, l.title]));
-  const start = useStartHealthyComparison(runId);
+  const [failingPasted, setFailingPasted] = useState("");
+  const start = useStartHealthyComparison(runId, failingPasted || undefined);
   const [pasting, setPasting] = useState(false);
   const [pasted, setPasted] = useState("");
   const [showAll, setShowAll] = useState(false);
@@ -72,6 +73,9 @@ function Comparison({ runId, production }: { runId: string; production: boolean 
   const found = query.data;
   const attempt = found.attempt ?? undefined;
   const running = attempt?.status === "running" || start.isPending;
+  // This run's key is PII and stored masked: finding a healthy record by itself needs its ID.
+  const masked = found.failing_subject === "[masked]";
+  const needsId = masked && failingPasted === "";
   const compared = attempt?.status === "compared";
   const { highlighted, hidden, matching, notCompared } = partDifferences(found.differences ?? []);
   const differing = highlighted.filter((row) => row.result === "different").length;
@@ -91,12 +95,12 @@ function Comparison({ runId, production }: { runId: string; production: boolean 
         </div>
         <div className="compare-choices" role="group" aria-label="Find the healthy record by">
           {found.has_sample && (
-            <button type="button" className="filter-chip" disabled={running} aria-pressed={attempt !== undefined && !attempt.narrow && !attempt.pasted} onClick={() => start.mutate({})}>
+            <button type="button" className="filter-chip" disabled={running || needsId} aria-pressed={attempt !== undefined && !attempt.narrow && !attempt.pasted} onClick={() => start.mutate({})}>
               Newest passing
             </button>
           )}
           {(found.choices ?? []).map((choice) => (
-            <button key={choice.name} type="button" className="filter-chip" disabled={running} aria-pressed={attempt?.narrow === choice.name} onClick={() => start.mutate({ narrow: choice.name })}>
+            <button key={choice.name} type="button" className="filter-chip" disabled={running || needsId} aria-pressed={attempt?.narrow === choice.name} onClick={() => start.mutate({ narrow: choice.name })}>
               {choice.title}
             </button>
           ))}
@@ -105,6 +109,13 @@ function Comparison({ runId, production }: { runId: string; production: boolean 
           </button>
         </div>
       </header>
+
+      {masked && (found.has_sample || (found.choices ?? []).length > 0) && (
+        <label className="runbook-pasted">
+          This run's key is PII and stored masked: paste its ID to find a healthy record by itself
+          <input value={failingPasted} autoComplete="off" spellCheck={false} onChange={(e) => setFailingPasted(e.target.value.trim())} />
+        </label>
+      )}
 
       {pasting && (
         <form className="compare-paste" onSubmit={paste}>

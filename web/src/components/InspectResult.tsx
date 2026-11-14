@@ -146,10 +146,12 @@ interface InspectResultProps {
   entity: Entity;
   /** Start runs on these subjects, picked from this run's matches. */
   onInspect: (runId: string, subjects: string[]) => void;
+  /** Runs started by picking masked matches by number. */
+  onStarted: (ids: string[]) => void;
 }
 
 /** An inspect run as it progresses and once finished: resolution line, locations, expectations. */
-export function InspectResult({ runId, entity, onInspect }: InspectResultProps) {
+export function InspectResult({ runId, entity, onInspect, onStarted }: InspectResultProps) {
   const { application } = useSelection();
   const query = useRun(runId);
 
@@ -175,6 +177,8 @@ export function InspectResult({ runId, entity, onInspect }: InspectResultProps) 
         value={run.identifier_value}
         matches={run.matches ?? []}
         onInspect={(subjects) => onInspect(run.id, subjects)}
+        runId={run.id}
+        onStarted={onStarted}
       />
     );
   }

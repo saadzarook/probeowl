@@ -494,3 +494,11 @@ input.mono { font-family: var(--font-mono); }
 .password-prompt { display: grid; gap: 0.5rem; margin: 0.75rem 0; padding: 0.8rem 0.9rem; border: 1px solid var(--color-production); border-left-width: 3px; border-radius: 0.6rem; background: var(--color-card); max-width: 36rem; }
 .password-prompt label { display: grid; gap: 0.25rem; }
 .password-prompt p { margin: 0; }
+
+/* A subject's ID pasted for one action, when its key is PII and stored masked (#66). */
+.runbook-pasted {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0;
+  max-width: 420px;
+}

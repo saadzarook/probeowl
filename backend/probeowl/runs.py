@@ -29,6 +29,7 @@ from probeowl.checks.time_offsets import imported_types, refuse_typed_time, type
 from probeowl.connectors.factory import OpenConnector, open_connector
 from probeowl.connectors.lookup import LookupResult, ReplicaLag
 from probeowl.engine.identifiers import (
+    MAX_MATCH_ROWS,
     Resolution,
     candidates,
     detect,
@@ -39,7 +40,13 @@ from probeowl.engine.identifiers import (
     via_connector,
 )
 from probeowl.engine.locations import RUN_TIME_LIMIT, all_connectors, lag_caveat
-from probeowl.engine.masking import MASKED, to_json
+from probeowl.engine.masking import (
+    MASKED,
+    mask_rows,
+    masked_key_reason,
+    pii_fields,
+    to_json,
+)
 from probeowl.engine.runner import check_run, run_probe
 from probeowl.errors import (
     CapacityError,
@@ -90,6 +97,7 @@ from probeowl.secrets import keychain_entry
 from probeowl.store.audit import AuditEvent, append_event
 from probeowl.store.runs import get_run, list_runs, running_run_ids, save_run
 from probeowl.store.tables import LOCAL_WORKSPACE
+from probeowl.stored_masking import masked_run
 
 log = logging.getLogger(__name__)
 
@@ -306,11 +314,19 @@ class RunService:
         """Check and start a run in the background; its id. Errors before any lookup."""
         return self._admit([self._prepare(request)])[0]
 
-    def start_matches(self, run_id: str, subjects: list[str]) -> list[str]:
+    def start_matches(
+        self,
+        run_id: str,
+        subjects: list[str] | None,
+        value: str | None = None,
+        picks: list[int] | None = None,
+    ) -> list[str]:
         """Run the probe for subjects an Ambiguous run matched; their run ids, in order.
 
         They share one of the concurrent run slots and run one after another, so picking
-        several matches never crowds out other runs.
+        several matches never crowds out other runs. When the entity's key is PII its matches
+        are stored masked (#66): the person pastes the value searched for again and picks by
+        number, and the same lookup runs again to find them.
         """
         ambiguous = self.get(run_id)
         if ambiguous.status is not RunStatus.AMBIGUOUS:
@@ -318,17 +334,14 @@ class RunService:
                 f"run {run_id} is {ambiguous.status.value}, not Ambiguous",
                 {"run": "only an Ambiguous run's matches can be picked"},
             )
-        matched = {match.subject for match in ambiguous.matches}
-        unknown = [subject for subject in subjects if subject not in matched]
-        if unknown or len(set(subjects)) != len(subjects):
-            raise RequestError(
-                "pick each subject once, from the run's matches",
-                {"subjects": f"one or more of: {', '.join(sorted(matched))}"},
-            )
         app = self._applications.get(ambiguous.application)
         entity = app.entities.get(ambiguous.entity) if app is not None else None
         if app is None or entity is None:
             raise NotFoundError(f"{ambiguous.application} has no entity {ambiguous.entity}")
+        if any(match.subject == MASKED for match in ambiguous.matches):
+            subjects = self._picked_again(ambiguous, app, entity, value, picks)
+        else:
+            subjects = _picked(ambiguous, subjects)
         prepared: list[_Prepared] = []
         try:
             for subject in subjects:
@@ -355,8 +368,8 @@ class RunService:
             _close(each.connectors.values())
             self._save_and_audit(
                 each.run,
-                ("run_started", _started_details(each.run)),
-                ("run_finished", _finished_details(each.run)),
+                ("run_started", _started_details(self._masked(each.run))),
+                ("run_finished", _finished_details(self._masked(each.run))),
             )
         if ready:
             self._run_in_background(ready)
@@ -379,7 +392,9 @@ class RunService:
             )
         try:
             for each in prepared:
-                self._save_and_audit(each.run, ("run_started", _started_details(each.run)))
+                self._save_and_audit(
+                    each.run, ("run_started", _started_details(self._masked(each.run)))
+                )
             self._pool.submit(self._execute_all, prepared)
         except BaseException:
             self._slots.release()
@@ -571,8 +586,61 @@ class RunService:
 
     # --- Healthy comparison --------------------------------------------------------------
 
-    def start_healthy(self, run_id: str, narrow: str | None, subject: str | None) -> None:
-        """Start looking for a known-good subject to compare a finished run with."""
+    def _picked_again(
+        self,
+        ambiguous: Run,
+        app: LoadedApplication,
+        entity: Entity,
+        value: str | None,
+        picks: list[int] | None,
+    ) -> list[str]:
+        """The subjects picked by number, found by the Ambiguous run's own lookup run again.
+
+        Nothing pasted or found is stored or returned: the picked runs store their subjects
+        masked. If the lookup no longer finds as many matches, the numbers may point at
+        others, so it is refused and the person starts again.
+        """
+        again = f"pick by number: paste the {ambiguous.identifier} you searched for again"
+        if value is None or not picks:
+            raise RequestError(again, {"value": again, "picks": "the numbers of the matches"})
+        if ambiguous.via is None:
+            reason = "this run tried its value as several identifiers: start again with Find by set"
+            raise RequestError(reason, {"value": reason})
+        detect(entity, value, ambiguous.identifier)
+        lookup = _lookup_for(app, entity, ambiguous.identifier)
+        assert lookup is not None  # via is set, so the identifier has a lookup
+        location = entity.locations[split_field_ref(ambiguous.via)[0]]
+        found = self.read_once(
+            app,
+            location.using,
+            ambiguous.environment,
+            lookup,
+            {ambiguous.identifier: value},
+            MAX_MATCH_ROWS,
+        )
+        subjects = sorted(
+            {str(v) for v in field_values(found.rows, entity.root_key) if v is not None}
+        )
+        if len(subjects) != len(ambiguous.matches):
+            reason = "the matches have changed since this run: start again"
+            raise RequestError(reason, {"value": reason})
+        if len(set(picks)) != len(picks) or any(not 1 <= n <= len(subjects) for n in picks):
+            reason = f"pick each number once, from 1 to {len(subjects)}"
+            raise RequestError(reason, {"picks": reason})
+        return [subjects[n - 1] for n in picks]
+
+    def start_healthy(
+        self,
+        run_id: str,
+        narrow: str | None,
+        subject: str | None,
+        failing_subject: str | None = None,
+    ) -> None:
+        """Start looking for a known-good subject to compare a finished run with.
+
+        failing_subject: this run's subject, pasted when its key is PII and so stored masked
+        (#66). The sample needs it to leave this run's subject out; it stays in memory.
+        """
         failing = self.get(run_id)
         app, entity = self._definitions(failing)
         if failing.subject is None or failing.status not in {RunStatus.PASSED, RunStatus.FAILED}:
@@ -588,8 +656,14 @@ class RunService:
                 "choose a closer match or paste an ID, not both",
                 {"narrow": "leave this out when pasting an ID"},
             )
+        if failing.subject == MASKED and failing_subject is not None:
+            detect(entity, failing_subject, entity.root_key)
+            failing = failing.model_copy(update={"subject": failing_subject})
         plan = None
         if subject is None:
+            if failing.subject == MASKED:
+                reason = masked_key_reason(entity)
+                raise RequestError(reason, {"failing_subject": reason})
             plan = self._sample_plan(failing, app, entity, narrow)
             self.kill.check(failing.application, plan.connector)
         else:
@@ -803,12 +877,17 @@ class RunService:
         )
         found = [str(v) for v in field_values(result.rows, entity.root_key) if v is not None]
         candidates = [s for s in dict.fromkeys(found) if s != failing.subject][:MAX_CANDIDATES]
+        # The candidates are root keys, and the failing subject a parameter: masked when PII.
+        hidden = pii_fields(entity)
         evidence = Evidence(
             connector=plan.connector,
             query=result.query,
-            parameters={name: to_json(value) for name, value in result.parameters.items()},
+            parameters={
+                name: MASKED if name.lower() in hidden else to_json(value)
+                for name, value in result.parameters.items()
+            },
             guards=result.guards,
-            rows=[{entity.root_key: subject} for subject in found],
+            rows=mask_rows([{entity.root_key: subject} for subject in found], hidden),
             started_at=result.started_at,
             duration_ms=result.duration_ms,
         )
@@ -833,11 +912,11 @@ class RunService:
             _close(prepared.connectors.values())
             self._save_and_audit(
                 run,
-                ("run_started", _started_details(run)),
-                ("run_finished", _finished_details(run)),
+                ("run_started", _started_details(self._masked(run))),
+                ("run_finished", _finished_details(self._masked(run))),
             )
             return run
-        self._save_and_audit(run, ("run_started", _started_details(run)))
+        self._save_and_audit(run, ("run_started", _started_details(self._masked(run))))
         self._execute(prepared)
         return self.get(run.id)
 
@@ -1023,19 +1102,29 @@ class RunService:
         return run
 
     def _finish(self, run: Run) -> None:
-        self._save_and_audit(run, ("run_finished", _finished_details(run)))
+        self._save_and_audit(run, ("run_finished", _finished_details(self._masked(run))))
 
     # --- Store --------------------------------------------------------------------------
 
     def _save(self, run: Run) -> None:
         with self._store.begin() as conn:
-            save_run(conn, self._workspace, run)
+            save_run(conn, self._workspace, self._masked(run))
+
+    def _masked(self, run: Run) -> Run:
+        """The run as stored: each PII identifier masked, and the subject if the key is (#66).
+
+        Only the run in memory, while it runs, has the real value: never the store, the API,
+        the audit or the CLI, which read the stored run.
+        """
+        app = self._applications.get(run.application)
+        entity = app.entities.get(run.entity) if app is not None else None
+        return run if entity is None else masked_run(run, entity)
 
     def _save_and_audit(self, run: Run, *events: tuple[str, dict[str, Any]]) -> None:
         """The run and its audit events in one transaction: never one without the other (#242)."""
         # Saved apart, a reader between the two saw a finished run with no run_finished event.
         with self._store.begin() as conn:
-            save_run(conn, self._workspace, run)
+            save_run(conn, self._workspace, self._masked(run))
             for action, details in events:
                 append_event(conn, self._workspace, _event(action, run, details))
 
@@ -1059,6 +1148,20 @@ def _could_not_run(attempt: HealthyAttempt, reason: str) -> HealthyAttempt:
     return attempt.model_copy(
         update={"status": HealthyAttemptStatus.COULD_NOT_RUN, "message": reason}
     )
+
+
+def _picked(ambiguous: Run, subjects: list[str] | None) -> list[str]:
+    """Subjects picked from an Ambiguous run's matches, each once."""
+    matched = {match.subject for match in ambiguous.matches}
+    if not subjects:
+        raise RequestError("pick subjects from the run's matches", {"subjects": "pick one or more"})
+    unknown = [subject for subject in subjects if subject not in matched]
+    if unknown or len(set(subjects)) != len(subjects):
+        raise RequestError(
+            "pick each subject once, from the run's matches",
+            {"subjects": f"one or more of: {', '.join(sorted(matched))}"},
+        )
+    return subjects
 
 
 def _lookup_for(app: LoadedApplication, entity: Entity, name: str) -> str | None:
@@ -1100,6 +1203,7 @@ def _run_caveat(run: Run) -> str | None:
 
 
 def _started_details(run: Run) -> dict[str, Any]:
+    # Given the run as stored, as _finished_details is.
     investigation = run.investigation
     if investigation is None:
         raise ConfigError("a run started by a person needs an investigation record")
@@ -1115,6 +1219,7 @@ def _started_details(run: Run) -> dict[str, Any]:
 
 
 def _finished_details(run: Run) -> dict[str, Any]:
+    # Given the run as stored: a PII key's subject and matches are masked (#66).
     return {
         "status": run.status.value,
         "stop_reason": run.stop_reason,
