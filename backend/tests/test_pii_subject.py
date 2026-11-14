@@ -403,7 +403,9 @@ def test_each_pasted_lookup_writes_its_own_audit_event_with_the_subject_masked(
     with setup.store.connect() as conn:
         events = list_events(conn, LOCAL_WORKSPACE, run_id)
     # The run's own run_finished shows its subject [masked] too; these are the pasted lookups'.
-    actions = [e for e in events if e.action not in ("run_started", "run_finished")]
+    # healthy_comparison_finished ends the same comparison, whenever it ends: not a lookup.
+    done = ("run_started", "run_finished", "healthy_comparison_finished")
+    actions = [e for e in events if e.action not in done]
     pasted = [e for e in actions if e.details.get("subject") == "[masked]"]
     assert len(pasted) == len(actions)  # each pasted lookup says so
     assert sorted(e.action for e in pasted) == [
