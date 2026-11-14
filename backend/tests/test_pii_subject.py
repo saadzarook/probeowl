@@ -22,6 +22,7 @@ from tests.test_run_steps import PROBE, REVIEWED_READ, outbox, step_url
 from tests.test_runs import finished, start
 
 TOPUP = "tp_91f2c7"
+PROD_RECORD = ["--reason", "incident", "--reference", "WALLET-482"]
 REASON = "topup's key is PII and stored masked: paste its topup_id"
 
 
@@ -313,8 +314,7 @@ def test_owl_validate_prints_the_subject_masked(
     monkeypatch.setattr(server, "client", lambda url: client)
     result = CliRunner().invoke(
         cli.app,
-        ["validate", "topup", TOPUP, "--env", "prod", "--application", "wallet"]
-        + ["--reason", "incident", "--reference", "WALLET-482"],
+        ["validate", "topup", TOPUP, "--env", "prod", "--application", "wallet", *PROD_RECORD],
     )
     assert result.exit_code == 1, result.output  # tp_91f2c7 fails, as planted
     assert "on [masked]" in result.output
