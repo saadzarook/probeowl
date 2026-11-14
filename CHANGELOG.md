@@ -27,8 +27,9 @@ See docs/implementation-plan.md, Releases. -->
 
 - First-run setup shows `application.yaml` as a diff on the environments step as you choose, with no
   Preview button. Create is still the one write, of exactly the diff shown.
-- `owl serve` prints its version on its first line, and the guide no longer has a separate
-  `owl --version` check.
+- `owl serve` prints `Starting ProbeOwl…` at once, before anything slow, then its version and
+  address once it's up. The guide no longer has a separate `owl --version` check, and its
+  troubleshooting page says the first start after installing can take about 20 seconds on Windows.
 
 ### Fixed
 

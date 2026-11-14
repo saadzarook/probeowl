@@ -65,6 +65,15 @@ echo "{\"seconds\": $(since "$t")}" >"$WORK/install.json"
 PY="$UV_TOOL_DIR/probeowl/Scripts/python.exe"; [ -x "$PY" ] || PY="$UV_TOOL_DIR/probeowl/bin/python"
 OWL="$UV_TOOL_BIN_DIR/owl"; [ -x "$OWL.exe" ] && OWL="$OWL.exe"
 "$OWL" --version || fail "owl --version"
+# The first process starts after a fresh install are slow on Windows while antivirus checks the
+# new files (docs/v0.2.md, "Startup after a fresh install"). Both newcomer scripts let them pass
+# here, timed as their own row, so owl serve is timed at the same point after install in each.
+echo "== first loads after install"
+t=$(now)
+for _ in 1 2 3; do
+  "$PY" -I -c "import probeowl.cli.main, probeowl.api.app, uvicorn" || fail "owl's imports"
+done
+echo "{\"seconds\": $(since "$t")}" >"$WORK/settle.json"
 
 taken=$("$PY" -I -c "import keyring; print(keyring.get_password('probeowl', '$KEY') is not None)") || fail "the keychain could not be read"
 [ "$taken" = False ] || fail "the keychain already has probeowl/$KEY; this run would overwrite it"
