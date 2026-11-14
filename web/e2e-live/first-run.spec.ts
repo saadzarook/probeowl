@@ -21,7 +21,6 @@ test("an empty owl serve opens setup, and Create writes application.yaml and loa
   await page.getByLabel("Owning team").fill("access-team");
   await page.getByRole("button", { name: "Next: Environments" }).click();
   await page.getByLabel(/^Dev/).uncheck();
-  await page.getByRole("button", { name: "Preview" }).click();
   await expect(page.getByLabel("Diff of card_access/application.yaml")).toContainText("+application: card_access");
   const path = join(folder ?? "", "card_access", "application.yaml");
   expect(existsSync(path)).toBe(false); // nothing written by the preview

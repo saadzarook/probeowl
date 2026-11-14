@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: ProbeOwl API
   description: Validate production data across databases and APIs, safely.
-  version: 0.1.0
+  version: 0.2.0.dev0
 paths:
   /api/applications:
     get:

@@ -2,6 +2,7 @@
 import logging
 import shutil
 from collections.abc import Iterator
+from importlib.metadata import version
 from pathlib import Path
 from typing import Any
 
@@ -214,6 +215,8 @@ def test_serve_binds_to_localhost_with_runs(
     [(app, kwargs)] = served
     assert kwargs == {"host": "127.0.0.1", "port": 7979, "use_colors": False}  # no terminal here
     assert app.state.runs is not None
+    # Its version on the first line: the guide's check that the install worked.
+    assert f"ProbeOwl {version('probeowl')} on http://127.0.0.1:7979 " in result.output
 
 
 def test_serve_takes_the_config_folder_from_the_environment(
@@ -430,12 +433,10 @@ def test_check_needs_no_database_for_the_save_checks(
 
 
 def test_version_is_the_packages() -> None:
-    from importlib.metadata import version
-
     result = runner.invoke(cli.app, ["--version"])
     assert result.exit_code == 0
     assert result.output == f"owl {version('probeowl')}\n"
-    assert version("probeowl") == "0.1.0"
+    assert version("probeowl") == "0.2.0.dev0"
 
 
 @pytest.mark.parametrize(

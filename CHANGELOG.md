@@ -23,8 +23,17 @@ See docs/implementation-plan.md, Releases. -->
 - A run started again after its missing password is saved goes where the first was sent. If the top
   bar's environment changed meanwhile, nothing runs: it asks instead.
 
+### Changed
+
+- First-run setup shows `application.yaml` as a diff on the environments step as you choose, with no
+  Preview button. Create is still the one write, of exactly the diff shown.
+- `owl serve` prints its version on its first line, and the guide no longer has a separate
+  `owl --version` check.
+
 ### Fixed
 
+- First-run setup's "Add its first connection", clicked as soon as it appears, opens Add connection.
+  It showed before the new application was loaded, and a quick click went back to setup.
 - `owl serve` started without `--config` or `PROBEOWL_CONFIG` no longer tries to load the folder it
   was started in when that folder's YAML isn't ProbeOwl's, such as `C:\Windows\System32` or a
   project with its own `application.yaml`: it uses `./probeowl` (or `~/probeowl`) instead and says

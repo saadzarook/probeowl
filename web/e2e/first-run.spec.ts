@@ -41,7 +41,11 @@ test("the id follows the name without environment words, and can be changed", as
   await expect(page.getByRole("button", { name: "Next: Environments" })).toBeEnabled();
 });
 
-test("environments: Dev, UAT and Production suggested, nothing written until Create", async ({ page }) => {
+test("environments: Dev, UAT and Production suggested, the diff live, nothing written until Create", async ({ page }) => {
+  const puts: { base?: string; environments: { name: string }[] }[] = [];
+  page.on("request", (r) => {
+    if (r.method() === "PUT" && new URL(r.url()).pathname === "/api/applications/card_access") puts.push(r.postDataJSON());
+  });
   await page.goto("/setup");
   await nameIt(page, "Card access", "access-team");
   await page.getByRole("button", { name: "Next: Environments" }).click();
@@ -50,25 +54,31 @@ test("environments: Dev, UAT and Production suggested, nothing written until Cre
   await expect(page.getByLabel(/^Staging/)).not.toBeChecked();
   await expect(page.getByLabel(/^Production/)).toBeChecked();
   await expect(page.getByText("Nothing is written until Create.")).toContainText("card_access");
-  // Create needs a preview of exactly what will be written.
-  const create = page.getByRole("button", { name: "Create Card access" });
-  await expect(create).toBeDisabled();
-  await page.getByLabel(/^Dev/).uncheck();
-  await page.getByRole("button", { name: "Preview" }).click();
+  // application.yaml as a diff as soon as the step opens, with no Preview button; it follows
+  // each choice.
+  await expect(page.getByRole("button", { name: "Preview" })).toHaveCount(0);
   const diff = page.getByLabel("Diff of card_access/application.yaml");
   await expect(diff).toContainText("+application: card_access");
-  await expect(diff).toContainText("+  prod:");
+  await expect(diff).toContainText("dev:");
+  await page.getByLabel(/^Dev/).uncheck();
   await expect(diff).not.toContainText("dev:");
-  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
-  // A change after the preview needs a new one.
+  await expect(diff).toContainText("+  prod:");
   await page.getByLabel(/^Staging/).check();
-  await expect(page.getByText("Edited after this preview.")).toBeVisible();
-  await expect(create).toBeDisabled();
+  await expect(diff).toContainText("staging:");
   await page.getByLabel(/^Staging/).uncheck();
+  await expect(diff).not.toContainText("staging:");
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  // The previews wrote nothing; Create is the one write, of exactly the diff shown, by its base.
+  expect(puts.length).toBeGreaterThan(0);
+  expect(puts.every((p) => p.base === undefined)).toBe(true);
+  const create = page.getByRole("button", { name: "Create Card access" });
   await expect(create).toBeEnabled();
   await create.click();
 
   await expect(page.getByRole("heading", { name: "First connection" })).toBeVisible();
+  const written = puts.at(-1);
+  expect(written?.base).toEqual(expect.any(String));
+  expect(written?.environments.map((e) => e.name)).toEqual(["uat", "prod"]);
   await expect(page.getByRole("status").filter({ hasText: "was created" })).toContainText("Card access was created: card_access/application.yaml");
   await expect(page.getByRole("link", { name: "Add its first connection" })).toHaveAttribute("href", "/connectors/new?environment=uat");
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
@@ -77,13 +87,27 @@ test("environments: Dev, UAT and Production suggested, nothing written until Cre
   await expect(page.getByRole("button", { name: "Application" })).toContainText("Card access");
 });
 
-test("no environment chosen: Preview waits until one is", async ({ page }) => {
+test("Add its first connection, clicked at once, opens Add connection even while the list is slow", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("mock-slow-applications", "1"));
+  await page.goto("/setup");
+  await nameIt(page, "Card access", "access-team");
+  await page.getByRole("button", { name: "Next: Environments" }).click();
+  await page.getByRole("button", { name: "Create Card access" }).click();
+  // Shown only once the new application is loaded: before, Add connection would find none and
+  // send the newcomer back to setup.
+  await page.getByRole("link", { name: "Add its first connection" }).click();
+  await expect(page).toHaveURL(/\/connectors\/new\?environment=dev$/); // Dev is kept: the first that isn't Production
+  await expect(page.getByRole("heading", { name: "Add connection", level: 1 })).toBeVisible();
+});
+
+test("no environment chosen: no diff, and Create waits until one is", async ({ page }) => {
   await page.goto("/setup");
   await nameIt(page, "Ledger", "finance-team");
   await page.getByRole("button", { name: "Next: Environments" }).click();
   for (const env of [/^Dev/, /^UAT/, /^Production/]) await page.getByLabel(env).uncheck();
   await expect(page.getByRole("alert")).toContainText("Choose at least one environment.");
-  await expect(page.getByRole("button", { name: "Preview" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Create Ledger" })).toBeDisabled();
+  await expect(page.getByLabel("Diff of ledger/application.yaml")).toHaveCount(0);
 });
 
 test.describe("with applications loaded", () => {
