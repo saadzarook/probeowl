@@ -1,0 +1,1004 @@
+{
+  "server": "probeowl",
+  "tools": [
+    {
+      "annotations": {
+        "destructive_hint": false,
+        "open_world_hint": false,
+        "read_only_hint": true
+      },
+      "description": "The save checks on a draft, after a scan for credentials. It writes nothing. Findings\n        name a credential's kind and line, never its value; the draft's text is not repeated.\n        environment: where plans are read, when owl mcp was started with --plan-checks.",
+      "input_schema": {
+        "$defs": {
+          "DraftKind": {
+            "description": "What a draft is: one file in a config folder.",
+            "enum": [
+              "entity",
+              "probe",
+              "connector",
+              "catalog",
+              "runbook"
+            ],
+            "title": "DraftKind",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "application": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Application"
+          },
+          "environment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Environment"
+          },
+          "kind": {
+            "$ref": "#/$defs/DraftKind"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Name"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "text"
+        ],
+        "title": "check_draftArguments",
+        "type": "object"
+      },
+      "name": "check_draft",
+      "output_schema": {
+        "$defs": {
+          "Credential": {
+            "additionalProperties": false,
+            "description": "Something in the draft that looks like a secret or an address. Never any part of it.",
+            "properties": {
+              "line": {
+                "title": "Line",
+                "type": "integer"
+              },
+              "shown": {
+                "description": "The kind and length only, such as 'password (12 characters)'.",
+                "title": "Shown",
+                "type": "string"
+              },
+              "what": {
+                "enum": [
+                  "password",
+                  "token",
+                  "connection_string",
+                  "private_key",
+                  "host",
+                  "ip_address"
+                ],
+                "title": "What",
+                "type": "string"
+              }
+            },
+            "required": [
+              "what",
+              "line",
+              "shown"
+            ],
+            "title": "Credential",
+            "type": "object"
+          },
+          "DraftFinding": {
+            "additionalProperties": false,
+            "description": "One check's finding, in the save checks' own words.",
+            "properties": {
+              "check": {
+                "title": "Check",
+                "type": "string"
+              },
+              "line": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Line"
+              },
+              "message": {
+                "title": "Message",
+                "type": "string"
+              },
+              "severity": {
+                "enum": [
+                  "error",
+                  "warning"
+                ],
+                "title": "Severity",
+                "type": "string"
+              }
+            },
+            "required": [
+              "check",
+              "severity",
+              "message"
+            ],
+            "title": "DraftFinding",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "description": "What the checks say about a draft. Its text is never repeated, here or anywhere.",
+        "properties": {
+          "credentials": {
+            "items": {
+              "$ref": "#/$defs/Credential"
+            },
+            "title": "Credentials",
+            "type": "array"
+          },
+          "findings": {
+            "items": {
+              "$ref": "#/$defs/DraftFinding"
+            },
+            "title": "Findings",
+            "type": "array"
+          },
+          "next": {
+            "title": "Next",
+            "type": "string"
+          },
+          "ok": {
+            "description": "False on any error, and on any credential found.",
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "paste_into": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where to paste it, when ok.",
+            "title": "Paste Into"
+          }
+        },
+        "required": [
+          "ok",
+          "findings",
+          "credentials",
+          "paste_into",
+          "next"
+        ],
+        "title": "DraftCheck",
+        "type": "object"
+      }
+    },
+    {
+      "annotations": {
+        "destructive_hint": false,
+        "open_world_hint": false,
+        "read_only_hint": true
+      },
+      "description": "How to draft one kind of file: where it goes, its required fields, the rules and the\n        save checks' common findings.",
+      "input_schema": {
+        "$defs": {
+          "DraftKind": {
+            "description": "What a draft is: one file in a config folder.",
+            "enum": [
+              "entity",
+              "probe",
+              "connector",
+              "catalog",
+              "runbook"
+            ],
+            "title": "DraftKind",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "kind": {
+            "$ref": "#/$defs/DraftKind"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "drafting_guideArguments",
+        "type": "object"
+      },
+      "name": "drafting_guide",
+      "output_schema": {
+        "$defs": {
+          "DraftKind": {
+            "description": "What a draft is: one file in a config folder.",
+            "enum": [
+              "entity",
+              "probe",
+              "connector",
+              "catalog",
+              "runbook"
+            ],
+            "title": "DraftKind",
+            "type": "string"
+          },
+          "RequiredField": {
+            "additionalProperties": false,
+            "description": "One field the file must have, and what it means.",
+            "properties": {
+              "field": {
+                "title": "Field",
+                "type": "string"
+              },
+              "meaning": {
+                "title": "Meaning",
+                "type": "string"
+              }
+            },
+            "required": [
+              "field",
+              "meaning"
+            ],
+            "title": "RequiredField",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "description": "How to draft one kind of file, from its schema and the save checks.",
+        "properties": {
+          "file": {
+            "description": "Where it goes, with placeholders.",
+            "title": "File",
+            "type": "string"
+          },
+          "guide": {
+            "description": "The bundled guide page, as /guide/<page>/.",
+            "title": "Guide",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/$defs/DraftKind"
+          },
+          "mistakes": {
+            "description": "The save checks' common findings, as their fix.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Mistakes",
+            "type": "array"
+          },
+          "required": {
+            "items": {
+              "$ref": "#/$defs/RequiredField"
+            },
+            "title": "Required",
+            "type": "array"
+          },
+          "rules": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Rules",
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind",
+          "file",
+          "required",
+          "rules",
+          "mistakes",
+          "guide"
+        ],
+        "title": "DraftingGuide",
+        "type": "object"
+      }
+    },
+    {
+      "annotations": {
+        "destructive_hint": false,
+        "open_world_hint": false,
+        "read_only_hint": true
+      },
+      "description": "The bundled examples of this kind, or the one named. A connector's host, port,\n        database, login, URL and secret are placeholders.",
+      "input_schema": {
+        "$defs": {
+          "DraftKind": {
+            "description": "What a draft is: one file in a config folder.",
+            "enum": [
+              "entity",
+              "probe",
+              "connector",
+              "catalog",
+              "runbook"
+            ],
+            "title": "DraftKind",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "kind": {
+            "$ref": "#/$defs/DraftKind"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Name"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "examplesArguments",
+        "type": "object"
+      },
+      "name": "examples",
+      "output_schema": {
+        "$defs": {
+          "DraftKind": {
+            "description": "What a draft is: one file in a config folder.",
+            "enum": [
+              "entity",
+              "probe",
+              "connector",
+              "catalog",
+              "runbook"
+            ],
+            "title": "DraftKind",
+            "type": "string"
+          },
+          "Example": {
+            "additionalProperties": false,
+            "description": "One example file; a connector's hosts, logins, URLs and secrets are placeholders.",
+            "properties": {
+              "application": {
+                "title": "Application",
+                "type": "string"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "path": {
+                "title": "Path",
+                "type": "string"
+              },
+              "yaml": {
+                "title": "Yaml",
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "application",
+              "path",
+              "yaml"
+            ],
+            "title": "Example",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The bundled examples of one kind.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/Example"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "kind": {
+            "$ref": "#/$defs/DraftKind"
+          }
+        },
+        "required": [
+          "kind",
+          "items"
+        ],
+        "title": "Examples",
+        "type": "object"
+      }
+    },
+    {
+      "annotations": {
+        "destructive_hint": false,
+        "open_world_hint": false,
+        "read_only_hint": true
+      },
+      "description": "The loaded configuration by names, titles and kinds: applications, environments,\n        entities, probes, connectors and runbooks. Never where a connector points.",
+      "input_schema": {
+        "properties": {
+          "application": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Application"
+          }
+        },
+        "title": "list_configArguments",
+        "type": "object"
+      },
+      "name": "list_config",
+      "output_schema": {
+        "$defs": {
+          "ApplicationConfig": {
+            "additionalProperties": false,
+            "properties": {
+              "connectors": {
+                "items": {
+                  "$ref": "#/$defs/ConnectorSummary"
+                },
+                "title": "Connectors",
+                "type": "array"
+              },
+              "entities": {
+                "items": {
+                  "$ref": "#/$defs/EntitySummary"
+                },
+                "title": "Entities",
+                "type": "array"
+              },
+              "environments": {
+                "items": {
+                  "$ref": "#/$defs/EnvironmentSummary"
+                },
+                "title": "Environments",
+                "type": "array"
+              },
+              "id": {
+                "title": "Id",
+                "type": "string"
+              },
+              "probes": {
+                "items": {
+                  "$ref": "#/$defs/ProbeSummary"
+                },
+                "title": "Probes",
+                "type": "array"
+              },
+              "runbooks": {
+                "items": {
+                  "$ref": "#/$defs/RunbookSummary"
+                },
+                "title": "Runbooks",
+                "type": "array"
+              },
+              "title": {
+                "title": "Title",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "environments",
+              "entities",
+              "probes",
+              "connectors",
+              "runbooks"
+            ],
+            "title": "ApplicationConfig",
+            "type": "object"
+          },
+          "ConnectorSummary": {
+            "additionalProperties": false,
+            "description": "A connector by name and type: never where it points or who logs in.",
+            "properties": {
+              "environments": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Environments",
+                "type": "array"
+              },
+              "id": {
+                "title": "Id",
+                "type": "string"
+              },
+              "type": {
+                "title": "Type",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "type",
+              "environments"
+            ],
+            "title": "ConnectorSummary",
+            "type": "object"
+          },
+          "EntitySummary": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "title": "Id",
+                "type": "string"
+              },
+              "identifiers": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Identifiers",
+                "type": "array"
+              },
+              "locations": {
+                "items": {
+                  "$ref": "#/$defs/LocationSummary"
+                },
+                "title": "Locations",
+                "type": "array"
+              },
+              "pii_identifiers": {
+                "description": "Named as PII: their values are always masked.",
+                "items": {
+                  "type": "string"
+                },
+                "title": "Pii Identifiers",
+                "type": "array"
+              },
+              "root_key": {
+                "title": "Root Key",
+                "type": "string"
+              },
+              "title": {
+                "title": "Title",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "root_key",
+              "identifiers",
+              "pii_identifiers",
+              "locations"
+            ],
+            "title": "EntitySummary",
+            "type": "object"
+          },
+          "EnvironmentSummary": {
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "production": {
+                "title": "Production",
+                "type": "boolean"
+              },
+              "title": {
+                "title": "Title",
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "title",
+              "production"
+            ],
+            "title": "EnvironmentSummary",
+            "type": "object"
+          },
+          "LocationSummary": {
+            "additionalProperties": false,
+            "properties": {
+              "cardinality": {
+                "title": "Cardinality",
+                "type": "string"
+              },
+              "connector": {
+                "title": "Connector",
+                "type": "string"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "connector",
+              "cardinality"
+            ],
+            "title": "LocationSummary",
+            "type": "object"
+          },
+          "ProbeSummary": {
+            "additionalProperties": false,
+            "properties": {
+              "entity": {
+                "title": "Entity",
+                "type": "string"
+              },
+              "id": {
+                "title": "Id",
+                "type": "string"
+              },
+              "kind": {
+                "title": "Kind",
+                "type": "string"
+              },
+              "title": {
+                "title": "Title",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "kind",
+              "entity"
+            ],
+            "title": "ProbeSummary",
+            "type": "object"
+          },
+          "RunbookSummary": {
+            "additionalProperties": false,
+            "properties": {
+              "entity": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Entity"
+              },
+              "id": {
+                "title": "Id",
+                "type": "string"
+              },
+              "title": {
+                "title": "Title",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "entity"
+            ],
+            "title": "RunbookSummary",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The loaded configuration by names, titles and kinds only.",
+        "properties": {
+          "applications": {
+            "items": {
+              "$ref": "#/$defs/ApplicationConfig"
+            },
+            "title": "Applications",
+            "type": "array"
+          }
+        },
+        "required": [
+          "applications"
+        ],
+        "title": "ConfigList",
+        "type": "object"
+      }
+    },
+    {
+      "annotations": {
+        "destructive_hint": false,
+        "open_world_hint": false,
+        "read_only_hint": true
+      },
+      "description": "A connector's tables as last imported, with the catalog's labels and column roles.\n        Names and types only: never rows or values.",
+      "input_schema": {
+        "properties": {
+          "application": {
+            "title": "Application",
+            "type": "string"
+          },
+          "connector": {
+            "title": "Connector",
+            "type": "string"
+          },
+          "environment": {
+            "title": "Environment",
+            "type": "string"
+          }
+        },
+        "required": [
+          "application",
+          "connector",
+          "environment"
+        ],
+        "title": "schemaArguments",
+        "type": "object"
+      },
+      "name": "schema",
+      "output_schema": {
+        "$defs": {
+          "ColumnInfo": {
+            "additionalProperties": false,
+            "description": "A column's name, type and roles. PII is a role; no value is ever given.",
+            "properties": {
+              "links_to": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Links To"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "nullable": {
+                "title": "Nullable",
+                "type": "boolean"
+              },
+              "roles": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Roles",
+                "type": "array"
+              },
+              "type": {
+                "title": "Type",
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "type",
+              "nullable",
+              "roles"
+            ],
+            "title": "ColumnInfo",
+            "type": "object"
+          },
+          "IndexInfo": {
+            "additionalProperties": false,
+            "properties": {
+              "columns": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Columns",
+                "type": "array"
+              },
+              "unique": {
+                "title": "Unique",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "columns",
+              "unique"
+            ],
+            "title": "IndexInfo",
+            "type": "object"
+          },
+          "TableInfo": {
+            "additionalProperties": false,
+            "properties": {
+              "columns": {
+                "items": {
+                  "$ref": "#/$defs/ColumnInfo"
+                },
+                "title": "Columns",
+                "type": "array"
+              },
+              "confirmed": {
+                "title": "Confirmed",
+                "type": "boolean"
+              },
+              "indexes": {
+                "items": {
+                  "$ref": "#/$defs/IndexInfo"
+                },
+                "title": "Indexes",
+                "type": "array"
+              },
+              "label": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Label"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "primary_key": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Primary Key",
+                "type": "array"
+              }
+            },
+            "required": [
+              "name",
+              "label",
+              "confirmed",
+              "columns",
+              "primary_key",
+              "indexes"
+            ],
+            "title": "TableInfo",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A connector's tables as last imported: names, types, labels and roles, never rows.",
+        "properties": {
+          "imported_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null: not imported yet; next says how.",
+            "title": "Imported At"
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Next"
+          },
+          "tables": {
+            "items": {
+              "$ref": "#/$defs/TableInfo"
+            },
+            "title": "Tables",
+            "type": "array"
+          }
+        },
+        "required": [
+          "imported_at",
+          "tables"
+        ],
+        "title": "Schema",
+        "type": "object"
+      }
+    },
+    {
+      "annotations": {
+        "destructive_hint": false,
+        "open_world_hint": false,
+        "read_only_hint": true
+      },
+      "description": "A file of this kind to start from: placeholders only, its secret a keyring: reference.",
+      "input_schema": {
+        "$defs": {
+          "DraftKind": {
+            "description": "What a draft is: one file in a config folder.",
+            "enum": [
+              "entity",
+              "probe",
+              "connector",
+              "catalog",
+              "runbook"
+            ],
+            "title": "DraftKind",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "kind": {
+            "$ref": "#/$defs/DraftKind"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "templateArguments",
+        "type": "object"
+      },
+      "name": "template",
+      "output_schema": {
+        "$defs": {
+          "DraftKind": {
+            "description": "What a draft is: one file in a config folder.",
+            "enum": [
+              "entity",
+              "probe",
+              "connector",
+              "catalog",
+              "runbook"
+            ],
+            "title": "DraftKind",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A file to start from: placeholders only, and its secret a keyring: reference.",
+        "properties": {
+          "kind": {
+            "$ref": "#/$defs/DraftKind"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "yaml": {
+            "title": "Yaml",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "path",
+          "yaml"
+        ],
+        "title": "Template",
+        "type": "object"
+      }
+    }
+  ]
+}

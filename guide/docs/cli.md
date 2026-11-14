@@ -165,6 +165,16 @@ If `owl serve` would refuse the folder at start, nothing changes and the first e
 (`owl check <folder>` lists them all). It's refused while a run is running. Kill switches stay as
 they are. Plugins, the port, the store and the log file change only with a restart.
 
+## `owl mcp`
+
+```sh
+owl mcp --config probeowl                # for an AI assistant's app to start, on stdio
+owl mcp --config probeowl --plan-checks  # check_draft also reads lookups' plans
+```
+
+ProbeOwl's drafting tools for an AI assistant: it drafts, you paste and reload. It runs on stdio
+only, with no port, and writes nothing. See [Draft with an AI assistant](drafting-with-an-assistant.md).
+
 ## `owl store`
 
 ```sh

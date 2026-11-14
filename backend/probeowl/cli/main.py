@@ -32,6 +32,7 @@ from probeowl.cli.defaults import (
 )
 from probeowl.cli.inspect import inspect
 from probeowl.cli.kill import kill_app
+from probeowl.cli.mcp import mcp
 from probeowl.cli.reload import reload as reload_config
 from probeowl.cli.runbook import runbook_app
 from probeowl.cli.validate import validate
@@ -83,6 +84,7 @@ app.add_typer(runbook_app, name="runbook")
 app.command("reload")(reload_config)
 app.command()(validate)
 app.command()(inspect)
+app.command()(mcp)
 
 
 def _show_version(show: bool) -> None:
