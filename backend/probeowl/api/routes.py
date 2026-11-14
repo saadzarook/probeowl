@@ -454,7 +454,7 @@ def pick_matches(run_id: str, body: PickMatches, http: Request) -> RunsStarted:
     the limit. 404 for an unknown run; 422 when the run is not Ambiguous or a subject is not
     one of its matches; 429 when the maximum number of runs is already running.
     """
-    ids = _runs(http).start_matches(run_id, body.subjects)
+    ids = _runs(http).start_matches(run_id, body.subjects, body.value, body.picks)
     return RunsStarted(runs=[RunStarted(id=i, status=RunStatus.RUNNING) for i in ids])
 
 
@@ -477,7 +477,7 @@ def start_healthy_comparison(
     sample needs. 429 when the maximum number of runs is already running.
     """
     runs = _runs(http)
-    runs.start_healthy(run_id, body.narrow, body.subject)
+    runs.start_healthy(run_id, body.narrow, body.subject, body.failing_subject)
     redactor: Redactor = http.app.state.redactor
     return runs.comparison(run_id, redactor.run)
 
@@ -878,7 +878,7 @@ def run_step(run_id: str, runbook: str, step: str, body: RunRunbookStep, http: R
     Production a plan that cannot be read needs run_without_plan_check. A write query is always
     refused. 403 if a kill switch covers it; 429 when the maximum number of runs is running.
     """
-    return _steps(http).run_step(run_id, runbook, step, body.run_without_plan_check)
+    return _steps(http).run_step(run_id, runbook, step, body.run_without_plan_check, body.subject)
 
 
 @router.post(

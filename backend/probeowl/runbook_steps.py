@@ -17,7 +17,14 @@ from probeowl.checks.plans import PlanOpener, PlanSource, plan_checks
 from probeowl.checks.rules import read_step_statement
 from probeowl.connectors.plan import PlanStep
 from probeowl.engine.locations import DEFAULT_MAX_ROWS
-from probeowl.engine.masking import MASKED, mask_rows, to_json
+from probeowl.engine.masking import (
+    MASKED,
+    mask_rows,
+    masked_fields,
+    masked_key_reason,
+    pii_fields,
+    to_json,
+)
 from probeowl.engine.typed_values import column_kinds, restore
 from probeowl.errors import (
     ConfigError,
@@ -51,7 +58,7 @@ from probeowl.model.runbook_step import (
 )
 from probeowl.model.save_check import CheckStatus
 from probeowl.runbooks import is_write_step, why_copy_only
-from probeowl.runs import RunService
+from probeowl.runs import RunService, check_pasted_subject
 from probeowl.store.runbook_steps import save_step, step_states
 
 # A parameter, skipping what is inside a quoted string and a PostgreSQL-style :: cast.
@@ -74,6 +81,10 @@ class _Value:
 
 def parameter_value(run: Run, entity: Entity, name: str) -> _Value | str:
     """A parameter's value from the run, or why it has none."""
+    if name == entity.root_key and run.subject not in (None, MASKED):
+        # The key is the run's subject: pasted for this step when it is stored masked (#66),
+        # where every location's rows show it masked.
+        return _Value(run.subject, ValueKind.TEXT)
     found: list[_Value] = []
     several = masked = False
     for location_name, location in entity.locations.items():
@@ -84,7 +95,7 @@ def parameter_value(run: Run, entity: Entity, name: str) -> _Value | str:
             columns = {column.lower() for row in rows for column in row}
             if name.lower() not in columns:
                 continue
-            if name.lower() in {f.lower() for f in [*location.pii, *location.mask]}:
+            if name.lower() in masked_fields(entity, location):
                 masked = True
             elif location.cardinality is Cardinality.MANY or len(rows) != 1:
                 several = True
@@ -102,12 +113,35 @@ def parameter_value(run: Run, entity: Entity, name: str) -> _Value | str:
     if several:
         return SEVERAL_ROWS
     if name == entity.root_key and run.subject is not None:
+        # Stored masked when the key is PII: a step that runs asks for it to be pasted.
+        if run.subject == MASKED:
+            return MASKED_PARAMETER
         return _Value(run.subject, ValueKind.TEXT)
     if name == run.identifier:
         if run.identifier_value == MASKED:
             return MASKED_PARAMETER
         return _Value(run.identifier_value, ValueKind.TEXT)
     return NOT_IN_RUN
+
+
+def _with_pasted_subject(
+    run: Run, app: LoadedApplication, entity: Entity, subject: str | None
+) -> tuple[Run, bool]:
+    """The run with its real subject for one step, when its key is PII; refused without one.
+
+    And whether it was pasted. A pasted subject is checked as a new lookup (check_pasted_subject).
+    """
+    if run.subject != MASKED:
+        return run, False
+    if subject is None:
+        raise RequestError(masked_key_reason(entity), {"subject": masked_key_reason(entity)})
+    check_pasted_subject(run, app, entity, subject)
+    return run.model_copy(update={"subject": subject}), True
+
+
+def _pasted_detail(pasted: bool) -> dict[str, str]:
+    # The step used a pasted subject: audited as such, never its value.
+    return {"subject": MASKED} if pasted else {}
 
 
 def _sql_literal(found: _Value, backslash_escapes: bool) -> str:
@@ -167,9 +201,18 @@ class RunbookSteps:
         return found
 
     def run_step(
-        self, run_id: str, runbook_name: str, step: str, without_plan_check: bool = False
+        self,
+        run_id: str,
+        runbook_name: str,
+        step: str,
+        without_plan_check: bool = False,
+        subject: str | None = None,
     ) -> StepRan:
-        """Run a step the server marks runnable: a reviewed read query, or a probe."""
+        """Run a step the server marks runnable: a reviewed read query, or a probe.
+
+        subject: the run's subject, pasted when its key is PII and so stored masked (#66). Used
+        for this step only, in memory: never stored, logged, audited or returned.
+        """
         run, app, entity, runbook = self._context(run_id, runbook_name)
         chosen = _step(runbook, step)
         if is_write_step(app, chosen):
@@ -177,8 +220,11 @@ class RunbookSteps:
                 "a write query is never run by ProbeOwl: copy it for a change request",
                 {"step": f"step {step} is a write query"},
             )
+        pasted = False
+        if isinstance(chosen, (ProbeStep, ReadQueryStep)):
+            run, pasted = _with_pasted_subject(run, app, entity, subject)
         if isinstance(chosen, ProbeStep):
-            return self._run_probe(run, app, runbook, step, chosen)
+            return self._run_probe(run, app, runbook, step, chosen, pasted)
         if not isinstance(chosen, ReadQueryStep):
             raise RequestError(
                 "ProbeOwl does not run this step", {"step": f"step {step} is {chosen.kind}"}
@@ -186,7 +232,9 @@ class RunbookSteps:
         why = why_copy_only(app, chosen)
         if why is not None:
             raise RequestError(f"this step is copy only: {why}", {"step": why})
-        return self._run_read(run, app, entity, runbook_name, step, chosen, without_plan_check)
+        return self._run_read(
+            run, app, entity, runbook_name, step, chosen, without_plan_check, pasted
+        )
 
     def tick(self, run_id: str, runbook_name: str, step: str, done: bool) -> None:
         """Save a manual step's tick with the run. Audited."""
@@ -264,7 +312,13 @@ class RunbookSteps:
         return run, app, entity, runbook
 
     def _run_probe(
-        self, run: Run, app: LoadedApplication, runbook: Runbook, step: str, chosen: ProbeStep
+        self,
+        run: Run,
+        app: LoadedApplication,
+        runbook: Runbook,
+        step: str,
+        chosen: ProbeStep,
+        pasted: bool,
     ) -> StepRan:
         probe = app.probes.get(chosen.probe)
         if probe is None:
@@ -276,7 +330,13 @@ class RunbookSteps:
         self._runs.record(
             "runbook_step_run",
             run,
-            {"runbook": runbook.runbook, "step": step, "title": chosen.title, "run": started},
+            {
+                "runbook": runbook.runbook,
+                "step": step,
+                "title": chosen.title,
+                "run": started,
+                **_pasted_detail(pasted),
+            },
         )
         return StepRan(id=step, run=started)
 
@@ -289,6 +349,7 @@ class RunbookSteps:
         step: str,
         chosen: ReadQueryStep,
         without_plan_check: bool,
+        pasted: bool,
     ) -> StepRan:
         if run.status is RunStatus.RUNNING or run.subject is None:
             raise RequestError(
@@ -299,7 +360,7 @@ class RunbookSteps:
         self._runs.kill.check(run.application, chosen.using)
         parameters = _bound_parameters(chosen, run, entity)
         warnings, skipped = self._check_plan(run, app, chosen, without_plan_check)
-        result = self._read(run, app, chosen, parameters, warnings)
+        result = self._read(run, app, pii_fields(entity), chosen, parameters, warnings)
         with self._runs.store.begin() as conn:
             save_step(conn, self._runs.workspace, run.id, runbook_name, step, result=result)
             self._runs.record(
@@ -313,6 +374,7 @@ class RunbookSteps:
                     "rows": len(result.evidence.rows) if result.evidence else 0,
                     "run_without_plan_check": bool(skipped),
                     "plans_not_run": skipped,
+                    **_pasted_detail(pasted),
                 },
                 conn,
             )
@@ -354,6 +416,7 @@ class RunbookSteps:
         self,
         run: Run,
         app: LoadedApplication,
+        hidden: set[str],
         chosen: ReadQueryStep,
         parameters: dict[str, ParameterValue],
         warnings: list[str],
@@ -370,11 +433,15 @@ class RunbookSteps:
             return StepResult(
                 outcome=Outcome.ERROR, reason=str(err), warnings=warnings, actor=actor, at=now
             )
-        rows = mask_rows(read.rows, _catalog_pii(app, chosen))
+        # The catalog's PII columns, and every PII identifier (hidden): a pasted key is never kept.
+        rows = mask_rows(read.rows, {*_catalog_pii(app, chosen), *hidden})
         evidence = Evidence(
             connector=chosen.using,
             query=read.query,
-            parameters={name: to_json(value) for name, value in parameters.items()},
+            parameters={
+                name: MASKED if name.lower() in hidden else to_json(value)
+                for name, value in parameters.items()
+            },
             guards=read.guards,
             rows=[{key: to_json(value) for key, value in row.items()} for row in rows],
             rows_total=read.rows_total,

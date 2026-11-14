@@ -176,6 +176,16 @@ def read_step_problems(app: LoadedApplication, statement: Statement) -> list[str
     return [*_time_problems(statement, tables), *_unmasked(statement, tables)]
 
 
+def pii_key_warnings(app: LoadedApplication) -> list[str]:
+    """For owl check: each entity whose key is PII, so its runs show it masked (#66)."""
+    return [
+        f"{app.application.application}: {name}'s key is PII; its runs show [masked]; "
+        "find them by run ID or ticket reference"
+        for name, entity in sorted(app.entities.items())
+        if entity.identifiers[entity.root_key].pii
+    ]
+
+
 def rule_warnings(app: LoadedApplication, entity: Entity) -> list[str]:
     """For a run: each save rule the entity's lookups break, which owl check fails on."""
     return [

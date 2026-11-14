@@ -5154,20 +5154,46 @@ components:
     PickMatches:
       properties:
         subjects:
-          items:
-            type: string
-          type: array
-          maxItems: 5
-          minItems: 1
+          anyOf:
+          - items:
+              type: string
+            type: array
+            maxItems: 5
+            minItems: 1
+          - type: 'null'
           title: Subjects
           description: Root key values from the run's matches; up to 5 run together.
+        value:
+          anyOf:
+          - type: string
+            maxLength: 256
+            minLength: 1
+          - type: 'null'
+          title: Value
+          description: 'With picks: the value the Ambiguous run searched for, pasted
+            again. Never stored, logged, audited or returned.'
+        picks:
+          anyOf:
+          - items:
+              type: integer
+            type: array
+            maxItems: 5
+            minItems: 1
+          - type: 'null'
+          title: Picks
+          description: 'With value: the matches'' numbers as the run lists them, from
+            1.'
       additionalProperties: false
       type: object
-      required:
-      - subjects
       title: PickMatches
-      description: Subjects picked from an Ambiguous run's matches, to run its probe
-        for.
+      description: 'Matches picked from an Ambiguous run, to run its probe for: by
+        subject, or by number.
+
+
+        By number when the entity''s key is PII, so its matches show [masked]: the
+        value searched
+
+        for is pasted again, and the same lookup runs again to find them (#66).'
     PlanAccess:
       type: string
       enum:
@@ -5706,11 +5732,21 @@ components:
           description: In Production, the person's acknowledgement that the step's
             plan could not be read. Recorded in the audit with the actor.
           default: false
+        subject:
+          anyOf:
+          - type: string
+            maxLength: 256
+            minLength: 1
+          - type: 'null'
+          title: Subject
+          description: 'The run''s subject, pasted when its entity''s key is PII and
+            so stored masked. Used for this step only: never stored, logged, audited
+            or returned.'
       additionalProperties: false
       type: object
       title: RunRunbookStep
-      description: 'Run a step, named in the path. It carries no SQL and no values:
-        the server has both.'
+      description: 'Run a step, named in the path. It carries no SQL: the server has
+        it, and the run''s values.'
     RunStarted:
       properties:
         id:
@@ -6514,6 +6550,16 @@ components:
           - type: 'null'
           title: Subject
           description: A known-good ID a person pasted.
+        failing_subject:
+          anyOf:
+          - type: string
+            maxLength: 256
+            minLength: 1
+          - type: 'null'
+          title: Failing Subject
+          description: 'This run''s subject, pasted when its entity''s key is PII
+            and so stored masked: the sample needs it to leave this run out. Never
+            stored, logged, audited or returned.'
       additionalProperties: false
       type: object
       title: StartHealthyComparison

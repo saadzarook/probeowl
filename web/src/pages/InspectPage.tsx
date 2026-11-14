@@ -86,6 +86,7 @@ export function InspectPage({ item }: { item: NavItem }) {
                   onInspect={(runId, subjects) =>
                     pick.mutate({ runId, subjects })
                   }
+                  onStarted={onStarted}
                 />
                 <HealthyComparisonSection runId={id} production={environment?.production === true} />
                 <SuggestedNextSteps runId={id} />

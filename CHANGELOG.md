@@ -31,6 +31,21 @@ See docs/implementation-plan.md, Releases. -->
   address once it's up. The guide no longer has a separate `owl --version` check, and its
   troubleshooting page says the first start after installing can take about 20 seconds on Windows.
 
+### Security
+
+- **Fixed in v0.1:** an entity whose key is PII (`pii: true` on its root key, such as a national
+  ID, phone number or email) had its runs' subject stored and shown unmasked. Now it shows as
+  `[masked]` in the store, the runs list, the API, the audit and the CLI.
+- A PII identifier is now masked wherever it shows, whatever each location's own `pii` list says:
+  in rows, in lookup parameters and in runbook step results.
+- Where a run needs the real value later, it asks for it to be pasted for that one action: a
+  runbook step, the healthy comparison, or an Ambiguous run's matches, which are then picked by
+  number. `owl check` warns about such entities, and doesn't refuse them.
+- **If you used v0.1 with an entity whose key or identifiers are PII,** mask the runs it already
+  stored. With owl serve stopped, run `owl store mask-pii <config folder>` to see what would
+  change, then add `--apply`. It never prints a value. It names how many audit events still hold
+  one: the audit is append-only, so those are kept.
+
 ### Fixed
 
 - First-run setup's "Add its first connection", clicked as soon as it appears, opens Add connection.

@@ -329,9 +329,19 @@ function matchingRunbooks(url: URL): RunbookView[] {
   });
 }
 
+// "mock-pii-key": the entity's key is PII (#66): subjects and matches show [masked], and what needs
+// the real value later asks for it to be pasted.
+const PII_KEY_REASON = "topup's key is PII and stored masked: paste its topup_id";
+function piiKey(): boolean {
+  return localStorage.getItem("mock-pii-key") === "1";
+}
+function masked<T extends { subject?: string | null }>(item: T): T {
+  return piiKey() && item.subject ? { ...item, subject: "[masked]" } : item;
+}
+
 function comparisonOf(id: string, value: string): HealthyComparison {
   const choices = [{ name: "same_payment_method", title: "Same payment method" }];
-  const base = { run: id, has_sample: value !== "tp_nosamp", choices: value === "tp_nosamp" ? [] : choices, failing_subject: value };
+  const base = { run: id, has_sample: value !== "tp_nosamp", choices: value === "tp_nosamp" ? [] : choices, failing_subject: piiKey() ? "[masked]" : value };
   const entry = comparisons.get(id);
   if (entry === undefined) return { ...base, attempt: null, differences: [] };
   if (entry.seen < 1) return { ...base, attempt: entry.attempt, differences: [] };
@@ -897,14 +907,16 @@ export const handlers = [
     const running = poll.seen < POLLS_BEFORE_FINISHED;
     const { request } = poll;
     const run = runFor(id, request, running);
-    return json({
+    const matches = piiKey() ? [...(run.matches ?? [])].sort((a, b) => a.subject.localeCompare(b.subject)).map(masked) : run.matches;
+    return json(masked({
       ...run,
+      matches,
       environment: request.environment,
       identifier_value: run.status === "ambiguous" ? run.identifier_value : request.value,
       investigation: request.investigation,
       from_run: poll.fromRun ?? null,
       subject: run.subject ?? (run.status === "passed" || run.status === "failed" ? request.value : null),
-    });
+    }));
   }),
 
   http.get("/api/applications/:application/runbooks", ({ params, request }) => {
@@ -960,9 +972,12 @@ export const handlers = [
   http.post("/api/runs/:run_id/runbooks/:runbook/steps/:step/run", async ({ params, request }) => {
     const id = String(params["run_id"]);
     const step = String(params["step"]);
-    const body = (await request.json()) as { run_without_plan_check?: boolean };
+    const body = (await request.json()) as { run_without_plan_check?: boolean; subject?: string };
     const poll = polls.get(id);
     if (poll === undefined) return problem(404, "Not Found", "No such run.");
+    if (piiKey() && (step === "revalidate" || step === "check-outbox") && !body.subject) {
+      return problem(422, "Unprocessable Content", PII_KEY_REASON, [{ field: "subject", message: PII_KEY_REASON }]);
+    }
     if (step === "revalidate") {
       const again = `run_${nextRun++}`;
       polls.set(again, { seen: 0, request: poll.request });
@@ -979,7 +994,9 @@ export const handlers = [
       }
       warnings = ["index use not checked: the connection was refused"];
     }
-    const result = outboxResult(warnings);
+    const plain = outboxResult(warnings);
+    // As the backend: a PII key, pasted for this step, is masked in what is kept and returned.
+    const result = piiKey() && plain?.evidence ? { ...plain, evidence: { ...plain.evidence, parameters: { topup_id: "[masked]" } } } : plain;
     const results = stepResults.get(id) ?? new Map<string, StepInRun["result"]>();
     results.set(step, result);
     stepResults.set(id, results);
@@ -1024,7 +1041,10 @@ export const handlers = [
     const id = String(params["run_id"]);
     const poll = polls.get(id);
     if (poll === undefined) return problem(404, "Not Found", "No such run.");
-    const body = (await request.json()) as { narrow?: string | null; subject?: string | null };
+    const body = (await request.json()) as { narrow?: string | null; subject?: string | null; failing_subject?: string | null };
+    if (piiKey() && !body.subject && !body.failing_subject) {
+      return problem(422, "Unprocessable Content", PII_KEY_REASON, [{ field: "failing_subject", message: PII_KEY_REASON }]);
+    }
     const stopped = body.subject ? undefined : stoppedBy(poll.request.application, "wallet_db");
     if (stopped) return problem(403, "Forbidden", stopped);
     if (body.subject === poll.request.value) return problem(422, "Unprocessable Content", "that is the subject of this run");
@@ -1051,10 +1071,20 @@ export const handlers = [
     const id = String(params["run_id"]);
     const from = polls.get(id);
     if (from === undefined) return problem(404, "Not Found", "No such run.");
-    const { subjects } = (await request.json()) as { subjects: string[] };
+    const body = (await request.json()) as { subjects?: string[]; value?: string; picks?: number[] };
     const run = runFor(id, from.request, false);
-    const known = (run.matches ?? []).map((m) => m.subject);
-    if (run.status !== "ambiguous" || subjects.some((s) => !known.includes(s))) {
+    const known = (run.matches ?? []).map((m) => m.subject).sort();
+    let subjects = body.subjects ?? [];
+    if (piiKey()) {
+      // Picked by number: the same lookup again, which here only the original value finds.
+      if (body.value !== from.request.value) return problem(422, "Unprocessable Content", "the matches have changed since this run: start again");
+      const picks = body.picks ?? [];
+      if (picks.length === 0 || new Set(picks).size !== picks.length || picks.some((n) => n < 1 || n > known.length)) {
+        return problem(422, "Unprocessable Content", `pick each number once, from 1 to ${known.length}`);
+      }
+      subjects = picks.map((n) => known[n - 1] ?? "");
+    }
+    if (run.status !== "ambiguous" || subjects.length === 0 || subjects.some((s) => !known.includes(s))) {
       return problem(422, "Unprocessable Content", "Pick subjects from the matches of an Ambiguous run.");
     }
     const runs = subjects.map((subject) => {

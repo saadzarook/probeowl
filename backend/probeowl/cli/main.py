@@ -1,6 +1,7 @@
 # Author: @SaadZarook
 """The `owl` command."""
 
+import getpass
 import os
 from importlib.metadata import version
 from pathlib import Path
@@ -14,7 +15,7 @@ from probeowl.api.app import DEFAULT_PORT, create_app
 from probeowl.api.guide_site import find_guide
 from probeowl.api.web_app import find_web_app
 from probeowl.catalog.service import CatalogService
-from probeowl.checks.rules import folder_failures
+from probeowl.checks.rules import folder_failures, pii_key_warnings
 from probeowl.checks.saving import ProbeWrites
 from probeowl.checks.time_offsets import unchecked_without_imports
 from probeowl.cli import init as init_wizard
@@ -41,6 +42,7 @@ from probeowl.errors import ProbeOwlError
 from probeowl.guards.breaker import CircuitBreaker
 from probeowl.guards.kill_switch import KillSwitches
 from probeowl.model.check import check_folder, load_applications
+from probeowl.model.run import Actor, ActorKind
 from probeowl.plugins.registry import (
     default_settings_file,
     load_plugins,
@@ -53,7 +55,10 @@ from probeowl.secret_writes import SecretWrites
 from probeowl.server_log import configure_server_log, default_log_file
 from probeowl.setup_writes import SetupWrites
 from probeowl.store import migrate
+from probeowl.store.audit import AuditEvent, append_event
 from probeowl.store.engine import create_store_engine
+from probeowl.store.tables import LOCAL_WORKSPACE
+from probeowl.stored_masking import mask_stored_runs
 
 HOST = "127.0.0.1"  # never anything else by default; see AGENTS.md
 WEB_ORIGINS_VARIABLE = "PROBEOWL_WEB_ORIGINS"
@@ -279,6 +284,9 @@ def check(
         typer.echo(f"{counted(len(failures), 'error')} in {summary}", err=True)
         raise typer.Exit(1)
     typer.echo(f"OK: {summary}")
+    for loaded in applications.values():
+        for warning in pii_key_warnings(loaded):
+            typer.echo(f"warning: {warning}", err=True)
     for name, loaded in applications.items():
         # owl check reads no schema imports, so the time offset check is left to saving.
         for connector in unchecked_without_imports(loaded):
@@ -308,6 +316,54 @@ def init(url: StoreUrl = None) -> None:
 def store_init(url: StoreUrl = None) -> None:
     """Create ProbeOwl's tables in the store, or upgrade them to this release."""
     create_store(url or default_store_url())
+
+
+@store_app.command("mask-pii")
+def store_mask_pii(
+    folder: Annotated[
+        Path, typer.Argument(help="The config folder that says which identifiers are PII.")
+    ],
+    url: StoreUrl = None,
+    apply: Annotated[bool, typer.Option("--apply", help="Write the masked runs.")] = False,
+) -> None:
+    """Mask PII in runs stored before v0.2: a PII key's subject, and PII identifiers' values.
+
+    A dry run by default: it lists each run it would change and what in it, never a value.
+    With --apply it writes them, in one transaction, and audits it. It uses the folder's
+    current configuration; a run of an entity it doesn't load is skipped and counted.
+    """
+    applications = load_applications(folder)
+    store = create_store_engine(url or default_store_url())
+    migrate.check_current(store)
+    with store.begin() as conn:
+        changed, skipped = mask_stored_runs(conn, LOCAL_WORKSPACE, applications, apply)
+        if apply and changed:
+            event = AuditEvent(
+                action="store_pii_masked",
+                actor=Actor(kind=ActorKind.PERSON, name=getpass.getuser()),
+                details={"runs": [each.run_id for each in changed]},
+            )
+            append_event(conn, LOCAL_WORKSPACE, event)
+    for each in changed:
+        typer.echo(f"{each.run_id}: {', '.join(each.fields)}")
+    held = sum(each.audit_events for each in changed)
+    if held:
+        typer.echo(
+            f"{counted(held, 'audit event')} of these runs still hold the value: the audit is "
+            "append-only, so they are kept as they are"
+        )
+        typer.echo(
+            "These audit events can't be changed. To remove them, delete the store outside "
+            "ProbeOwl; see the guide."
+        )
+    if skipped:
+        typer.echo(f"{counted(skipped, 'run')} skipped: their entities aren't in {folder}")
+    if not changed:
+        typer.echo("Nothing to mask.")
+    elif apply:
+        typer.echo(f"Masked {counted(len(changed), 'run')}.")
+    else:
+        typer.echo(f"{counted(len(changed), 'run')} to mask. Nothing written: run with --apply.")
 
 
 @store_app.command("upgrade")

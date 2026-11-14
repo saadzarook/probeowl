@@ -17,7 +17,7 @@ from sqlglot import exp
 from sqlglot.errors import ParseError
 
 from probeowl.engine.locations import Connector
-from probeowl.engine.masking import MASKED, mask_rows, to_json
+from probeowl.engine.masking import MASKED, mask_rows, masked_fields, pii_fields, to_json
 from probeowl.errors import ConfigError, ProbeOwlError, ReadsStopped, RequestError
 from probeowl.model.common import split_field_ref
 from probeowl.model.entity import Entity
@@ -229,17 +229,22 @@ def resolve(
         key = row.get(entity.root_key)
         if key is not None:
             rows_by_subject.setdefault(str(key), row)
+    # In a stable order, so a person can pick a match by its number when the subjects are masked
+    # (#66), and the same lookup again gives the same numbers.
+    rows_by_subject = dict(sorted(rows_by_subject.items()))
     subjects = list(rows_by_subject)
-    masked_fields = [*location.pii, *location.mask]
+    hidden = masked_fields(entity, location)
     evidence = Evidence(
         connector=location.using,
         query=found.query,
         parameters={
-            name: MASKED if entity.identifiers[identifier].pii else to_json(v)
+            name: MASKED
+            if entity.identifiers[identifier].pii or name.lower() in pii_fields(entity)
+            else to_json(v)
             for name, v in found.parameters.items()
         },
         guards=found.guards,
-        rows=[_json_row(row) for row in mask_rows(found.rows, masked_fields)],
+        rows=[_json_row(row) for row in mask_rows(found.rows, hidden)],
         started_at=found.started_at,
         duration_ms=found.duration_ms,
     )
@@ -255,7 +260,7 @@ def resolve(
     if found.truncated:
         reason = f"{reason or ''}; {found.truncated}".lstrip("; ")
     matches = [
-        Match(subject=subject, fields=_json_row(mask_rows([row], masked_fields)[0]))
+        Match(subject=subject, fields=_json_row(mask_rows([row], hidden)[0]))
         for subject, row in rows_by_subject.items()
     ]
     result = LocationResult(

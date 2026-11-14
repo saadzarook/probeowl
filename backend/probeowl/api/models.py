@@ -1,9 +1,9 @@
 # Author: @SaadZarook
 """Request and response bodies that exist only in the API."""
 
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Self
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from probeowl.model.catalog import CatalogTable
 from probeowl.model.common import FieldName, Name, ProbeOwlModel
@@ -120,16 +120,34 @@ class StartHealthyComparison(ProbeOwlModel):
     subject: str | None = Field(
         default=None, min_length=1, description="A known-good ID a person pasted."
     )
+    failing_subject: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=256,
+        description=(
+            "This run's subject, pasted when its entity's key is PII and so stored masked: the "
+            "sample needs it to leave this run out. Never stored, logged, audited or returned."
+        ),
+    )
 
 
 class RunRunbookStep(ProbeOwlModel):
-    """Run a step, named in the path. It carries no SQL and no values: the server has both."""
+    """Run a step, named in the path. It carries no SQL: the server has it, and the run's values."""
 
     run_without_plan_check: bool = Field(
         default=False,
         description=(
             "In Production, the person's acknowledgement that the step's plan could not be read. "
             "Recorded in the audit with the actor."
+        ),
+    )
+    subject: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=256,
+        description=(
+            "The run's subject, pasted when its entity's key is PII and so stored masked. Used "
+            "for this step only: never stored, logged, audited or returned."
         ),
     )
 
@@ -141,13 +159,41 @@ class TickRunbookStep(ProbeOwlModel):
 
 
 class PickMatches(ProbeOwlModel):
-    """Subjects picked from an Ambiguous run's matches, to run its probe for."""
+    """Matches picked from an Ambiguous run, to run its probe for: by subject, or by number.
 
-    subjects: list[str] = Field(
+    By number when the entity's key is PII, so its matches show [masked]: the value searched
+    for is pasted again, and the same lookup runs again to find them (#66).
+    """
+
+    subjects: list[str] | None = Field(
+        default=None,
         min_length=1,
         max_length=MAX_PICKED_MATCHES,
         description="Root key values from the run's matches; up to 5 run together.",
     )
+    value: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=256,
+        description=(
+            "With picks: the value the Ambiguous run searched for, pasted again. Never stored, "
+            "logged, audited or returned."
+        ),
+    )
+    picks: list[int] | None = Field(
+        default=None,
+        min_length=1,
+        max_length=MAX_PICKED_MATCHES,
+        description="With value: the matches' numbers as the run lists them, from 1.",
+    )
+
+    @model_validator(mode="after")
+    def _one_way(self) -> Self:
+        by_subject = self.subjects is not None and self.value is None and self.picks is None
+        by_number = self.subjects is None and self.value is not None and self.picks is not None
+        if not (by_subject or by_number):
+            raise ValueError("pick by subjects, or by value and picks: one of the two")
+        return self
 
 
 class ImportSchema(ProbeOwlModel):

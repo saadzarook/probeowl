@@ -14,10 +14,14 @@ export function useHealthyComparison(runId: string) {
 }
 
 /** Start a comparison, which replaces the run's last one; its answer starts the polling. */
-export function useStartHealthyComparison(runId: string) {
+export function useStartHealthyComparison(runId: string, failingSubject?: string) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (body: StartHealthyComparison) => startHealthyComparison(runId, body),
+    // failingSubject: this run's ID, pasted when its key is PII and stored masked (#66). PII, so
+    // closed over rather than a mutation's variables, and gone with the form.
+    gcTime: 0,
+    mutationFn: (body: StartHealthyComparison) =>
+      startHealthyComparison(runId, failingSubject ? { ...body, failing_subject: failingSubject } : body),
     onSuccess: (found) => client.setQueryData(["healthy-comparison", runId], found),
   });
 }

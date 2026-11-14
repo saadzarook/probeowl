@@ -162,10 +162,11 @@ export async function fetchStepsInRun(run: string, runbook: string): Promise<Ste
 }
 
 /** Run one step by its ID. The server has its SQL and its values, and decides whether it may run. */
-export async function runStep(run: string, runbook: string, step: string, acknowledged: boolean): Promise<StepRan> {
+export async function runStep(run: string, runbook: string, step: string, acknowledged: boolean, subject?: string): Promise<StepRan> {
+  // subject: pasted when the run's key is PII and stored masked; sent for this step only.
   const { data, error } = await api.POST("/api/runs/{run_id}/runbooks/{runbook}/steps/{step}/run", {
     params: { path: { run_id: run, runbook, step } },
-    body: { run_without_plan_check: acknowledged },
+    body: { run_without_plan_check: acknowledged, ...(subject ? { subject } : {}) },
   });
   if (data) return data;
   throw problemError(error, "The step could not be run.");
@@ -218,6 +219,16 @@ export async function pickMatches(runId: string, subjects: string[]): Promise<st
   const { data, error } = await api.POST("/api/runs/{run_id}/matches", {
     params: { path: { run_id: runId } },
     body: { subjects },
+  });
+  if (data) return data.runs.map((r) => r.id);
+  throw problemError(error, "The matches could not be inspected.");
+}
+
+/** Pick an Ambiguous run's masked matches by number: the value searched for is pasted again. */
+export async function pickMatchesByNumber(runId: string, value: string, picks: number[]): Promise<string[]> {
+  const { data, error } = await api.POST("/api/runs/{run_id}/matches", {
+    params: { path: { run_id: runId } },
+    body: { value, picks },
   });
   if (data) return data.runs.map((r) => r.id);
   throw problemError(error, "The matches could not be inspected.");
