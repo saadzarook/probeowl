@@ -14,9 +14,9 @@ folder or the store themselves, and need nothing running.
 
 | Command | What it does | Needs running |
 | --- | --- | --- |
-| `owl init` | Writes a config folder for a first application and connector, step by step | Nothing |
+| `owl init` | Writes a config folder for a first application and connector, step by step: first-run setup from a terminal | Nothing |
 | `owl connector add` | Adds a connector to an application, or bindings for the environments one lacks | Nothing |
-| `owl serve` | Serves ProbeOwl on 127.0.0.1: the web app at `/`, this guide at `/guide/`, the API under `/api` | The store (`owl store init`) |
+| `owl serve` | Serves ProbeOwl on 127.0.0.1: the web app at `/`, this guide at `/guide/`, the API under `/api` | Nothing: it creates the default store the first time |
 | `owl check <folder>` | Checks every YAML file, the references between them, and every lookup | Nothing |
 | `owl validate <entity> <value>` | Runs an entity's validate probe on one subject | `owl serve` |
 | `owl inspect <value>` | Runs an inspect probe on a subject | `owl serve` |
@@ -45,8 +45,8 @@ folder or the store themselves, and need nothing running.
 
 Asks for the application, its environments and a first connector with a binding per environment,
 then writes the folder and saves each password in your keychain. Then it offers to test the
-connections, create the store and import the schema. See [Your first
-application](first-application.md).
+connections, create the store and import the schema. The web app's first-run setup does the same
+in the browser. See [Your first application](first-application.md#for-scripts-owl-init).
 
 ## `owl connector add`
 

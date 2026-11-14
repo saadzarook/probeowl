@@ -5,8 +5,22 @@ a REST API. It has one **binding** per environment, saying where it points there
 
 ## Adding a connector
 
-`owl init` writes your first connector. For the next ones, run this in your config folder, the
-one `owl serve` was started with:
+**Add connection** on the **Connectors** screen adds a connector, or binds an existing one in
+another environment. It works in the environment chosen in the top bar.
+
+- For a **new connector**, choose its type and fill in the binding, as for [your first
+  connection](first-application.md#3-add-its-first-connection).
+- To bind an **existing connector** in an environment it isn't bound in yet, give its id. The
+  file gets the new binding, and nothing else in it changes. To change a binding it already has,
+  edit its file.
+
+**Test connection** tries it before anything is written. **Save** writes the connector's file and
+puts the password or token straight into this machine's keychain, never in a file. Then it tests
+the connection again, and for a SQL connector offers to import its tables and confirm their labels.
+The new connector is loaded at once.
+
+From a terminal, `owl connector add` does the same, in the config folder `owl serve` was started
+with:
 
 ```sh
 owl connector add --application wallet
@@ -49,6 +63,9 @@ Then save each password in your system keychain, under the name its `secret` giv
 ```sh
 uvx keyring set probeowl ledger_db.prod
 ```
+
+Or leave it to the web app: once the file is loaded, Connectors asks for each password this
+machine doesn't have yet ([A password missing on this machine](web-app/connectors.md#a-password-missing-on-this-machine)).
 
 A `secret` is a reference, never the password itself: `keyring:<service>/<name>` reads the system
 keychain, and `env:<VARIABLE>` reads an environment variable. ProbeOwl won't read a keyring that
