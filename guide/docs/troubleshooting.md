@@ -12,6 +12,12 @@ uv tool update-shell
 
 once, and open a new terminal. `uv tool dir --bin` shows the folder it adds.
 
+## `owl serve` is slow to start the first time
+
+`owl serve` prints `Starting ProbeOwl…` at once, then its version and address once it's up. The
+first start after installing can take about 20 seconds on Windows while antivirus checks the new
+files. Later starts take 3–4 seconds.
+
 ## The web app shows 422 or 404 errors on first load
 
 Fixed in ProbeOwl's first-run work: the Probe editor no longer checks an empty draft, and the

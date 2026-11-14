@@ -71,6 +71,10 @@ def main() -> int:
         ("Commands typed", len(commands), sum(map(len, commands)), None, "the guide's commands"),
         ("Install", 0, 0, install["seconds"], INSTALL[path]),
     ]
+    if (work / "settle.json").exists():
+        settle = read(work, "settle")["seconds"]
+        note = "three imports of what owl serve loads, while antivirus checks the new files"
+        rows.append(("First loads after install", 0, 0, settle, note))
     if path == "baseline":
         init = read(work, "init")
         note = f"{init['answers']} answers, {init['defaults']} by Enter; Test and import on"

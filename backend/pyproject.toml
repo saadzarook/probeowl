@@ -29,7 +29,7 @@ dependencies = [
 ]
 
 [project.scripts]
-owl = "probeowl.cli.main:main"
+owl = "probeowl.cli.start:main"
 
 [dependency-groups]
 dev = [
