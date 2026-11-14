@@ -5,8 +5,8 @@ import { isToolPath } from "../plugins";
 import { useSelection } from "../selection";
 import { ApplicationSelector } from "./ApplicationSelector";
 
-/** Top bar: application selector, environment and the current user. */
-export function TopBar() {
+/** Top bar: application selector, environment, search and the current user. */
+export function TopBar({ onSearch }: { onSearch: () => void }) {
   const { application, environment, selectEnvironment } = useSelection();
   const me = useMe();
   const choices = application?.environments ?? [];
@@ -42,6 +42,9 @@ export function TopBar() {
         </>
       )}
       <span className="topbar-spacer" />
+      <button className="btn-outline topbar-search" type="button" onClick={onSearch} aria-keyshortcuts="Control+K /">
+        Search <kbd>Ctrl K</kbd>
+      </button>
       {/* Only the real user, as runs record them; nothing while it loads or if it cannot be read. */}
       {me.data && (
         <div className="user" aria-label={`Signed in as ${me.data.name}`}>

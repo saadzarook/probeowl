@@ -1,5 +1,6 @@
 // Author: @SaadZarook
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useCatalog, useCatalogReview, useSchemas } from "../api/useCatalog";
 import { useEntities } from "../api/useEntities";
 import { EmptyState } from "../components/EmptyState";
@@ -33,7 +34,9 @@ export function TablesPage({ item }: { item: NavItem }) {
   // What a link can point to: every table imported here, on any connector.
   const targets = importedTables([...schemas.values()].flatMap((r) => (r.snapshot ? [r.snapshot] : [])));
   const [label, setLabel] = useState<string>("all");
-  const [pick, setPick] = useState<string>();
+  // ?table=<connector>.<table> from search opens that one.
+  const [params] = useSearchParams();
+  const [pick, setPick] = useState<string | undefined>(() => params.get("table") ?? undefined);
   const [importing, setImporting] = useState(false);
 
   const shown = label === "all" ? rows : rows.filter((r) => effectiveLabel(r) === label);
