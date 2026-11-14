@@ -120,8 +120,50 @@ An empty clipboard means there's no such entry.
 `no keychain entry for service 'probeowl' and user 'wallet_db.prod'` means the entry is missing,
 as when the connector's file came from a teammate. The web app asks for it where it's needed
 ([A password missing on this machine](web-app/connectors.md#a-password-missing-on-this-machine)).
-On Linux without a desktop keychain, ProbeOwl refuses a keyring that keeps secrets in files.
-Use an `env:` secret instead.
+
+## "there is no system keychain on this machine"
+
+```text
+there is no system keychain on this machine: ProbeOwl keeps passwords only in Windows Credential
+Manager, the macOS Keychain, or Secret Service or KWallet on Linux
+```
+
+ProbeOwl keeps a `keyring:` password only in your operating system's keychain, and found none
+here. This is usual on a Linux server, or in WSL, where no desktop session runs Secret Service
+or KWallet. It never falls back to a file or the registry instead. So the setup screen, **Add
+connection** and **Change password** refuse to save a password, and a `keyring:` secret can't be
+read.
+
+On such a machine, use an `env:` secret: the binding names an environment variable, and you set
+that variable in the shell that runs `owl serve`.
+
+1. In the connector's file, point the binding's `secret` at a variable. Use one variable per
+   connector and environment:
+
+    ```yaml
+    environments:
+      uat:
+        secret: env:PROBEOWL_ACCESS_DB_UAT
+    ```
+
+    This names the variable only. The password itself is never in the file.
+
+2. In the shell that will run `owl serve`, set the variable without it showing on screen or in
+   your shell's history, then start `owl serve` from that same shell:
+
+    ```sh
+    read -rs PROBEOWL_ACCESS_DB_UAT && export PROBEOWL_ACCESS_DB_UAT   # type it, then Enter
+    owl serve
+    ```
+
+    `owl serve` reads the variable when it starts. After changing it, restart `owl serve`.
+
+Never put the password in a file in the config folder, such as a `.env` file or a script that
+exports it: the folder is meant to be shared and committed, and ProbeOwl never reads passwords
+from files. Also keep it out of shell startup files (`~/.bashrc`, `~/.profile`).
+
+On a machine with a desktop, a locked or missing keychain gives this message too. Unlock it, or on
+Linux check that Secret Service is running (as `gnome-keyring` or KWallet), then try again.
 
 ## "connection refused"
 

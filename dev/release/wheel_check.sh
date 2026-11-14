@@ -5,8 +5,9 @@
 #
 #     bash dev/release/wheel_check.sh [port]      from a checkout; port defaults to 7992
 #
-# It found #248: uv resolved Typer 0.29, newer than the lock, and owl init crashed. Nothing touches
-# the system keychain: the passwords go to a keyring file in the check's own folder.
+# It found #248: uv resolved Typer 0.29, newer than the lock, and owl init crashed. owl init saves
+# to this machine's system keychain, as a user's does, but only probeowl_test_* entries, which
+# init_answers.py removes before and after. On Linux that needs Secret Service: dev/ci/keychain.sh.
 set -u
 REPO=$(cd "$(dirname "$0")/../.." && pwd)
 PORT=${1:-7992}
@@ -32,8 +33,8 @@ echo "== build"
 WHEEL=$(ls "$WORK"/dist/*.whl)
 
 echo "== uv tool install (fresh resolution)"
-# keyrings.alt only for this check's own keyring file; everything else as a user gets it.
-uv tool install --python 3.12 --with keyrings.alt "$WHEEL" >"$WORK/install.log" 2>&1 || { cat "$WORK/install.log"; fail "uv tool install"; }
+# Exactly as a user gets it.
+uv tool install --python 3.12 "$WHEEL" >"$WORK/install.log" 2>&1 || { cat "$WORK/install.log"; fail "uv tool install"; }
 TOOL="$UV_TOOL_DIR/probeowl"
 PY="$TOOL/Scripts/python.exe"; [ -x "$PY" ] || PY="$TOOL/bin/python"
 OWL="$UV_TOOL_BIN_DIR/owl"; [ -x "$OWL.exe" ] && OWL="$OWL.exe"
@@ -42,9 +43,10 @@ OWL="$UV_TOOL_BIN_DIR/owl"; [ -x "$OWL.exe" ] && OWL="$OWL.exe"
 echo "== owl --version"
 "$OWL" --version || fail "owl --version"
 
-# The check's keyring: a file under WORK, allowed only by the CI switch, read by owl init alone.
-export PYTHON_KEYRING_BACKEND=keyrings.alt.file.PlaintextKeyring PROBEOWL_ALLOW_INSECURE_KEYRING=1
-export LOCALAPPDATA="$WORK/appdata" XDG_DATA_HOME="$WORK/appdata"
+echo "== nothing installed reaches a file keyring"
+# The packaged code, as installed: no old CI switch, no keyrings.alt, no keyring default backend.
+"$PY" -I "$REPO/dev/release/keyring_scan.py" "$TOOL" || fail "the installed package can reach a file or registry keyring"
+
 for case in uat prod-uat; do
   echo "== owl init: $case"
   folder="$WORK/$case/probeowl"

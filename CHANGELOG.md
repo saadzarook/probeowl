@@ -77,6 +77,27 @@ Still a pre-release: a security review comes before 1.0.
 
 ### Security
 
+- Passwords are kept only in the operating system's keychain: Windows Credential Manager, the
+  macOS Keychain, or Secret Service or KWallet on Linux. ProbeOwl now picks that keychain itself
+  instead of taking keyring's default. That default can be a chain that falls back to a file or the
+  Windows registry when the keychain fails, or a backend named by `PYTHON_KEYRING_BACKEND` or a
+  `keyringrc.cfg`. On a machine with none of those keychains, saving a password is refused ("there
+  is no system keychain on this machine"), and a `keyring:` secret is never read from anywhere
+  else. Use an `env:` secret there. This covers Add connection, Change password, the
+  missing-password prompt, `owl init`, `owl connector add` and every run.
+- **Fixed in v0.1:** `PROBEOWL_ALLOW_INSECURE_KEYRING=1`, meant for CI only, let `owl` read and
+  write passwords in a file or registry keyring. It is removed. It only mattered if you set it, with
+  keyrings.alt installed next to ProbeOwl, which `uv tool install probeowl` doesn't do.
+- **If you set `PROBEOWL_ALLOW_INSECURE_KEYRING` with v0.1:**
+  1. Unset it.
+  2. Enter each connection's password again (Connectors, **Change password**), so it goes to the
+     keychain.
+  3. Delete what keyrings.alt wrote: the `[probeowl]` section, or the whole file if nothing else
+     uses it. It is in:
+     - `keyring_pass.cfg` (plaintext) or `crypted_pass.cfg` (encrypted), in
+       `%LOCALAPPDATA%\Python Keyring\` on Windows, or in `~/.local/share/python_keyring/`
+       (`$XDG_DATA_HOME/python_keyring/`) on Linux and macOS;
+     - on Windows, the registry key `HKEY_CURRENT_USER\Software\probeowl\Keyring`.
 - A store URL with an inline password is refused by `owl mcp`: "the store URL contains a password;
   keep it in PROBEOWL_STORE_URL, not in the assistant's config". `owl serve` and `owl store` warn
   about one. None of them shows the URL.
