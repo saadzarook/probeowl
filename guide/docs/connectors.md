@@ -68,8 +68,9 @@ Or leave it to the web app: once the file is loaded, Connectors asks for each pa
 machine doesn't have yet ([A password missing on this machine](web-app/connectors.md#a-password-missing-on-this-machine)).
 
 A `secret` is a reference, never the password itself: `keyring:<service>/<name>` reads the system
-keychain, and `env:<VARIABLE>` reads an environment variable. ProbeOwl won't read a keyring that
-keeps secrets in files rather than in your operating system's keychain.
+keychain, and `env:<VARIABLE>` reads an environment variable. ProbeOwl keeps passwords only in your
+operating system's keychain, never in a file or the registry. On a machine without one, such as a
+Linux server, use `env:` ([No system keychain](troubleshooting.md#there-is-no-system-keychain-on-this-machine)).
 
 Then load it into `owl serve`: **Reload configuration** on the **Connectors** screen, or
 `owl reload`. Check the connector there with **Test connection**. `owl check <folder>` checks the files without starting anything.
