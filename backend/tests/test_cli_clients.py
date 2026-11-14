@@ -55,3 +55,21 @@ def test_the_root_help_says_which_commands_are_clients_of_owl_serve() -> None:
     result = CliRunner().invoke(cli.app, ["--help"])
     assert "validate, inspect, catalog, kill and reload" in _plain(result.output)
     assert "start owl serve --config <folder> first" in _plain(result.output)
+
+
+@pytest.mark.parametrize(
+    ("command", "says"),
+    [
+        (
+            [],
+            "New here? Run owl serve and open the browser; it walks you through setup. "
+            "owl init does the same in the terminal, for scripts.",
+        ),
+        (["serve"], "New here? Open the address it prints in the browser"),
+        (["init"], "In the terminal, for scripts"),
+    ],
+)
+def test_the_help_sends_a_newcomer_to_the_browser_first(command: list[str], says: str) -> None:
+    result = CliRunner().invoke(cli.app, [*command, "--help"])
+    assert result.exit_code == 0
+    assert says in _plain(result.output)

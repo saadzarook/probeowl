@@ -73,7 +73,8 @@ app = typer.Typer(
         "owl serve --config <folder> first. "
         "They reach it at $PROBEOWL_SERVER, else http://127.0.0.1:7878 (--server to change). "
         "check, store and connector add read the folder and the store themselves. "
-        "New here? owl init writes a first application and connector, step by step."
+        "New here? Run owl serve and open the browser; it walks you through setup. "
+        "owl init does the same in the terminal, for scripts."
     )
 )
 store_app = typer.Typer(help="Create and inspect ProbeOwl's own store.")
@@ -163,7 +164,10 @@ def serve(
         ),
     ] = False,
 ) -> None:
-    """Serve ProbeOwl on 127.0.0.1: the web app at /, its API under /api."""
+    """Serve ProbeOwl on 127.0.0.1: the web app at /, its API under /api.
+
+    New here? Open the address it prints in the browser; it walks you through setup.
+    """
     configure_server_log(log_file or default_log_file())
     show_raw_driver_errors(debug_driver_errors)
     if debug_driver_errors:
@@ -308,7 +312,9 @@ def check(
 
 @app.command()
 def init(url: StoreUrl = None) -> None:
-    """Write a config folder for a first application and connector, step by step.
+    """In the terminal, for scripts: a first application and connector, step by step.
+
+    owl serve and the browser do the same setup.
 
     Passwords go to the system keychain, never to a file. It creates the store first, so the
     setup is audited; then it offers to test the connections and import the connector's schema.
