@@ -2312,7 +2312,14 @@ paths:
         connection, never the server''s own text. Reads no data. 403 if a kill switch
         covers the
 
-        application, or the connector if it exists.'
+        application, or the connector if it exists. With a password given, at most
+        5 attempts per
+
+        connector and environment in any minute: then 429 too-many-attempts, "too
+        many attempts,
+
+        wait a minute", with Retry-After, and nothing is tried (#61). The refusal
+        is audited.'
       operationId: test_draft_connection
       parameters:
       - name: application
@@ -2364,6 +2371,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/Problem'
           description: Unprocessable Entity
+        '429':
+          headers:
+            Retry-After:
+              description: Seconds until this binding may be tried again.
+              schema:
+                type: integer
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Too Many Requests
       security:
       - ProbeOwlRequest: []
   /api/applications/{application}/connectors/{connector}/environments/{environment}/secret:

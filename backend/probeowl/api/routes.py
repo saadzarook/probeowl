@@ -41,7 +41,13 @@ from probeowl.checks.saving import ProbeWrites
 from probeowl.checks.service import check_draft, runnable
 from probeowl.checks.time_offsets import ColumnTypes, imported_types
 from probeowl.connector_status import ConnectorStatuses
-from probeowl.errors import NotFoundError, RequestError, unknown_application
+from probeowl.errors import (
+    TOO_MANY_ATTEMPTS,
+    NotFoundError,
+    RequestError,
+    TooManyAttempts,
+    unknown_application,
+)
 from probeowl.model import Catalog, Entity, Run, RunStatus
 from probeowl.model.check import LoadedApplication
 from probeowl.model.common import Name, humanized
@@ -745,7 +751,18 @@ def save_connector(
 @router.post(
     "/applications/{application}/connectors/test-draft",
     tags=["setup"],
-    responses=_problems(403, 404, 422),
+    responses={
+        **_problems(403, 404, 422),
+        429: {
+            **_PROBLEM,
+            "headers": {
+                "Retry-After": {
+                    "description": "Seconds until this binding may be tried again.",
+                    "schema": {"type": "integer"},
+                }
+            },
+        },
+    },
 )
 def test_draft_connection(application: str, body: DraftConnection, http: Request) -> ConnectionTest:
     """Connect once to a binding that is not saved yet, and say how it went. Audited.
@@ -753,9 +770,24 @@ def test_draft_connection(application: str, body: DraftConnection, http: Request
     With the password given, used for this one connection and never stored, logged or
     returned; or with the one this machine's keychain has. The same fixed reasons as Test
     connection, never the server's own text. Reads no data. 403 if a kill switch covers the
-    application, or the connector if it exists.
+    application, or the connector if it exists. With a password given, at most 5 attempts per
+    connector and environment in any minute: then 429 too-many-attempts, "too many attempts,
+    wait a minute", with Retry-After, and nothing is tried (#61). The refusal is audited.
     """
-    result = _setup(http).test_draft(application, body)
+    try:
+        result = _setup(http).test_draft(application, body)
+    except TooManyAttempts:
+        _runs(http).audit(
+            "connection_test_refused",
+            {
+                "application": application,
+                "connector": body.connector,
+                "environment": body.environment,
+                "reason": TOO_MANY_ATTEMPTS,
+                "draft": True,
+            },
+        )
+        raise
     _runs(http).audit(
         "connection_tested",
         {

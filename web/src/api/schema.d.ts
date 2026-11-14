@@ -748,7 +748,9 @@ export interface paths {
          *     With the password given, used for this one connection and never stored, logged or
          *     returned; or with the one this machine's keychain has. The same fixed reasons as Test
          *     connection, never the server's own text. Reads no data. 403 if a kill switch covers the
-         *     application, or the connector if it exists.
+         *     application, or the connector if it exists. With a password given, at most 5 attempts per
+         *     connector and environment in any minute: then 429 too-many-attempts, "too many attempts,
+         *     wait a minute", with Retry-After, and nothing is tried (#61). The refusal is audited.
          */
         post: operations["test_draft_connection"];
         delete?: never;
@@ -5998,6 +6000,17 @@ export interface operations {
             /** @description Unprocessable Entity */
             422: {
                 headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Seconds until this binding may be tried again. */
+                    "Retry-After"?: number;
                     [name: string]: unknown;
                 };
                 content: {

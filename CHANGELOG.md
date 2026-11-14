@@ -33,6 +33,11 @@ See docs/implementation-plan.md, Releases. -->
 
 ### Security
 
+- Testing a connection with a typed password is limited to 5 attempts per connector and
+  environment in any minute. This covers Add connection and Change password, so repeated wrong
+  passwords can't lock the database account; Oracle's default profile locks one after 10 failed
+  logins. The sixth answers "too many attempts, wait a minute", with `Retry-After`, tries
+  nothing, and is recorded in the audit. Testing with the saved password isn't limited.
 - **Fixed in v0.1:** an entity whose key is PII (`pii: true` on its root key, such as a national
   ID, phone number or email) had its runs' subject stored and shown unmasked. Now it shows as
   `[masked]` in the store, the runs list, the API, the audit and the CLI.
