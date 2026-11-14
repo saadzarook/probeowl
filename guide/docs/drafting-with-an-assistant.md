@@ -37,6 +37,13 @@ Server** from the command palette:
 claude mcp add probeowl -- owl mcp --config ./probeowl
 ```
 
+**The store.** `owl mcp` records every tool call in the audit, in ProbeOwl's store, so it uses the
+same store as `owl serve`: by default `~/.probeowl/store.db`, or `$PROBEOWL_STORE_URL` for a team
+store on a server. Set that variable in your environment, or keep the default. Never put a
+password in `--url` in the assistant's config, such as `claude mcp add`: those files are plain text,
+and `owl mcp` refuses a store URL with a password in it. Keep a server store's URL, with its
+password, in `$PROBEOWL_STORE_URL`, set in the environment the assistant's app starts from.
+
 Restart the app after adding it. Its list of tools should show `drafting_guide`, `template`,
 `examples`, `check_draft`, `list_config` and `schema`.
 

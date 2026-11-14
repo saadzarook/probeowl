@@ -423,3 +423,45 @@ def test_an_application_with_only_production_is_refused_plan_checks(
     )
     ok = without.call("check_draft", kind="probe", text=PROBE_DRAFT, application="card_access")
     assert ok.structured_content["ok"] is True
+
+
+# --- The store URL never carries a password into an assistant's config ------------------------
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "postgresql+psycopg://probeowl:store-pw-31c9@store.example/probeowl",
+        "mssql+mssqlpython://probeowl:store-pw-31c9@store.example:1433/probeowl",
+        "mariadb+pymysql://probeowl@store.example/probeowl?password=store-pw-31c9",
+    ],
+)
+def test_owl_mcp_refuses_a_store_url_with_a_password_and_never_echoes_it(
+    url: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from typer.testing import CliRunner
+
+    from probeowl.cli import main as cli
+    from probeowl.cli.mcp import INLINE_PASSWORD
+
+    def never(self: Any) -> None:
+        raise AssertionError("owl mcp started with a password in its store URL")
+
+    monkeypatch.setattr(mcp_server.MCPServer, "run_stdio_async", never)
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    monkeypatch.setenv("HOME", str(tmp_path))
+    result = CliRunner().invoke(cli.app, ["mcp", "--config", str(EXAMPLES), "--url", url])
+    assert result.exit_code != 0
+    out = result.output + str(result.exception or "")
+    assert INLINE_PASSWORD in out
+    assert "store-pw-31c9" not in out and "store.example" not in out
+
+
+@pytest.mark.parametrize(
+    "url",
+    ["postgresql+psycopg://probeowl@store.example/probeowl", "sqlite:///C:/store/store.db"],
+)
+def test_a_store_url_without_a_password_is_accepted(url: str) -> None:
+    from probeowl.cli.mcp import has_password
+
+    assert has_password(url) is False
