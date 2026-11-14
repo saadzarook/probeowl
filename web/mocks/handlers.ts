@@ -7,6 +7,7 @@ import type { CompareRequest } from "../../plugins/compare_files/web/types";
 import { compareFilesManifest, compareFilesResult } from "./fixtures/compareFiles";
 import type { HealthyAttempt, HealthyComparison, Run, RunbookView, StepInRun } from "../src/api/client";
 import { CONFIGURATION_HEADER } from "../src/api/configuration";
+import { mockSearch, type Searchable } from "./search";
 import { detectIdentifier } from "../src/identifiers";
 import {
   ambiguousEmailRun,
@@ -842,6 +843,42 @@ export const handlers = [
   }),
 
   // Wallet in UAT has two pages of runs; every other application and environment has none.
+  // Global search over the mocks' configuration and runs, by the backend's rules.
+  http.get("/api/search", ({ request }) => {
+    const query = new URL(request.url).searchParams;
+    const q = (query.get("q") ?? "").trim();
+    const limit = Number(query.get("limit") ?? "8");
+    const application = query.get("application");
+    if (q.length < 1 || q.length > 128) return problem(422, "Unprocessable Content", "give 1 to 128 characters to search for", [{ field: "q", message: "1 to 128 characters" }]);
+    if (!Number.isInteger(limit) || limit < 1 || limit > 20) return problem(422, "Unprocessable Content", "limit is 1 to 20", [{ field: "limit", message: "1 to 20" }]);
+    const shown = [...applications, ...createdApplications];
+    if (application !== null && !shown.some((a) => a.name === application)) return problem(404, "Not Found", `no application named ${application}`);
+    const scope = shown.filter((a) => application === null || a.name === application);
+    const items: Searchable[] = scope.flatMap((app): Searchable[] => {
+      const probes = app.name === "wallet" ? walletProbes : app.name === "card_access" ? cardAccessProbes : [];
+      const connectors = app.name === "wallet" ? walletConnectors("uat", false) : app.name === "card_access" ? cardAccessConnectors("uat", false) : [];
+      const environments = app.environments.map((e) => e.name).join(", ");
+      return [
+        { kind: "application", application: null, id: app.name, title: app.title, detail: app.owner },
+        ...entitiesOf(app.name).flatMap((entity): Searchable[] => [
+          { kind: "entity", application: app.name, id: entity.entity, title: entity.title || entity.entity, detail: entity.root_key },
+          ...Object.entries(entity.locations).map(([name, location]): Searchable => ({
+            kind: "location", application: app.name, id: `${entity.entity}.${name}`, title: location.title || name, detail: `${entity.entity} · ${location.using}`,
+          })),
+        ]),
+        ...probes.map((probe): Searchable => ({
+          kind: "probe", application: app.name, id: probe.name, title: probe.title || probe.name, detail: `${probe.kind === "inspect" ? "Inspect" : "Validate"} · ${probe.entity}`,
+        })),
+        ...connectors.map((c): Searchable => ({ kind: "connector", application: app.name, id: c.connector, title: c.connector, detail: `${c.type} · ${environments}` })),
+        ...(app.name === "wallet"
+          ? [{ kind: "runbook" as const, application: app.name, id: topUpNotCredited.runbook, title: topUpNotCredited.title, detail: topUpNotCredited.applies_to.entity, also: ["ledger missing"] }]
+          : []),
+      ];
+    });
+    const runs = walletRunPages.flat().filter((run) => scope.some((a) => a.name === run.application));
+    return json(mockSearch(q, limit, items, runs));
+  }),
+
   http.get("/api/runs", ({ request }) => {
     const query = new URL(request.url).searchParams;
     const wallet = query.get("application") === "wallet" && query.get("environment") === "uat";
