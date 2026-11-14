@@ -104,8 +104,8 @@ def read_masked(
     """A reviewed read step run as a person runs it: its rows masked by the catalog's PII."""
     run = Run.model_validate(run_data(application=APPLICATION, environment=ENV))
     with run_service(app, adapter, folder) as runs:
-        entity = app.entities[run.entity]
-        return RunbookSteps(runs, None)._read(run, app, entity, read_step(sql), parameters, [])
+        # No entity here, so no PII identifier: the catalog's PII columns mask the rows.
+        return RunbookSteps(runs, None)._read(run, app, set(), read_step(sql), parameters, [])
 
 
 def review(app: LoadedApplication, adapter: SqlAdapter, table: str) -> TableReview:

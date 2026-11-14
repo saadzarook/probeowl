@@ -147,7 +147,12 @@ def test_no_route_can_execute_a_runbook_step(app: FastAPI) -> None:
         ("/api/runs/{run_id}/runbooks/{runbook}/steps/{step}/tick", "post"),
     ]
     assert "requestBody" not in app.openapi()["paths"]["/api/config/reload"]["post"]
-    assert set(app.openapi()["components"]["schemas"]["PickMatches"]["properties"]) == {"subjects"}
+    # By subject, or by number with the value searched for pasted again when the key is PII (#66).
+    assert set(app.openapi()["components"]["schemas"]["PickMatches"]["properties"]) == {
+        "subjects",
+        "value",
+        "picks",
+    }
     assert set(app.openapi()["components"]["schemas"]["StartRun"]["properties"]) == {
         "application",
         "environment",

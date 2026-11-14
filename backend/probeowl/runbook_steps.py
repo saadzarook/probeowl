@@ -335,7 +335,7 @@ class RunbookSteps:
         self._runs.kill.check(run.application, chosen.using)
         parameters = _bound_parameters(chosen, run, entity)
         warnings, skipped = self._check_plan(run, app, chosen, without_plan_check)
-        result = self._read(run, app, entity, chosen, parameters, warnings)
+        result = self._read(run, app, pii_fields(entity), chosen, parameters, warnings)
         with self._runs.store.begin() as conn:
             save_step(conn, self._runs.workspace, run.id, runbook_name, step, result=result)
             self._runs.record(
@@ -390,7 +390,7 @@ class RunbookSteps:
         self,
         run: Run,
         app: LoadedApplication,
-        entity: Entity,
+        hidden: set[str],
         chosen: ReadQueryStep,
         parameters: dict[str, ParameterValue],
         warnings: list[str],
@@ -407,8 +407,7 @@ class RunbookSteps:
             return StepResult(
                 outcome=Outcome.ERROR, reason=str(err), warnings=warnings, actor=actor, at=now
             )
-        # The catalog's PII columns, and every PII identifier: a pasted key is never stored.
-        hidden = pii_fields(entity)
+        # The catalog's PII columns, and every PII identifier (hidden): a pasted key is never kept.
         rows = mask_rows(read.rows, {*_catalog_pii(app, chosen), *hidden})
         evidence = Evidence(
             connector=chosen.using,
