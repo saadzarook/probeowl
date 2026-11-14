@@ -400,6 +400,13 @@ def test_each_pasted_lookup_writes_its_own_audit_event_with_the_subject_masked(
     assert api.post(step_url(run_id, PROBE), json={"subject": TOPUP}).status_code == 200
     started = api.post(f"/api/runs/{run_id}/healthy-comparison", json={"failing_subject": TOPUP})
     assert started.status_code in (200, 202), started.text
+    # Read once the comparison has ended, so its finished event is always there to leave out.
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        attempt = api.get(f"/api/runs/{run_id}/healthy-comparison").json()["attempt"]
+        if attempt["status"] != "running":
+            break
+        time.sleep(0.05)
     with setup.store.connect() as conn:
         events = list_events(conn, LOCAL_WORKSPACE, run_id)
     # The run's own run_finished shows its subject [masked] too; these are the pasted lookups'.
