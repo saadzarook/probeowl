@@ -14,8 +14,11 @@ after it. `owl serve` prints its version on its first line as it starts, which s
 worked. If a new terminal says `owl` isn't found, run `uv tool update-shell` again and open another
 one.
 
-Then [Your first application](first-application.md) sets it up for one of your own systems. To
-see what it does first, try the examples.
+Then [Your first application](first-application.md) sets it up for one of your own systems, in
+the browser. To see what it does first, try the examples.
+
+With an AI assistant, such as Claude or GitHub Copilot, it can draft entities and probes for you
+to check and paste in: see [Draft with an AI assistant](drafting-with-an-assistant.md).
 
 ## The examples
 

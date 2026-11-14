@@ -1,123 +1,82 @@
 # Your first application
 
 This page sets ProbeOwl up for one of your own systems: an application, its environments and a
-first connector, then an entity and a probe. It assumes ProbeOwl is installed, as in
-[Getting started](getting-started.md#install).
+first connection, then an entity and a probe. It's all done in the browser. It assumes ProbeOwl is
+installed, as in [Getting started](getting-started.md#install). To do the setup from a terminal
+instead, see [For scripts](#for-scripts-owl-init).
 
-## 1. Run `owl init`
+## 1. Start `owl serve`
 
-```sh
-owl init
-```
-
-`owl init` asks its questions first, and writes nothing until you have answered all of them. If
-you stop part-way, nothing is left behind.
-
-```text
-This writes a config folder and saves passwords in your system keychain, never in a file.
-Config folder [./probeowl]:
-Application id, such as wallet or card_access: wallet
-Application title [Wallet]:
-Owning team: payments-team
-Environments, comma-separated [prod,uat]:
-  Which one is Production? (none if none is) [prod]:
-  Title for prod [Production]:
-  Title for uat [UAT]:
-
-First connector
-Type (sqlserver, oracle, mariadb, rest) [sqlserver]:
-Connector id [wallet_sqlserver]: wallet_db
-  Binding for prod (Production)
-    Host [127.0.0.1]: wallet-replica.internal
-    Port [1433]:
-    Database [wallet]:
-    Read-only login: probeowl_ro
-    Password (hidden; saved to the keychain as probeowl/wallet_db.prod):
-    Is this a read replica, readable secondary or Active Data Guard standby? [y/N]: y
-    Trust the server certificate without checking it? [y/N]:
-  Binding for uat (UAT)
-    ...
-```
-
-What to know about the questions:
-
-- **Ids** (`wallet`, `wallet_db`) use a-z, 0-9 and `_`. They become file names and appear in
-  lookups, so `owl init` asks again for anything else. The application id has no default: choose
-  the product area's own name. An application spans its environments, so an id with an
-  environment's word in it, such as `access_uat_test`, is offered again without it (`access`). The connector id suggested is the application and the database
-  type, such as `wallet_sqlserver`; naming it after the system, such as `wallet_db`, reads better.
-- **Production must be a replica.** ProbeOwl reads Production only from a read replica, readable
-  secondary or Active Data Guard standby, never from the primary. If you answer no, `owl init`
-  stops and writes nothing: ask your DBA for one, then run it again.
-- **The login is read-only.** The [Connectors](connectors.md) page lists what it needs on each
-  database.
-- **Passwords** go into your system keychain, as `probeowl/<connector>.<environment>`. The files
-  refer to them, and never contain them. On a machine whose only keyring keeps secrets in files,
-  `owl init` refuses before the first question.
-- **TLS:** MariaDB and Oracle connections are encrypted unless you say no and give a reason. SQL
-  Server connections are always encrypted. Trusting a certificate without checking it needs a
-  reason too.
-- **Later environments** offer the earlier one's answers as defaults. Enter at the password
-  prompt reuses the earlier password.
-
-Then it asks about the store, before it writes anything: **Create the store**, ProbeOwl's own
-database for runs and audit, at `~/.probeowl/store.db`, or `$PROBEOWL_STORE_URL`. With it, the
-setup itself is recorded in the audit: if that can't be recorded, nothing is written and no
-password is kept. Every setup is recorded, so answering no stops here, with nothing written.
-
-Then it offers two things:
-
-1. **Test the connections**, binding by binding: `prod: reached in 42 ms`, or why not. A
-   binding that isn't reached doesn't stop the setup. Fix it in its file and test it again from
-   the Connectors screen.
-2. **Import the connector's schema** in your first non-Production environment. It reads
-   tables, columns and indexes, never data, so the Tables screen can list them with a suggested
-   label for each. If you skip it, or it fails, the next steps say how to import later: **Import
-   from replica** on the Tables screen, or `owl catalog import` while `owl serve` runs.
-
-It writes two files:
-
-```text
-probeowl/wallet/application.yaml
-probeowl/wallet/connectors/wallet_db.yaml
-```
-
-```yaml
-# probeowl/wallet/connectors/wallet_db.yaml
-connector: wallet_db
-type: sqlserver
-owner: payments-team
-guards:
-  row_ceiling: 1000
-environments:
-  prod:
-    host: wallet-replica.internal
-    port: 1433
-    database: wallet
-    user: probeowl_ro
-    secret: keyring:probeowl/wallet_db.prod
-    replica: true
-  uat:
-    ...
-```
-
-## 2. Start `owl serve`
+In a new, empty folder:
 
 ```sh
-owl serve --config probeowl
+owl serve
 ```
 
-Open <http://127.0.0.1:7878>: `owl serve` serves the web app itself. The application is in the top
-bar, with its environments.
+It prints `Starting ProbeOwl…` at once, then its version and address once it's up. Open
+<http://127.0.0.1:7878>. The first start after installing can take about 20 seconds on Windows.
 
-## 3. Confirm the table labels
+With no `--config`, `owl serve` keeps your applications in `./probeowl`, or `~/probeowl` when it's
+started from a system or program folder, and says which. It creates its store the first time, at
+`~/.probeowl/store.db`, so every setup step is recorded in the audit. Set `$PROBEOWL_STORE_URL` for a
+store on a server.
 
-Open **Tables**. Each table the import found has a suggested label, such as Transaction, Master,
-Log or Audit, and the columns that matter: keys, time, status, links and personal data. Confirm
-or correct each one. ProbeOwl writes your answers to `catalog.yaml` in the application's folder.
-The labels set defaults, and personal-data columns are masked everywhere.
+## 2. Set up the application
 
-## 4. Write an entity
+With no applications yet, the web app opens **Set up ProbeOwl**.
+
+1. **What do you want to check?** Give the application a **name**, such as *Wallet*, and its
+   **owning team**, such as `payments-team`. The id, `wallet`, comes from the name; it names the application's folder
+   and appears in every URL. **Change the id** if you want another. An application spans its
+   environments, so leave the environment out of its name.
+2. **Environments:** tick the copies of it that probes can read: Dev, UAT, Staging and Production.
+   Each gets its own connection. As you choose, the page shows the `application.yaml` it will
+   write, as a diff. Nothing is written until **Create**, which writes exactly that file.
+
+## 3. Add its first connection
+
+After Create, **Add its first connection** opens **Add connection** in your first environment that
+isn't Production. The top bar's environment is the one you're binding: change it there for
+another.
+
+- **Type:** SQL Server, Oracle, MariaDB or REST API.
+- **Paste a connection string** (optional): JDBC, ODBC or a URL fills the fields below. It's read
+  in the browser and never sent or stored, and a password in it moves to the password field.
+- **Connector id:** suggested from the application and the type, such as `wallet_sqlserver`.
+  Naming it after the system, such as `wallet_db`, reads better. Ids use a-z, 0-9 and `_`.
+- **Host, port, database** (Oracle: the service name, and optionally a schema), the **read-only
+  login** and its **password**. The [Connectors](connectors.md#what-the-login-needs) page lists
+  what the login needs on each database.
+- **Production must be a replica.** In Production, tick that it's a read replica, readable
+  secondary or Active Data Guard standby. ProbeOwl never reads Production from the primary, and
+  won't save the binding until it's ticked.
+- **TLS:** **Verify the certificate** by default. **Trust this server's certificate**, or **No
+  TLS** for MariaDB and Oracle, needs a reason, written beside the binding.
+
+**Test connection** connects once with what you typed and says how long it took, or why it
+failed. **Preview** shows the connector's file as a diff. **Save** writes that file, then puts the
+password straight into this machine's keychain, as `probeowl/<connector>.<environment>`. No file or
+log has it. If the keychain already holds a password under that name, it asks before overwriting
+it. Then it tests the connection again, with the saved password.
+
+## 4. Import its tables and confirm their labels
+
+Once the connection works, **Import wallet_db's tables** reads its tables, columns and indexes, never data,
+and suggests a label for each: Transaction, Master, Log, Audit and so on, with the columns that
+matter (keys, time, status, links and personal data).
+
+**Confirm all *n* as suggested** writes them to the application's `catalog.yaml`. To check or
+correct them one by one, **Review them on Tables** instead. The labels set defaults, and
+personal-data columns are masked everywhere.
+
+Commit what setup wrote to git: `application.yaml`, the connector's file and `catalog.yaml`.
+Passwords are never in them.
+
+For more environments or systems, use **Add connection** on Connectors. Give an existing
+connector's id to bind it in an environment it isn't bound in yet. See [Adding a
+connector](connectors.md#adding-a-connector).
+
+## 5. Write an entity
 
 An entity says what a subject is and where its data lives. The quickest way is **New entity…** in
 the **Probe editor**: pick the root table from the imported schema and follow its keys to other
@@ -147,7 +106,7 @@ locations:
 Every lookup is a single `SELECT`, with its keys as `:parameters`, never pasted into the text.
 [Writing probes](writing-probes.md) adds more locations and the key graph that links them.
 
-## 5. Write a probe, and run it
+## 6. Write a probe, and run it
 
 Open the **Probe editor**, choose the entity, and start a new probe:
 
@@ -169,3 +128,29 @@ Check the whole folder at any time:
 ```sh
 owl check probeowl
 ```
+
+## For scripts: `owl init`
+
+`owl init` does steps 2 to 4 from a terminal: the application, its environments, and a first
+connector with a binding per environment. It asks all its questions first and writes nothing until
+you have answered them, so stopping part-way leaves nothing behind.
+
+```sh
+owl init
+owl serve --config probeowl
+```
+
+- It keeps the same rules as the browser. Production must be a replica, or it stops and writes
+  nothing. Each password goes to your system keychain, never to a file. Trusting a certificate,
+  or turning TLS off, needs a reason.
+- It asks to create the store before writing anything: the setup is recorded in the audit, so
+  without a store nothing is written. On a machine whose only keyring keeps secrets in files, it
+  refuses before the first question.
+- Then it offers to test each binding and to import the schema in your first non-Production
+  environment. If you skip the import, use **Import from replica** on Tables, or `owl catalog
+  import` while `owl serve` runs.
+
+It writes `probeowl/<application>/application.yaml` and
+`probeowl/<application>/connectors/<connector>.yaml`. Then start `owl serve --config probeowl`,
+confirm the labels on **Tables**, and carry on from [step 5](#5-write-an-entity). The [CLI
+reference](cli.md#owl-init) has the details.

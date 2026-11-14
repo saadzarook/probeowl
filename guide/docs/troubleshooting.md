@@ -101,9 +101,12 @@ Set `PROBEOWL_STORE_URL` for a server database. A store on a network share is re
 authentication failed; check the binding's login and secret
 ```
 
-The login or its password is wrong. Check the binding's `user`, and that its `secret` names an
-entry that exists. Copy it to the clipboard rather than printing it, so it never lands in your
-terminal's scrollback:
+The login or its password is wrong. Check the binding's `user`. If the password changed, use
+**Change password** on the **Connectors** screen: it tests the new one before replacing the saved
+one ([Change password](web-app/connectors.md#change-password)).
+
+From a terminal, check that the binding's `secret` names an entry that exists. Copy it to the
+clipboard rather than printing it, so it never lands in your terminal's scrollback:
 
 ```sh
 uvx keyring get probeowl wallet_db.prod | Set-Clipboard              # Windows PowerShell
@@ -114,7 +117,9 @@ uvx keyring set probeowl wallet_db.prod                              # to save i
 
 An empty clipboard means there's no such entry.
 
-`no keychain entry for service 'probeowl' and user 'wallet_db.prod'` means the entry is missing.
+`no keychain entry for service 'probeowl' and user 'wallet_db.prod'` means the entry is missing,
+as when the connector's file came from a teammate. The web app asks for it where it's needed
+([A password missing on this machine](web-app/connectors.md#a-password-missing-on-this-machine)).
 On Linux without a desktop keychain, ProbeOwl refuses a keyring that keeps secrets in files.
 Use an `env:` secret instead.
 

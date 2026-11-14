@@ -21,8 +21,8 @@ There are two ways to look:
 
 - **[Getting started](getting-started.md)**: run the examples, with their planted problems,
   in one command.
-- **[Your first application](first-application.md)**: `owl init`, then your own connector,
-  entity and probe.
+- **[Your first application](first-application.md)**: set up in the browser: your application,
+  its first connection, then an entity and a probe.
 - **[Concepts](concepts.md)**: applications, connectors, entities, locations, probes and
   outcomes, on one worked example.
 - **[Safety](safety.md)**: every refusal, what it protects, and what to do.
