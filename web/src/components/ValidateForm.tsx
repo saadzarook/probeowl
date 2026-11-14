@@ -1,6 +1,7 @@
 // Author: @SaadZarook
 import { useMutation } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
+import { useSearchParams } from "react-router-dom";
 import { PasswordMissingError, splitError, startRun, type Reason } from "../api/client";
 import { useEntities } from "../api/useEntities";
 import { useProbes } from "../api/useProbes";
@@ -24,7 +25,9 @@ export function ValidateForm({ onStarted }: ValidateFormProps) {
   const [probeChoice, setProbeChoice] = useState<string>();
   const probe = validateProbes.find((p) => p.name === probeChoice)?.name ?? validateProbes[0]?.name;
 
-  const [value, setValue] = useState("");
+  // ?value= from search fills the field; nothing runs until the person presses the button.
+  const [params] = useSearchParams();
+  const [value, setValue] = useState(() => params.get("value") ?? "");
   // "" lets the server place the value: by pattern, or by trying each identifier in turn.
   const [chosen, setChosen] = useState("");
   const identifiers = Object.keys(entities.data?.find((e) => e.entity === entity)?.identifiers ?? {});

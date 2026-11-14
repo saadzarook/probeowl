@@ -502,3 +502,69 @@ input.mono { font-family: var(--font-mono); }
   margin: 8px 0;
   max-width: 420px;
 }
+
+/* Global search, the command palette (#38). */
+.palette-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgb(20 23 28 / 40%);
+}
+.palette {
+  position: fixed;
+  top: 12vh;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(640px, calc(100vw - 32px));
+  max-height: 72vh;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgb(20 23 28 / 20%);
+}
+.palette-input {
+  font-size: 1rem;
+  padding: 8px 10px;
+}
+.palette-scope {
+  font-size: 0.875rem;
+}
+.palette-list {
+  overflow-y: auto;
+}
+.palette-group {
+  margin: 8px 0 2px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+}
+.palette-option {
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.palette-option[aria-selected="true"] {
+  background: var(--color-surface);
+  outline: 2px solid var(--color-action-blue);
+}
+.palette-option .chip {
+  margin-left: 6px;
+}
+.topbar-search kbd {
+  margin-left: 6px;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+.switch-notice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}

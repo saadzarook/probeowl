@@ -1,6 +1,6 @@
 // Author: @SaadZarook
 import { useState } from "react";
-import { Link as RouterLink } from "react-router-dom";
+import { Link as RouterLink, useSearchParams } from "react-router-dom";
 import type { KillTarget } from "../api/client";
 import { useConnectors } from "../api/useConnectors";
 import { useKillSwitches } from "../api/useKillSwitches";
@@ -22,7 +22,9 @@ const GLOBAL: KillTarget = { scope: "global" };
 export function ConnectorsPage({ item }: { item: NavItem }) {
   const { application, environment, selectEnvironment } = useSelection();
   const connectors = useConnectors(application?.name, environment?.name);
-  const [pick, setPick] = useState<string>();
+  // ?connector= from search opens that one.
+  const [params] = useSearchParams();
+  const [pick, setPick] = useState<string | undefined>(() => params.get("connector") ?? undefined);
   const switches = useKillSwitches();
   const [changing, setChanging] = useState<{ target: KillTarget; on: boolean }>();
   const reload = useReloadConfiguration();
