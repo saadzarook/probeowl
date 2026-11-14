@@ -90,6 +90,23 @@ export function splitError(error: Error | null | undefined, field: string): { fi
   return { rest: error.message };
 }
 
+/** A run needs a password this machine's keychain doesn't have: ask for it, then run again. */
+export class PasswordMissingError extends Error {
+  constructor(
+    message: string,
+    readonly connector: string,
+    readonly environment: string,
+  ) {
+    super(message);
+  }
+}
+
+/** The PasswordMissingError a 422 password-missing problem means, or undefined for any other. */
+function passwordMissing(problem: components["schemas"]["Problem"] | undefined): PasswordMissingError | undefined {
+  if (problem?.type !== "urn:probeowl:problem:password-missing" || !problem.connector || !problem.environment) return undefined;
+  return new PasswordMissingError(problem.detail ?? "This connection needs your password.", problem.connector, problem.environment);
+}
+
 /** List the applications, each with its environments. */
 export async function fetchApplications(): Promise<ApplicationSummary[]> {
   const { data, error } = await api.GET("/api/applications");
@@ -101,7 +118,7 @@ export async function fetchApplications(): Promise<ApplicationSummary[]> {
 export async function startRun(body: StartRun): Promise<string> {
   const { data, error } = await api.POST("/api/runs", { body });
   if (data) return data.id;
-  throw problemError(error, "The run could not be started.");
+  throw passwordMissing(error) ?? problemError(error, "The run could not be started.");
 }
 
 export type RunbookView = components["schemas"]["RunbookView"];
@@ -145,10 +162,11 @@ export async function fetchStepsInRun(run: string, runbook: string): Promise<Ste
 }
 
 /** Run one step by its ID. The server has its SQL and its values, and decides whether it may run. */
-export async function runStep(run: string, runbook: string, step: string, acknowledged: boolean): Promise<StepRan> {
+export async function runStep(run: string, runbook: string, step: string, acknowledged: boolean, subject?: string): Promise<StepRan> {
+  // subject: pasted when the run's key is PII and stored masked; sent for this step only.
   const { data, error } = await api.POST("/api/runs/{run_id}/runbooks/{runbook}/steps/{step}/run", {
     params: { path: { run_id: run, runbook, step } },
-    body: { run_without_plan_check: acknowledged },
+    body: { run_without_plan_check: acknowledged, ...(subject ? { subject } : {}) },
   });
   if (data) return data;
   throw problemError(error, "The step could not be run.");
@@ -204,6 +222,28 @@ export async function pickMatches(runId: string, subjects: string[]): Promise<st
   });
   if (data) return data.runs.map((r) => r.id);
   throw problemError(error, "The matches could not be inspected.");
+}
+
+/** Pick an Ambiguous run's masked matches by number: the value searched for is pasted again. */
+export async function pickMatchesByNumber(runId: string, value: string, picks: number[]): Promise<string[]> {
+  const { data, error } = await api.POST("/api/runs/{run_id}/matches", {
+    params: { path: { run_id: runId } },
+    body: { value, picks },
+  });
+  if (data) return data.runs.map((r) => r.id);
+  throw problemError(error, "The matches could not be inspected.");
+}
+
+export type SearchResults = components["schemas"]["SearchResults"];
+export type SearchGroup = components["schemas"]["SearchGroup"];
+export type SearchItem = components["schemas"]["SearchItem"];
+export type SearchKind = components["schemas"]["SearchKind"];
+
+/** Global search: one application's matches, or every application's when application is omitted. */
+export async function searchAll(q: string, application: string | undefined, limit?: number): Promise<SearchResults> {
+  const { data, error } = await api.GET("/api/search", { params: { query: { q, application, limit } } });
+  if (data) return data;
+  throw problemError(error, "Search could not be run.");
 }
 
 /** A page of runs in one application and environment, newest first; before is the last page's next. */
@@ -395,6 +435,8 @@ export async function startDraftRun(application: string, body: DraftRun): Promis
     body,
   });
   if (data) return data.id;
+  const missing = passwordMissing(error);
+  if (missing) throw missing;
   if (response.status === 422 && (error?.errors ?? []).length > 0) {
     throw new DraftRefusedError(error?.detail ?? "The draft failed its save checks.", error?.errors ?? []);
   }
@@ -450,6 +492,12 @@ export async function reloadConfiguration(): Promise<ConfigReload> {
 }
 
 export type ConnectionTest = components["schemas"]["ConnectionTest"];
+export type SetupState = components["schemas"]["SetupState"];
+export type SaveApplication = components["schemas"]["SaveApplication"];
+export type SaveConnector = components["schemas"]["SaveConnector"];
+export type DraftConnection = components["schemas"]["DraftConnection"];
+export type SaveSecret = components["schemas"]["SaveSecret"];
+export type SecretState = components["schemas"]["SecretState"];
 
 /** Connect once to one binding, now. A kill switch refuses it with a 403. */
 export async function testConnection(application: string, connector: string, environment: string): Promise<ConnectionTest> {
@@ -466,4 +514,57 @@ export async function fetchConnectors(application: string, environment: string):
   });
   if (data) return data;
   throw problemError(error, "The connectors could not be loaded.");
+}
+
+/** What first run needs: how many applications are loaded, where new ones go, the store, the keychain. */
+export async function fetchSetup(): Promise<SetupState> {
+  const { data, error } = await api.GET("/api/setup");
+  if (data) return data;
+  throw problemError(error, "The setup could not be read.");
+}
+
+/** Preview a new application's application.yaml (no base: nothing is written), or write it with the preview's base. */
+export async function saveApplication(application: string, body: SaveApplication): Promise<CatalogChange> {
+  const { data, error } = await api.PUT("/api/applications/{application}", {
+    params: { path: { application } },
+    body,
+  });
+  if (data) return data;
+  throw problemError(error, "The application could not be created.");
+}
+
+/** Test connection on a binding not saved yet: the password is used for this one connection only. */
+export async function testDraftConnection(application: string, body: DraftConnection): Promise<ConnectionTest> {
+  const { data, error } = await api.POST("/api/applications/{application}/connectors/test-draft", {
+    params: { path: { application } },
+    body,
+  });
+  if (data) return data;
+  throw problemError(error, "The connection could not be tested.");
+}
+
+/** Preview a new connector, or a binding for an environment not bound yet (no base); or write it with the preview's base. */
+export async function saveConnector(application: string, connector: string, body: SaveConnector): Promise<CatalogChange> {
+  const { data, error } = await api.PUT("/api/applications/{application}/connectors/{connector}", {
+    params: { path: { application, connector } },
+    body,
+  });
+  if (data) return data;
+  throw problemError(error, "The connection could not be saved.");
+}
+
+/** A password is already saved under the binding's keychain name, and replacing it wasn't asked. */
+export class SecretExistsError extends Error {}
+
+/** Save a binding's password to this machine's keychain. Nothing comes back: no route reads it. */
+export async function saveSecret(application: string, connector: string, environment: string, password: string, replace: boolean): Promise<void> {
+  const { error, response } = await api.PUT("/api/applications/{application}/connectors/{connector}/environments/{environment}/secret", {
+    params: { path: { application, connector, environment } },
+    body: { password, replace },
+  });
+  if (response.status === 204) return;
+  if (response.status === 409 && error?.type === "urn:probeowl:problem:secret-exists") {
+    throw new SecretExistsError(error.detail ?? "A password is already saved for this connection.");
+  }
+  throw problemError(error, "The password could not be saved.");
 }

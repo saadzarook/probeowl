@@ -19,7 +19,7 @@ ID can't become an injection.
 ## Production reads replicas
 
 A Production binding must have `replica: true`: a read replica, readable secondary or Active Data
-Guard standby. `owl check`, `owl init` and `owl serve` refuse one that doesn't.
+Guard standby. `owl check`, `owl init`, `owl serve` and Add connection refuse one that doesn't.
 
 *What to do:* ask your DBA for a replica binding.
 

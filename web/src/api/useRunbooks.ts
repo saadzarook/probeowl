@@ -23,10 +23,12 @@ export function useStepsInRun(run: string | undefined, runbook: string | undefin
 }
 
 /** Run one step by its ID; the server has its SQL and its values. */
-export function useRunStep(run: string, runbook: string, step: string) {
+export function useRunStep(run: string, runbook: string, step: string, subject?: string) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (acknowledged: boolean) => runStep(run, runbook, step, acknowledged),
+    // A pasted subject is PII: closed over, never a mutation's variables, and gone with the form.
+    gcTime: 0,
+    mutationFn: (acknowledged: boolean) => runStep(run, runbook, step, acknowledged, subject),
     onSuccess: () => void client.invalidateQueries({ queryKey: ["runbook-steps", run, runbook] }),
   });
 }

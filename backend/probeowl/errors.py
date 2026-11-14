@@ -7,9 +7,24 @@ from collections.abc import Iterable
 class ProbeOwlError(Exception):
     """Base class for every error ProbeOwl raises on purpose."""
 
+    # RFC 9457: a URI naming the problem, for a client that acts on it, and its extra members.
+    problem_type = "about:blank"
+
+    def extensions(self) -> dict[str, str]:
+        """Members a problem details response carries beside detail; none by default."""
+        return {}
+
+    def headers(self) -> dict[str, str]:
+        """HTTP headers the problem details response carries; none by default."""
+        return {}
+
 
 class ConfigError(ProbeOwlError):
     """A configuration file or value is invalid."""
+
+
+class KeychainUnavailable(ConfigError):
+    """The system keychain cannot be read or written on this machine."""
 
 
 class ConnectorError(ProbeOwlError):
@@ -75,5 +90,62 @@ class ConflictError(ProbeOwlError):
     """What a request was based on has changed since; look again and retry."""
 
 
+class SecretExists(ConflictError):
+    """A password is saved under this keychain name already, and replacing it was not asked."""
+
+    problem_type = "urn:probeowl:problem:secret-exists"
+
+    def __init__(self, entry: str, connector: str, environment: str) -> None:
+        super().__init__(
+            f"a password is already saved as {entry}, perhaps for another application's "
+            f"connector named {connector}; overwrite it only if it is this one's"
+        )
+        self.connector = connector
+        self.environment = environment
+
+    def extensions(self) -> dict[str, str]:
+        """The binding, so a client can ask before it overwrites."""
+        return {"connector": self.connector, "environment": self.environment}
+
+
+class PasswordMissing(RequestError):
+    """A binding a request needs has no password saved on this machine."""
+
+    problem_type = "urn:probeowl:problem:password-missing"
+
+    def __init__(self, connector: str, environment: str, title: str) -> None:
+        super().__init__(
+            f"{connector} needs your password for {title}: save it on this machine first",
+            {"connector": f"no password saved on this machine for {environment}"},
+        )
+        self.connector = connector
+        self.environment = environment
+
+    def extensions(self) -> dict[str, str]:
+        """The binding whose password to ask for."""
+        return {"connector": self.connector, "environment": self.environment}
+
+
 class CapacityError(ProbeOwlError):
     """ProbeOwl is already doing as much of this as it allows at once; try again shortly."""
+
+
+TOO_MANY_ATTEMPTS = "too many attempts, wait a minute"
+
+
+class TooManyAttempts(CapacityError):
+    """Too many connection tests with a password given, on one binding: wait, then try (#61).
+
+    So repeated wrong passwords can't lock the database account: Oracle's default profile locks
+    one after 10 failed logins.
+    """
+
+    problem_type = "urn:probeowl:problem:too-many-attempts"
+
+    def __init__(self, retry_after: int):
+        super().__init__(TOO_MANY_ATTEMPTS)
+        self.retry_after = retry_after
+
+    def headers(self) -> dict[str, str]:
+        """When the next attempt is allowed, in seconds."""
+        return {"Retry-After": str(self.retry_after)}

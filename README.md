@@ -55,19 +55,23 @@ You need [uv](https://docs.astral.sh/uv/). Nothing else: the web app comes in th
 
 ```sh
 uv tool install probeowl
-uv tool update-shell            # once: puts owl on your PATH; then open a new terminal
-owl init                        # your first application and connector, step by step
-owl serve --config probeowl     # ProbeOwl and its web app on http://127.0.0.1:7878
+uv tool update-shell    # once: puts owl on your PATH; then open a new terminal
+owl serve               # ProbeOwl and its web app on http://127.0.0.1:7878
 ```
 
 `uv tool install` puts `owl` in uv's tool folder, which a new terminal doesn't find until
 `uv tool update-shell` has added it to your PATH. That's needed once per machine.
 
-`owl init` asks for the application, its environments and a first connector, with one binding per
-environment. It writes the config folder, and saves each password in your system keychain, never in
-a file. Then it offers to test the connections, create the store and import the connector's schema.
-Open <http://127.0.0.1:7878>, and confirm the suggested labels on the Tables screen. The guide is
-at <http://127.0.0.1:7878/guide/>: `owl serve` serves it too, so it reads offline.
+Then open <http://127.0.0.1:7878>. With no applications yet, it opens **Set up ProbeOwl**, which
+walks you through an application, its environments and a first connection, then importing its
+tables. Each password goes to your system keychain, never to a file. Run `owl serve` in a new,
+empty folder: it keeps your applications in `./probeowl` and says where. The guide is at
+<http://127.0.0.1:7878/guide/>, served by `owl serve` too, so it reads offline:
+[Your first application](https://saadzarook.github.io/probeowl/guide/first-application/) goes
+through the setup step by step.
+
+For scripts, `owl init` does the same setup in the terminal. It asks its questions, writes the
+config folder and saves the passwords in your keychain; then start `owl serve --config probeowl`.
 
 ## Try the examples
 

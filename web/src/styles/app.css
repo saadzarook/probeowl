@@ -461,3 +461,110 @@ button, input, select { font: inherit; }
 .columns li { flex-wrap: wrap; }
 .columns li > span { min-width: 0; overflow-wrap: anywhere; }
 .role-editor { flex: 1 1 16rem; }
+
+/* First run (/setup) */
+.btn-link { background: none; border: 0; padding: 0; color: var(--color-action-blue); font: inherit; text-decoration: underline; cursor: pointer; }
+input.mono { font-family: var(--font-mono); }
+.env-picker { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 0.6rem; border: 0; margin: 0; padding: 0; }
+.wizard-form .env-choice, .env-choice { display: flex; gap: 0.6rem; align-items: flex-start; padding: 0.7rem 0.8rem; border: 1px solid var(--color-border); border-radius: 0.6rem; background: var(--color-card); cursor: pointer; }
+.env-choice:has(input:checked) { border-color: var(--color-action-blue); box-shadow: inset 0 0 0 1px var(--color-action-blue); }
+.env-choice[data-production] strong { color: var(--color-production); }
+.env-choice[data-production]:has(input:checked) { border-color: var(--color-production); box-shadow: inset 0 0 0 1px var(--color-production); }
+.setup-environments { max-width: 48rem; }
+.setup-note { margin: 0 0 0.75rem; }
+.app-new { display: block; margin-top: 0.5rem; padding: 0.5rem 0.6rem; border-top: 1px solid var(--color-border); font-weight: 600; color: var(--color-action-blue); text-decoration: none; }
+.app-new:hover, .app-new:focus-visible { text-decoration: underline; }
+
+/* Add connection (/connectors/new) */
+.type-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: 0.6rem; }
+.type-tile { text-align: left; padding: 0.7rem 0.8rem; border: 1px solid var(--color-border); border-radius: 0.6rem; background: var(--color-card); color: var(--color-text); font: inherit; cursor: pointer; }
+.type-tile[aria-pressed="true"] { border-color: var(--color-action-blue); box-shadow: inset 0 0 0 1px var(--color-action-blue); }
+.type-tile:disabled { opacity: 0.45; cursor: not-allowed; }
+.add-connection { max-width: 52rem; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: 0.75rem; }
+.wizard-form label.check { display: flex; gap: 0.5rem; align-items: center; }
+.wizard-form label.check[data-production] { color: var(--color-production); font-weight: 600; }
+.result-ok { padding: 0.6rem 0.8rem; border-radius: 0.5rem; background: var(--chip-found-bg); color: var(--chip-found-fg); }
+.result-bad { padding: 0.6rem 0.8rem; border-radius: 0.5rem; background: var(--color-production-bg); color: var(--color-production); }
+.overwrite { padding: 0.75rem 0.9rem; border: 1px solid var(--color-production); border-radius: 0.6rem; }
+.confirm-suggested { display: grid; gap: 0.6rem; margin-top: 0.5rem; }
+.suggested-list { margin: 0; padding-left: 1.2rem; display: grid; gap: 0.35rem; }
+
+/* A binding's password: a teammate's missing one, or Change password */
+.password-prompt { display: grid; gap: 0.5rem; margin: 0.75rem 0; padding: 0.8rem 0.9rem; border: 1px solid var(--color-production); border-left-width: 3px; border-radius: 0.6rem; background: var(--color-card); max-width: 36rem; }
+.password-prompt label { display: grid; gap: 0.25rem; }
+.password-prompt p { margin: 0; }
+
+/* A subject's ID pasted for one action, when its key is PII and stored masked (#66). */
+.runbook-pasted {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0;
+  max-width: 420px;
+}
+
+/* Global search, the command palette (#38). */
+.palette-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgb(20 23 28 / 40%);
+}
+.palette {
+  position: fixed;
+  top: 12vh;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(640px, calc(100vw - 32px));
+  max-height: 72vh;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgb(20 23 28 / 20%);
+}
+.palette-input {
+  font-size: 1rem;
+  padding: 8px 10px;
+}
+.palette-scope {
+  font-size: 0.875rem;
+}
+.palette-list {
+  overflow-y: auto;
+}
+.palette-group {
+  margin: 8px 0 2px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+}
+.palette-option {
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.palette-option[aria-selected="true"] {
+  background: var(--color-surface);
+  outline: 2px solid var(--color-action-blue);
+}
+.palette-option .chip {
+  margin-left: 6px;
+}
+.topbar-search kbd {
+  margin-left: 6px;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+.switch-notice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}

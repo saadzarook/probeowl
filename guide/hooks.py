@@ -1,14 +1,17 @@
 # Author: @SaadZarook
 """MkDocs hooks: the guide's address comes from backend/probeowl/guide.py, written once there.
 
-With PROBEOWL_GUIDE_BUNDLED=1 the guide is built to be served by owl serve at /guide/, as the
-release wheel carries it: it makes no call outside the machine. Material's Google Fonts and the
-repository widget, which asks the GitHub API, are left out, and the IBM Plex files the web app
-already ships (web/node_modules, after npm ci) are copied in. The Pages copy keeps both.
+Every build is the same offline build: the guide makes no call outside the site serving it.
+Material's Google Fonts and the repository widget, which asks the GitHub API, are left out, and
+the IBM Plex files the web app already ships (web/node_modules, after npm ci) are copied in. So
+the copy on GitHub Pages loads nothing from another site either, as the wheel's doesn't.
 
-The bundled build also leaves out what the wheel needn't carry: source maps, and the search's
-language packs (lunr/), which English search never loads. Material's licence goes in
-licenses/; its bundles keep the headers of what they include.
+The only difference is the address. With PROBEOWL_GUIDE_BUNDLED=1 it is built for owl serve at
+/guide/, as the release wheel carries it; otherwise for GitHub Pages, at GUIDE_URL.
+
+Every build also leaves out what isn't needed: source maps, and the search's language packs
+(lunr/), which English search never loads. Material's licence goes in licenses/; its bundles keep
+the headers of what they include.
 """
 
 import os
@@ -33,22 +36,20 @@ FONTS = {
 
 
 def on_config(config: Any) -> Any:
-    """Set site_url from GUIDE_URL, or stop the build if it cannot be read; then bundle."""
+    """Set site_url (owl serve's, or GUIDE_URL for Pages) and load nothing from another site."""
     found = re.search(r'^GUIDE_URL = "([^"]+)"$', GUIDE_FILE.read_text(encoding="utf-8"), re.M)
     if found is None:
         raise SystemExit(f"GUIDE_URL not found in {GUIDE_FILE}")
-    config["site_url"] = found.group(1)
-    if BUNDLED:
-        bundle(config)
+    config["site_url"] = BUNDLED_URL if BUNDLED else found.group(1)
+    offline(config)
     return config
 
 
-def bundle(config: Any) -> None:
-    """Configure the build owl serve serves: nothing loaded from another site."""
+def offline(config: Any) -> None:
+    """Configure a build that loads nothing from another site."""
     for package, _ in FONTS.values():
         if not (FONTSOURCE / package / "files").is_dir():
             raise SystemExit(f"{FONTSOURCE / package} not found: run npm ci in web/ first")
-    config["site_url"] = BUNDLED_URL
     config["theme"]["font"] = False  # no Google Fonts: plex.css names the local files
     config["repo_url"] = None  # no repository widget, so no GitHub API call
     config["repo_name"] = None
@@ -57,9 +58,7 @@ def bundle(config: Any) -> None:
 
 
 def on_post_build(config: Any) -> None:
-    """In the bundled build, copy the IBM Plex files in and write the CSS that names them."""
-    if not BUNDLED:
-        return
+    """Copy the IBM Plex files in and write the CSS that names them."""
     fonts = Path(config["site_dir"]) / "assets" / "fonts"
     fonts.mkdir(parents=True, exist_ok=True)
     rules = []

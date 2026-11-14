@@ -2,7 +2,9 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { usePlugins } from "./api/usePlugins";
 import { Shell } from "./components/Shell";
+import { AddConnectionPage } from "./pages/AddConnectionPage";
 import { ConnectorsPage } from "./pages/ConnectorsPage";
+import { FirstRunPage } from "./pages/FirstRunPage";
 import { InspectPage } from "./pages/InspectPage";
 import { KnowledgeBasePage } from "./pages/KnowledgeBasePage";
 import { NewEntityPage } from "./pages/NewEntityPage";
@@ -55,6 +57,8 @@ export function App() {
             <Route key={item.path} path={item.path} element={pageFor(item)} />
           ))}
           <Route path="/probes/new-entity" element={<NewEntityPage />} />
+          <Route path="/setup" element={<FirstRunPage />} />
+          <Route path="/connectors/new" element={<AddConnectionPage />} />
           {pluginScreens.map((screen) => (
             <Route key={screen.path} path={screen.path} element={<PluginPage screen={screen} />} />
           ))}

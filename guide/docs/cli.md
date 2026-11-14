@@ -14,9 +14,9 @@ folder or the store themselves, and need nothing running.
 
 | Command | What it does | Needs running |
 | --- | --- | --- |
-| `owl init` | Writes a config folder for a first application and connector, step by step | Nothing |
+| `owl init` | Writes a config folder for a first application and connector, step by step: first-run setup from a terminal | Nothing |
 | `owl connector add` | Adds a connector to an application, or bindings for the environments one lacks | Nothing |
-| `owl serve` | Serves ProbeOwl on 127.0.0.1: the web app at `/`, this guide at `/guide/`, the API under `/api` | The store (`owl store init`) |
+| `owl serve` | Serves ProbeOwl on 127.0.0.1: the web app at `/`, this guide at `/guide/`, the API under `/api` | Nothing: it creates the default store the first time |
 | `owl check <folder>` | Checks every YAML file, the references between them, and every lookup | Nothing |
 | `owl validate <entity> <value>` | Runs an entity's validate probe on one subject | `owl serve` |
 | `owl inspect <value>` | Runs an inspect probe on a subject | `owl serve` |
@@ -45,8 +45,8 @@ folder or the store themselves, and need nothing running.
 
 Asks for the application, its environments and a first connector with a binding per environment,
 then writes the folder and saves each password in your keychain. Then it offers to test the
-connections, create the store and import the schema. See [Your first
-application](first-application.md).
+connections, create the store and import the schema. The web app's first-run setup does the same
+in the browser. See [Your first application](first-application.md#for-scripts-owl-init).
 
 ## `owl connector add`
 
@@ -61,12 +61,12 @@ your keychain, never to a file.
 
 It writes one file: the new connector's, or the existing one with the new bindings added and its
 comments kept. If the folder wouldn't load with that file, the change is undone and nothing is
-saved. With a store, the change is recorded in the audit. Then it offers to test the new bindings
+saved, and the change is recorded in the audit. With no store at `~/.probeowl/store.db` it creates one first; a store named by `$PROBEOWL_STORE_URL` must already be at this release (`owl store init`). Then it offers to test the new bindings
 and, for a SQL connector, to import its schema.
 
 | Option | Default | Meaning |
 | --- | --- | --- |
-| `--config <folder>` | `$PROBEOWL_CONFIG`, else the current folder | The config folder: the one `owl serve` was started with |
+| `--config <folder>` | `$PROBEOWL_CONFIG`, else the current folder if it holds applications, else `./probeowl` | The config folder: the one `owl serve` was started with |
 | `--application <name>` | Asked, when the folder holds several | The application to add to |
 
 It works on a folder `owl serve` refuses because a probe needs a binding that isn't there, which
@@ -81,9 +81,9 @@ owl serve --config probeowl
 
 | Option | Default | Meaning |
 | --- | --- | --- |
-| `--config <folder>` | `$PROBEOWL_CONFIG`, else the current folder | The applications to load |
+| `--config <folder>` | `$PROBEOWL_CONFIG`, else the current folder if it holds ProbeOwl applications (an `application.yaml` with `application:` and `environments:`), else `./probeowl`, or `~/probeowl` when the current folder is a system or program folder or can't be written to; created if missing, and printed with how to choose another | The applications to load |
 | `--port <n>` | 7878 | The port on 127.0.0.1 |
-| `--url <url>` | `$PROBEOWL_STORE_URL`, else `~/.probeowl/store.db` | The store |
+| `--url <url>` | `$PROBEOWL_STORE_URL`, else `~/.probeowl/store.db`, created on a first run | The store |
 | `--web-origin <url>` | `$PROBEOWL_WEB_ORIGINS` | Where else the web app is served from, on loopback only. Vite on 5173 and 4173 is always accepted. Repeat for several |
 | `--log-file <path>` | `~/.probeowl/owl-serve.log` | The log, readable only by you |
 | `--debug-driver-errors` | off | Log the drivers' raw error text, which can hold values from statements and personal data |
@@ -165,14 +165,45 @@ If `owl serve` would refuse the folder at start, nothing changes and the first e
 (`owl check <folder>` lists them all). It's refused while a run is running. Kill switches stay as
 they are. Plugins, the port, the store and the log file change only with a restart.
 
+## `owl mcp`
+
+```sh
+owl mcp --config probeowl                # for an AI assistant's app to start, on stdio
+owl mcp --config probeowl --plan-checks  # check_draft also reads lookups' plans
+```
+
+ProbeOwl's drafting tools for an AI assistant: it drafts, you paste and reload. It runs on stdio
+only, with no port, and writes nothing. See [Draft with an AI assistant](drafting-with-an-assistant.md).
+
 ## `owl store`
 
 ```sh
 owl store init                                  # create, or upgrade to this release
 owl store upgrade
 owl store ddl --dialect postgresql > store.sql  # for a DBA: sqlite, postgresql, mssql, oracle, mariadb
+owl store mask-pii probeowl                     # what it would mask in runs stored before v0.2
+owl store mask-pii probeowl --apply             # mask them
 ```
 
+`owl store mask-pii` masks what v0.1 stored before an entity's key or identifiers were known to be
+PII: a subject, an identifier, and PII values in rows and lookup parameters. It uses the folder's
+current configuration. Without `--apply` it only lists each run and what in it would change, never
+a value. With `--apply` it writes them and records that in the audit. Stop `owl serve` first.
+
+**The audit is never edited.** Every run, write and conclusion is recorded once and kept as it
+was, so the record of who did what can be trusted. Nothing in ProbeOwl changes or deletes an audit
+event, and `owl store mask-pii` is no exception. Audit events from v0.1 that hold a value it now
+masks stay as they are, and it says how many there are. To remove them, delete the store outside
+ProbeOwl: the SQLite file at `~/.probeowl/store.db`, or the tables in a server store, by its DBA.
+Runs, kill switches and schema imports go with it, and `owl serve` starts a new one.
+
 The store holds runs, the audit, schema imports and kill switches. It's never a probed database.
+`owl serve` and `owl connector add` create the default SQLite store themselves the first time; a
+store named by `--url` or `$PROBEOWL_STORE_URL` is never created for you, as a server database may
+need a DBA.
 SQLite on a network share loses writes when several people use it, so `owl store init` refuses
 one: use a server database for a team store.
+
+Keep a server store's password in `$PROBEOWL_STORE_URL`, never in `--url`, where it would sit in
+your shell's history. `owl serve` and `owl store` warn about one there, without showing it, and
+`owl mcp` refuses one, as it would end up in your assistant's config file.

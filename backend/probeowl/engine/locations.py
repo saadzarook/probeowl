@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from probeowl.connectors.lookup import LookupResult, ReplicaLag
-from probeowl.engine.masking import mask_rows, to_json
+from probeowl.engine.masking import mask_rows, masked_fields, pii_fields, to_json
 from probeowl.engine.typed_values import column_kinds
 from probeowl.errors import ConfigError, ProbeOwlError, ReadsStopped
 from probeowl.model.common import seconds, split_field_ref
@@ -305,18 +305,21 @@ class _Reader:
     def _evidence(
         self, location: Location | FanOutLocation, result: LookupResult, parent: str | None
     ) -> Evidence:
-        masked = [*location.pii, *location.mask]
+        masked = masked_fields(self._entity, location)
+        # A PII identifier, such as a root key that is PII, is masked as a parameter too (#66).
+        hidden = {f for f in result.parameters if f.lower() in pii_fields(self._entity)}
         # A key that is a masked field of its source location is masked in evidence too.
-        hidden = set()
         if isinstance(location, Location) and location.key_from is not None:
             source, key = split_field_ref(location.key_from)
             upstream = self._entity.locations[source]
-            if key.lower() in {f.lower() for f in [*upstream.pii, *upstream.mask]}:
+            if key.lower() in masked_fields(self._entity, upstream):
                 hidden.add(key)
         if parent is not None:
             # A fan-out lookup's parameters come from its parent's row: masked there, here too.
             upstream = self._entity.locations[parent]
-            hidden.update(f for f in result.parameters if f.lower() in _masked(upstream))
+            hidden.update(
+                f for f in result.parameters if f.lower() in masked_fields(self._entity, upstream)
+            )
         parameters = mask_rows([dict(result.parameters)], hidden)[0]
         return Evidence(
             connector=location.using,
@@ -357,10 +360,6 @@ def rows_read(location: Location | FanOutLocation) -> int:
     if isinstance(location, Location) and location.max_rows is not None:
         return location.max_rows
     return DEFAULT_MAX_ROWS
-
-
-def _masked(location: Location | FanOutLocation) -> set[str]:
-    return {f.lower() for f in [*location.pii, *location.mask]}
 
 
 def _label(outcome: Outcome) -> str:

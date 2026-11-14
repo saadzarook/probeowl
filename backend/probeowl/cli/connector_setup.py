@@ -10,7 +10,9 @@ from typing import Any
 
 import typer
 
+from probeowl import secrets
 from probeowl.catalog.service import CatalogService
+from probeowl.connector_files import KEYCHAIN_SERVICE, keychain_reference
 from probeowl.connector_status import ConnectorStatuses
 from probeowl.errors import ConfigError, ProbeOwlError
 from probeowl.guards.breaker import CircuitBreaker
@@ -18,7 +20,6 @@ from probeowl.model.check import LoadedApplication
 from probeowl.secrets import save_secret
 from probeowl.store.engine import create_store_engine
 
-KEYCHAIN_SERVICE = "probeowl"
 TYPES = ("sqlserver", "oracle", "mariadb", "rest")
 DEFAULT_PORTS = {"sqlserver": 1433, "oracle": 1521, "mariadb": 3306}
 NAME = re.compile(r"^[a-z][a-z0-9_]*$")
@@ -88,7 +89,7 @@ def _ask_sql(
     env: str,
     production: bool,
     previous: dict[str, Any],
-) -> tuple[dict[str, Any], str]:
+) -> tuple[dict[str, Any], str | None]:
     kind = connector["type"]
     name = connector["connector"]
     binding: dict[str, Any] = {
@@ -105,7 +106,7 @@ def _ask_sql(
         guess = name.removesuffix("_db") if name.endswith("_db") else None
         binding["database"] = ask_text("    Database", previous.get("database", guess))
     binding["user"] = ask_text("    Read-only login", previous.get("user"))
-    binding["secret"] = f"keyring:{KEYCHAIN_SERVICE}/{name}.{env}"
+    binding["secret"] = keychain_reference(name, env)
     password = _ask_password(name, passwords, env)
     replica = typer.confirm(
         "    Is this a read replica, readable secondary or Active Data Guard standby?",
@@ -143,12 +144,24 @@ def _ask_rest(
     if not typer.confirm("    Does it need a token?", default="secret" in previous):
         return binding, None
     name = connector["connector"]
-    binding["secret"] = f"keyring:{KEYCHAIN_SERVICE}/{name}.{env}"
+    binding["secret"] = keychain_reference(name, env)
     return binding, _ask_password(name, passwords, env, what="Token")
 
 
-def _ask_password(name: str, passwords: dict[str, str], env: str, what: str = "Password") -> str:
+def _ask_password(
+    name: str, passwords: dict[str, str], env: str, what: str = "Password"
+) -> str | None:
+    """The password to save for this binding; None to keep the one saved under its name."""
     where = f"{KEYCHAIN_SERVICE}/{name}.{env}"
+    # Another application's connector of the same id shares this name: never overwrite unasked.
+    # Looked up at call time, so tests can stand in for the keychain.
+    if secrets.read_keychain(KEYCHAIN_SERVICE, f"{name}.{env}") is not None and not typer.confirm(
+        f"    A {what.lower()} is already saved as {where}, perhaps for another application's "
+        f"connector named {name}. Overwrite it?",
+        default=False,
+    ):
+        typer.echo(f"    Kept: {where} stays as it is, and this binding uses it.")
+        return None
     earlier = next(iter(passwords.values()), None)
     hint = "; Enter for the same as before" if earlier is not None else ""
     while True:

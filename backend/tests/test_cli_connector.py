@@ -19,6 +19,7 @@ from probeowl.store import migrate
 from probeowl.store.engine import create_store_engine
 from probeowl.store.tables import audit_events
 from tests.audit_fails import audit_fails
+from tests.conftest import MemoryKeychain
 
 EXAMPLES = Path(__file__).resolve().parents[2] / "examples"
 PASSWORD = "not-a-real-password-2"
@@ -28,7 +29,11 @@ PASSWORD = "not-a-real-password-2"
 def folder(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     copy = tmp_path / "config"
     shutil.copytree(EXAMPLES, copy)
-    monkeypatch.setenv("PROBEOWL_STORE_URL", f"sqlite:///{tmp_path / 'store.db'}")
+    url = f"sqlite:///{tmp_path / 'store.db'}"
+    monkeypatch.setenv("PROBEOWL_STORE_URL", url)
+    store = create_store_engine(url)  # a store at this release: every change is audited
+    migrate.upgrade(store)
+    store.dispose()
     return copy
 
 
@@ -45,7 +50,8 @@ def keychain(monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
 def add(folder: Path, answers: list[str], application: str | None = "wallet") -> Any:
     args = ["connector", "add", "--config", str(folder)]
     args += ["--application", application] if application else []
-    return CliRunner().invoke(cli.app, args, input="\n".join(answers) + "\n")
+    # A last "n": the import offered after a SQL connector is declined unless a test answers it.
+    return CliRunner().invoke(cli.app, args, input="\n".join([*answers, "n"]) + "\n")
 
 
 # A MariaDB connector bound in prod (a replica) and uat; no connection test.
@@ -82,10 +88,38 @@ def test_a_new_connector_is_written_bound_and_its_passwords_kept_in_the_keychain
         "probeowl/reports_db.uat": PASSWORD,
     }
     assert "reports_db" in load_applications(folder)["wallet"].connectors
-    # No store yet: nothing to audit or import into, and the next steps say how to import.
-    assert "Not recorded in the audit: no store at this release yet" in result.output
+    # Audited, and with the import declined the next steps say how to import.
+    assert "Not recorded in the audit" not in result.output
     assert "1. Load reports_db into owl serve: owl reload, or Reload configuration" in result.output
     assert "owl catalog import reports_db --application wallet --env uat" in result.output
+
+
+def test_a_password_already_saved_under_the_name_is_kept_unless_overwriting_is_chosen(
+    folder: Path, keychain: dict[str, str], machine_keychain: MemoryKeychain
+) -> None:
+    # Another application's connector named reports_db saved this one.
+    machine_keychain.entries[("probeowl", "reports_db.prod")] = "another-applications-password"
+    kept = list(NEW_MARIADB)
+    kept[kept.index(PASSWORD)] = "n"  # don't overwrite: no password is asked for prod
+    # Nor is there one to reuse for uat with Enter: it is typed.
+    uat_password = kept.index("reports_uat") + 2
+    kept[uat_password] = PASSWORD
+    result = add(folder, kept)
+    assert result.exit_code == 0, result.output
+    assert "A password is already saved as probeowl/reports_db.prod" in result.output
+    assert "Kept: probeowl/reports_db.prod stays as it is" in result.output
+    assert keychain == {"probeowl/reports_db.uat": PASSWORD}
+
+
+def test_overwriting_a_password_already_saved_is_asked_and_then_done(
+    folder: Path, keychain: dict[str, str], machine_keychain: MemoryKeychain
+) -> None:
+    machine_keychain.entries[("probeowl", "reports_db.prod")] = "another-applications-password"
+    replaced = list(NEW_MARIADB)
+    replaced.insert(replaced.index(PASSWORD), "y")
+    result = add(folder, replaced)
+    assert result.exit_code == 0, result.output
+    assert keychain["probeowl/reports_db.prod"] == PASSWORD
 
 
 def test_an_environment_can_be_left_unbound(folder: Path, keychain: dict[str, str]) -> None:

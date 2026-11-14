@@ -7,6 +7,7 @@ runs live in the store, not the folder, so a reload never turns a switch off. A 
 breaker pause runs out as it would have.
 """
 
+from collections.abc import Callable
 from pathlib import Path
 
 from probeowl.config_folder import ConfigFolder
@@ -25,8 +26,12 @@ class ConfigReloader:
         # Sent with every API response, so an open screen sees that owl reload loaded a new one.
         self.reloads = 0
 
-    def reload(self) -> ConfigReload:
-        """Load the folder again; ConfigError (nothing changed) if it would not start."""
+    def reload(self, change: Callable[[], None] | None = None) -> ConfigReload:
+        """Load the folder again; ConfigError (nothing changed) if it would not start.
+
+        change: a write to make first, once no run is running, so what it wrote is loaded at
+        once. If it fails, nothing is loaded and the configuration stays as it was.
+        """
         # Saves hold the folder's lock while they write: the folder is never read half-saved.
         reports: list[ConfigReload] = []
 
@@ -35,8 +40,13 @@ class ConfigReloader:
             self._runs.audit("config_reloaded", report.model_dump(mode="json", exclude={"note"}))
             reports.append(report)
 
+        def load() -> dict[str, LoadedApplication]:
+            if change is not None:
+                change()
+            return load_applications(self._folder)
+
         with self._config_folder.lock:
-            self._runs.reload(lambda: load_applications(self._folder), record)
+            self._runs.reload(load, record)
         self.reloads += 1
         return reports[0]
 

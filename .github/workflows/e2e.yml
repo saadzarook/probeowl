@@ -19,18 +19,14 @@ jobs:
       PROBEOWL_LEDGER_DB_UAT: ProbeOwl_Ro_Local1
       PROBEOWL_ACCESS_DB_UAT: ProbeOwl_Ro_Local1
       PROBEOWL_RO_PASSWORD: ProbeOwl_Ro_Local1
-      # CI has no system keychain; the examples' keyring: references read this file one,
-      # which owl refuses unless it is allowed here, in CI only.
-      PYTHON_KEYRING_BACKEND: keyrings.alt.file.PlaintextKeyring
-      PROBEOWL_ALLOW_INSECURE_KEYRING: "1"
       # The preview server's origins, which owl serve accepts on writes.
       PROBEOWL_WEB_ORIGINS: http://127.0.0.1:4173,http://localhost:4173
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Start the stack
         run: docker compose -f dev/docker-compose.yml up --wait --wait-timeout 900
-      - uses: astral-sh/setup-uv@v6
-      - uses: actions/setup-node@v5
+      - uses: astral-sh/setup-uv@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
@@ -38,6 +34,9 @@ jobs:
       - name: Install the backend
         working-directory: backend
         run: uv sync --locked
+      - name: A system keychain, as on a desktop (Secret Service)
+        # owl keeps passwords only in a system keychain, never a file: dev/ci/keychain.sh
+        run: bash dev/ci/keychain.sh
       - name: Production passwords in the keychain
         working-directory: backend
         run: |
@@ -52,7 +51,10 @@ jobs:
         run: |
           # A copy: the probe editor's live test saves into the folder served.
           cp -r ../examples "$RUNNER_TEMP/config"
-          nohup uv run owl serve --config "$RUNNER_TEMP/config" > "$RUNNER_TEMP/owl-serve.log" 2>&1 &
+          # Straight from the venv, not through uv run, which would hold uv's cache lock and
+          # stall setup-uv's cache cleanup at the end of the job; stopped at the end.
+          nohup .venv/bin/owl serve --config "$RUNNER_TEMP/config" > "$RUNNER_TEMP/owl-serve.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/owl-serve.pid"
           for _ in $(seq 1 60); do
             curl -fs http://127.0.0.1:7878/openapi.json > /dev/null && exit 0
             sleep 1
@@ -79,7 +81,7 @@ jobs:
         run: npm run test:e2e:live
       - name: Upload the Playwright report
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report
           path: web/playwright-report
@@ -88,6 +90,9 @@ jobs:
         run: |
           cat "$RUNNER_TEMP/owl-serve.log" || true
           docker compose -f dev/docker-compose.yml logs --no-color
+      - name: Stop owl serve
+        if: always()
+        run: kill "$(cat "$RUNNER_TEMP/owl-serve.pid")" 2>/dev/null || true
       - name: Stop the stack
         if: always()
         run: docker compose -f dev/docker-compose.yml down -v

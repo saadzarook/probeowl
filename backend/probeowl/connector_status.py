@@ -15,6 +15,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, replace
 from typing import Protocol
 
+from probeowl import secrets
 from probeowl.connectors.factory import configured_guards, open_connector, open_sql, sql_adapter
 from probeowl.connectors.lookup import ReplicaLag
 from probeowl.connectors.oracle import time_zone_shown
@@ -22,6 +23,7 @@ from probeowl.connectors.rest import RestLimits, rest_guards
 from probeowl.connectors.sql import SqlLimits, transport
 from probeowl.engine.locations import DEFAULT_MAX_ROWS
 from probeowl.errors import (
+    ConfigError,
     KillSwitchEngaged,
     KillSwitchUnknown,
     NotFoundError,
@@ -37,7 +39,9 @@ from probeowl.model.connector_status import (
     ConnectionTest,
     ConnectorStatus,
     PlanAccess,
+    SecretState,
 )
+from probeowl.secrets import keychain_entry
 
 CACHE_S = 60.0
 # As for plan checks: Oracle's EXPLAIN PLAN takes longer than a keyed lookup.
@@ -78,6 +82,10 @@ class ConnectionSource(Protocol):
 
 StatusOpener = Callable[[SqlConnector, str], StatusSource | None]
 ConnectionOpener = Callable[[SqlConnector | RestConnector, str], ConnectionSource | None]
+# A binding not saved yet: its secret comes from the request, not the keychain.
+DraftOpener = Callable[
+    [SqlConnector | RestConnector, str, Callable[[str], str]], ConnectionSource | None
+]
 
 
 def open_for_status(connector: SqlConnector, environment: str) -> StatusSource | None:
@@ -108,12 +116,14 @@ class ConnectorStatuses:
         opener: StatusOpener = open_for_status,
         clock: Callable[[], float] = time.monotonic,
         connection_opener: ConnectionOpener = open_connector,
+        draft_opener: DraftOpener = open_connector,
     ):
         self._applications = applications
         self._breaker = breaker
         self._stopped = stopped
         self._opener = opener
         self._connection_opener = connection_opener
+        self._draft_opener = draft_opener
         self._clock = clock
         self._lock = threading.Lock()
         self._readings: dict[tuple[str, str, str], tuple[float, _Reading]] = {}
@@ -158,11 +168,46 @@ class ConnectorStatuses:
             duration_ms=round((self._clock() - start) * 1000),
         )
 
+    def test_draft(
+        self,
+        application: str,
+        connector: SqlConnector | RestConnector,
+        environment: str,
+        secrets: Callable[[str], str],
+    ) -> ConnectionTest:
+        """Connect once to a binding that is not saved yet, and say how it went.
+
+        A kill switch on the application, or on the connector if it exists, refuses it before
+        any secret is read. The breaker is left alone: a draft has no readings to pause.
+        """
+        app = self._application(application, environment)
+        stopped = self._stopped(application, connector.connector)
+        if stopped is not None:
+            raise KillSwitchEngaged(stopped)
+        start = self._clock()
+        reason = self._try_connecting(
+            connector, environment, lambda c, env: self._draft_opener(c, env, secrets)
+        )
+        if connector.connector in app.connectors:
+            # What the Connectors screen shows next should not be an older reading.
+            with self._lock:
+                self._readings.pop((application, connector.connector, environment), None)
+        return ConnectionTest(
+            connector=connector.connector,
+            environment=environment,
+            reachable=reason is None,
+            reason=reason,
+            duration_ms=round((self._clock() - start) * 1000),
+        )
+
     def _try_connecting(
-        self, connector: SqlConnector | RestConnector, environment: str
+        self,
+        connector: SqlConnector | RestConnector,
+        environment: str,
+        opener: ConnectionOpener | None = None,
     ) -> str | None:
         try:
-            source = self._connection_opener(connector, environment)
+            source = (opener or self._connection_opener)(connector, environment)
         except ProbeOwlError as err:  # its secret cannot be read
             return str(err)
         assert source is not None  # the caller found the binding
@@ -197,7 +242,8 @@ class ConnectorStatuses:
         if environment not in connector.environments:
             reason = f"{connector.connector} has no binding in {environment}"
             return status.model_copy(update={"reason": reason})
-        status = status.model_copy(update=_from_config(connector, environment))
+        secret = _secret_state(connector, environment)
+        status = status.model_copy(update=_from_config(connector, environment) | {"secret": secret})
         # Asked before anything reads: not even a kept reading is shown as current.
         try:
             stopped = self._stopped(application, connector.connector)
@@ -207,6 +253,10 @@ class ConnectorStatuses:
             )
         if stopped is not None:
             return status.model_copy(update={"health": BindingHealth.STOPPED, "reason": stopped})
+        if status.secret is SecretState.MISSING:
+            # Nothing to try without it: the screen asks for the password instead.
+            reason = f"no password saved on this machine for {environment}"
+            return status.model_copy(update={"reason": reason})
         if isinstance(connector, RestConnector):
             return status.model_copy(
                 update={
@@ -331,3 +381,17 @@ def _with_lag(reading: _Reading, lag: ReplicaLag, max_seconds: float) -> _Readin
         reason = f"{lag.note} (max {max_seconds:g} s)"
         return replace(reading, health=BindingHealth.LAGGING, reason=reason)
     return reading
+
+
+def _secret_state(connector: SqlConnector | RestConnector, environment: str) -> SecretState:
+    """Whether this machine has the binding's secret: asked of the keychain, never shown."""
+    reference = connector.environments[environment].secret
+    if reference is None:
+        return SecretState.NOT_NEEDED
+    if keychain_entry(reference) is None:
+        return SecretState.FROM_ENVIRONMENT
+    try:
+        # Looked up at call time, so tests can stand in for the keychain.
+        return SecretState.SAVED if secrets.secret_saved(reference) else SecretState.MISSING
+    except ConfigError:
+        return SecretState.MISSING

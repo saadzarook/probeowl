@@ -8,7 +8,40 @@ from typing import Any
 
 from pydantic import JsonValue
 
+from probeowl.model.common import split_field_ref
+from probeowl.model.entity import Entity, LocationBase
+
 MASKED = "[masked]"
+
+
+def pii_fields(entity: Entity) -> set[str]:
+    """Every field that holds a PII identifier, lowercase: its name, and the field its via names.
+
+    A PII identifier is masked wherever it shows, whatever each location's own pii list says:
+    as a run's subject, in a match, in a location's rows and in a lookup's parameters (#66).
+    """
+    fields: set[str] = set()
+    for name, identifier in entity.identifiers.items():
+        if identifier.pii:
+            fields.add(name.lower())
+            if identifier.via is not None:
+                fields.add(split_field_ref(identifier.via)[1].lower())
+    return fields
+
+
+def key_is_pii(entity: Entity) -> bool:
+    """Whether the root key is PII, so a run's subject is stored and shown masked."""
+    return entity.identifiers[entity.root_key].pii
+
+
+def masked_key_reason(entity: Entity) -> str:
+    """Why a value a run stored masked must be pasted, as every place that asks says it."""
+    return f"{entity.entity}'s key is PII and stored masked: paste its {entity.root_key}"
+
+
+def masked_fields(entity: Entity, location: LocationBase) -> set[str]:
+    """The fields masked in this location's rows: its own pii and mask, and every PII identifier."""
+    return {f.lower() for f in [*location.pii, *location.mask]} | pii_fields(entity)
 
 
 def mask_rows(rows: list[dict[str, Any]], fields: Collection[str]) -> list[dict[str, Any]]:

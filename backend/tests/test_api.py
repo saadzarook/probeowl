@@ -93,7 +93,9 @@ def test_no_route_can_execute_a_runbook_step(app: FastAPI) -> None:
     parameters = {p["name"] for p in run_step["post"]["parameters"]}
     assert parameters == {"run_id", "runbook", "step"}
     schemas = app.openapi()["components"]["schemas"]
-    assert set(schemas["RunRunbookStep"]["properties"]) == {"run_without_plan_check"}
+    # subject: the run's own subject, pasted when its key is PII and so stored masked (#66). It
+    # is bound only as the root key's parameter, checked against the key's pattern, never SQL.
+    assert set(schemas["RunRunbookStep"]["properties"]) == {"run_without_plan_check", "subject"}
     assert set(schemas["TickRunbookStep"]["properties"]) == {"done"}
     # Everything else that is not a GET starts probe runs or writes config, and takes no SQL.
     writes = [
@@ -103,10 +105,20 @@ def test_no_route_can_execute_a_runbook_step(app: FastAPI) -> None:
         if method != "get"
     ]
     assert sorted(writes) == [
+        # Writes a new application's application.yaml in the loaded folder: config only.
+        ("/api/applications/{application}", "put"),
         ("/api/applications/{application}/catalog/imports", "post"),  # reads schema, never data
         # Writes catalog.yaml in the loaded folder: config, never a probed database.
         ("/api/applications/{application}/catalog/tables/{connector}/{table}", "put"),
         # Connects once to a binding, or GETs a REST API's base URL once; reads no data.
+        ("/api/applications/{application}/connectors/test-draft", "post"),  # the same, unsaved
+        # Writes a connector's YAML in the loaded folder: config, never a password.
+        ("/api/applications/{application}/connectors/{connector}", "put"),
+        # Saves a password to this machine's keychain: never to a file, a probed database or back.
+        (
+            "/api/applications/{application}/connectors/{connector}/environments/{environment}/secret",
+            "put",
+        ),
         ("/api/applications/{application}/connectors/{connector}/test", "post"),
         # Writes a new entity's YAML in the loaded folder: config, never a probed database.
         ("/api/applications/{application}/entities/{entity}", "put"),
@@ -135,7 +147,12 @@ def test_no_route_can_execute_a_runbook_step(app: FastAPI) -> None:
         ("/api/runs/{run_id}/runbooks/{runbook}/steps/{step}/tick", "post"),
     ]
     assert "requestBody" not in app.openapi()["paths"]["/api/config/reload"]["post"]
-    assert set(app.openapi()["components"]["schemas"]["PickMatches"]["properties"]) == {"subjects"}
+    # By subject, or by number with the value searched for pasted again when the key is PII (#66).
+    assert set(app.openapi()["components"]["schemas"]["PickMatches"]["properties"]) == {
+        "subjects",
+        "value",
+        "picks",
+    }
     assert set(app.openapi()["components"]["schemas"]["StartRun"]["properties"]) == {
         "application",
         "environment",

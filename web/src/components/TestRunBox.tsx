@@ -2,11 +2,12 @@
 import { useMutation } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { DraftRefusedError, startDraftRun, type Reason } from "../api/client";
+import { DraftRefusedError, PasswordMissingError, startDraftRun, type Reason } from "../api/client";
 import { useRun } from "../api/useRun";
 import { REASON_LABELS } from "../reasons";
 import { titleCase, withCaveat } from "../runFormat";
 import { useSelection } from "../selection";
+import { RunNeedsPassword } from "./RunNeedsPassword";
 
 interface TestRunBoxProps {
   probe: string;
@@ -53,7 +54,11 @@ export function TestRunBox({ probe, entity, rootKey }: TestRunBoxProps) {
   const [reason, setReason] = useState<Reason | "">("");
   const [reference, setReference] = useState("");
   const [started, setStarted] = useState<string>();
-  const start = useMutation({ mutationFn: (body: Parameters<typeof startDraftRun>[1]) => startDraftRun(application?.name ?? "", body), onSuccess: setStarted });
+  // The application travels with the request, so a run again goes where the first was sent.
+  const start = useMutation({
+    mutationFn: ({ application, body }: { application: string; body: Parameters<typeof startDraftRun>[1] }) => startDraftRun(application, body),
+    onSuccess: setStarted,
+  });
 
   const production = environment?.production === true;
   const ready = application !== undefined && environment !== undefined && value.trim() !== "" && reason !== "" && (!production || reference.trim() !== "");
@@ -63,60 +68,73 @@ export function TestRunBox({ probe, entity, rootKey }: TestRunBoxProps) {
     if (!ready) return;
     setStarted(undefined);
     start.mutate({
-      probe,
-      entity,
-      environment: environment.name,
-      value: value.trim(),
-      investigation: { reason, reference: reference.trim() || undefined },
+      application: application.name,
+      body: {
+        probe,
+        entity,
+        environment: environment.name,
+        value: value.trim(),
+        investigation: { reason, reference: reference.trim() || undefined },
+      },
     });
   }
 
   const refused = start.error instanceof DraftRefusedError ? start.error : undefined;
 
+  // The prompt is a form of its own, so it sits beside this one: forms never nest.
   return (
-    <form className="card test-run validate-form" onSubmit={submit} aria-label="Test run">
-      <h2>Test run</h2>
-      <label>
-        ID
-        <input value={value} onChange={(e) => setValue(e.target.value)} placeholder={rootKey ? `a ${rootKey} or another identifier` : ""} />
-      </label>
-      <label>
-        Reason
-        <select value={reason} onChange={(e) => setReason(e.target.value as Reason | "")}>
-          <option value="">Select a reason</option>
-          {Object.entries(REASON_LABELS).map(([key, label]) => (
-            <option key={key} value={key}>
-              {label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>
-        Reference{production ? "" : " (optional)"}
-        <input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="WALLET-482" />
-      </label>
-      <button className="btn btn-outline" type="submit" disabled={!ready || start.isPending}>
-        {start.isPending ? "Starting…" : "Run draft"}
-      </button>
-      {refused && (
-        <div role="alert" className="form-error">
-          <p>{refused.message}</p>
-          <ul>
-            {refused.failures.map((f) => (
-              <li key={f.field}>
-                {f.field}: {f.message}
-              </li>
+    <>
+      <form className="card test-run validate-form" onSubmit={submit} aria-label="Test run">
+        <h2>Test run</h2>
+        <label>
+          ID
+          <input value={value} onChange={(e) => setValue(e.target.value)} placeholder={rootKey ? `a ${rootKey} or another identifier` : ""} />
+        </label>
+        <label>
+          Reason
+          <select value={reason} onChange={(e) => setReason(e.target.value as Reason | "")}>
+            <option value="">Select a reason</option>
+            {Object.entries(REASON_LABELS).map(([key, label]) => (
+              <option key={key} value={key}>
+                {label}
+              </option>
             ))}
-          </ul>
-          <p>See the Save checks panel.</p>
-        </div>
+          </select>
+        </label>
+        <label>
+          Reference{production ? "" : " (optional)"}
+          <input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="WALLET-482" />
+        </label>
+        <button className="btn btn-outline" type="submit" disabled={!ready || start.isPending}>
+          {start.isPending ? "Starting…" : "Run draft"}
+        </button>
+        {refused && (
+          <div role="alert" className="form-error">
+            <p>{refused.message}</p>
+            <ul>
+              {refused.failures.map((f) => (
+                <li key={f.field}>
+                  {f.field}: {f.message}
+                </li>
+              ))}
+            </ul>
+            <p>See the Save checks panel.</p>
+          </div>
+        )}
+        {start.isError && !refused && !(start.error instanceof PasswordMissingError) && (
+          <p role="alert" className="form-error">
+            {start.error.message}
+          </p>
+        )}
+        {started && <Finished runId={started} />}
+      </form>
+      {application && (
+        <RunNeedsPassword
+          error={start.error}
+          request={start.variables && { application: start.variables.application, environment: start.variables.body.environment }}
+          onRerun={() => start.variables && start.mutate(start.variables)}
+        />
       )}
-      {start.isError && !refused && (
-        <p role="alert" className="form-error">
-          {start.error.message}
-        </p>
-      )}
-      {started && <Finished runId={started} />}
-    </form>
+    </>
   );
 }

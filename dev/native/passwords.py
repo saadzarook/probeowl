@@ -4,6 +4,7 @@
     init        generate the test logins' passwords, keeping any that exist
     set <name>  ask for an admin password: mssql_admin, mariadb_admin or postgresql_admin
     env         print the ones that exist as shell exports, for verify.sh to read
+    copy <name> put one on the clipboard, to paste into a database tool; never printed
 
 Run through uv from backend/, where keyring is installed. Nothing here prints a password except
 `env`, which verify.sh captures and never echoes.
@@ -12,6 +13,7 @@ Run through uv from backend/, where keyring is installed. Nothing here prints a 
 import getpass
 import secrets
 import shlex
+import subprocess
 import sys
 
 import keyring
@@ -60,6 +62,33 @@ def set_admin(name: str) -> None:
         sys.exit(f"name one of: {', '.join(ASKED)}")
     keyring.set_password(SERVICE, name, getpass.getpass(f"{name}: "))
     print(f"{name}: saved")
+
+
+# Each reads the password on stdin, never from its arguments, where other processes could see it.
+CLIPBOARD = {
+    "win32": [
+        "powershell.exe",
+        "-NoProfile",
+        "-Command",
+        "Set-Clipboard -Value ([Console]::In.ReadToEnd())",
+    ],
+    "darwin": ["pbcopy"],
+    "linux": ["xclip", "-selection", "clipboard"],
+}
+
+
+def copy(name: str) -> None:
+    """Put one saved password on the clipboard."""
+    if name not in (*GENERATED, *ASKED):
+        sys.exit(f"name one of: {', '.join((*GENERATED, *ASKED))}")
+    password = keyring.get_password(SERVICE, name)
+    if password is None:
+        sys.exit(f"{name}: not in the keychain; run init, or set {name}")
+    command = CLIPBOARD.get(sys.platform)
+    if command is None:
+        sys.exit(f"no clipboard command known for {sys.platform}")
+    subprocess.run(command, input=password, text=True, check=True)
+    print(f"{name}: copied to the clipboard")
 
 
 def environment() -> dict[str, str]:
@@ -140,6 +169,8 @@ def main() -> None:
             init()
         case ["set", name]:
             set_admin(name)
+        case ["copy", name]:
+            copy(name)
         case ["env"]:
             for name, value in environment().items():
                 print(f"export {name}={shlex.quote(value)}")

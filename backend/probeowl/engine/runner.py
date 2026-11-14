@@ -24,7 +24,7 @@ from probeowl.engine.expressions import (
     parse,
 )
 from probeowl.engine.locations import Connector, LocationRead, all_connectors, read_locations
-from probeowl.engine.masking import MASKED
+from probeowl.engine.masking import MASKED, masked_fields
 from probeowl.errors import ConfigError
 from probeowl.model.entity import Entity
 from probeowl.model.probe import Probe
@@ -146,9 +146,7 @@ def run_probe(
         entity, subject, bound, on_location, deadline, replica_lag, caveat_unknown_lag
     )
     data = _Data(reads)
-    masked = {
-        name: {f.lower() for f in [*loc.pii, *loc.mask]} for name, loc in _all_locations(entity)
-    }
+    masked = {name: masked_fields(entity, loc) for name, loc in _all_locations(entity)}
     expectations: list[ExpectationEvaluation] = []
     blocked_inputs = False
     for index, step in enumerate(steps):

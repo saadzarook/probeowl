@@ -7,7 +7,12 @@ export function useReloadConfiguration() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: reloadConfiguration,
-    // Applications, connectors, probes and the catalog may all have changed.
-    onSuccess: () => void client.invalidateQueries(),
+    // Applications, connectors, probes and the catalog may all have changed. A first read still
+    // running started before the reload, and invalidating would join it rather than read again:
+    // cancel it first.
+    onSuccess: async () => {
+      await client.cancelQueries();
+      await client.invalidateQueries();
+    },
   });
 }

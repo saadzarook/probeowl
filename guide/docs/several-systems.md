@@ -39,8 +39,9 @@ environments:
   uat: { base_url: "http://127.0.0.1:8082" }
 ```
 
-`owl connector add --application card_access` writes a file like these, and keeps each password
-or token in your keychain. See [Connectors](connectors.md#adding-a-connector).
+**Add connection** on the Connectors screen, or `owl connector add --application card_access`,
+writes a file like these, and keeps each password or token in your keychain. See
+[Connectors](connectors.md#adding-a-connector).
 
 ## Each location names its connector
 

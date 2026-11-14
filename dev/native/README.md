@@ -141,6 +141,19 @@ nothing is left in your environment. For one shell, from `backend/`:
 eval "$(uv run python ../dev/native/passwords.py env)"
 ```
 
+To paste one into a database tool, copy it to the clipboard. Nothing here prints a password to the
+terminal, and you shouldn't either: pipe what a keychain read returns to `Set-Clipboard`, `pbcopy` or
+`xclip -selection clipboard`, never to the screen.
+
+```sh
+uv run python ../dev/native/passwords.py copy ro            # the read-only seed login's password
+```
+
+`verify.sh --first-run` saves passwords to the real keychain through the page, under test-only
+names (`probeowl/probeowl_test_*`). It removes exactly those after the run, and at its start it
+removes any that a run killed hard left behind, logging each name it removes, never a value
+(`dev/native/keychain_test_entries.py`). It never touches any other entry.
+
 ## PROBEOWL_TEST_<DB>_URL
 
 `passwords.py env` sets these, in this form:

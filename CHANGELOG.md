@@ -12,6 +12,127 @@ v0.2 phase (a) first-run setup and Add connection, v0.3 phase (b) the entity gra
 v0.4 phase (c) blocks and probe by example, v0.5 phase (d) templates and New runbook.
 See docs/implementation-plan.md, Releases. -->
 
+## [0.2.0] - 2026-11-14
+
+Phase (a) of No YAML required: set up in the browser. The newcomer path, from install to a first
+Validate on the card example, goes from **61 actions and 366 characters typed to 49 and 264**
+(docs/v0.2.md, "Measured after phase (a)").
+- **Setup in the browser:** first-run setup and Add connection replace `owl init`'s questions.
+- **Search:** global search, with <kbd>Ctrl</kbd>+<kbd>K</kbd>.
+- **Drafting with an AI assistant:** `owl mcp`.
+- **A security fix for v0.1, PII root keys:** if you used v0.1 with an entity whose key is PII,
+  run `owl store mask-pii` (see Security).
+
+Still a pre-release: a security review comes before 1.0.
+
+### Added
+
+- First-run setup in the browser. `owl serve` started with no applications opens a setup screen:
+  - the application's name, its owning team and its environments, with `application.yaml` shown
+    as a diff as you choose;
+  - then its first connection.
+
+  `owl serve` creates its default SQLite store the first time, so that setup is audited, and uses
+  `./probeowl` (or `~/probeowl`) when no folder is named. `owl init` stays, for scripts.
+- Add connection, for a new connector or a binding in an environment not bound yet:
+  - paste a connection string to fill the form, read in the browser and never sent or stored;
+  - Test connection before saving;
+  - a preview of the connector's file;
+  - the password straight to this machine's keychain, through a write-only route.
+
+  Then it imports the tables and offers to **Confirm all** their suggested labels.
+- `owl mcp`: ProbeOwl's drafting tools for an AI assistant (Claude Desktop, VS Code with Copilot,
+  Claude Code), over the Model Context Protocol on stdio. The tools are `drafting_guide`,
+  `template`, `examples`, `check_draft`, `list_config` and `schema`. The assistant drafts and
+  checks; you paste and reload.
+  - It writes nothing, runs nothing and never returns a credential, host, URL, login, row or run
+    subject.
+  - `check_draft` flags a secret in a draft by kind and line, and never repeats it.
+  - Every call is audited as you, via MCP.
+  - See the guide's *Draft with an AI assistant*.
+- Search everything from the keyboard: <kbd>Ctrl</kbd>+<kbd>K</kbd>, or <kbd>/</kbd> outside a text
+  field. It searches applications, entities, locations, probes, connectors, runbooks, imported
+  tables and columns, runs by ID or subject, and the guide. Actions include New entity, New probe,
+  Add connection, Reload configuration, and Inspect or Validate with the typed value filled in.
+  - A result opens on its own screen in its own application. When that application doesn't have
+    the environment you're in, it opens in its first environment that isn't Production, and says
+    so. It opens in Production only when that's all the application has, and says that too.
+  - A masked subject shows as `[masked]` and matches nothing.
+- A connection whose password isn't on this machine, as when its file came from a teammate, asks
+  for it: on Connectors, and wherever Inspect, Validate or a test run needs it. The password goes
+  straight to this machine's keychain and is never stored by the page.
+- Change password on Connectors tests the new password on the saved binding first, and replaces the
+  saved one only if it connects. If it doesn't, the old one stays, with the reason, and Save anyway
+  is there for a database that is down.
+- A run started again after its missing password is saved goes where the first was sent. If the top
+  bar's environment changed meanwhile, nothing runs: it asks instead.
+
+### Changed
+
+- First-run setup shows `application.yaml` as a diff on the environments step as you choose, with no
+  Preview button. Create is still the one write, of exactly the diff shown.
+- `owl serve` prints `Starting ProbeOwl…` at once, before anything slow, then its version and
+  address once it's up. The guide no longer has a separate `owl --version` check, and its
+  troubleshooting page says the first start after installing can take about 20 seconds on Windows.
+
+### Security
+
+- Passwords are kept only in the operating system's keychain: Windows Credential Manager, the
+  macOS Keychain, or Secret Service or KWallet on Linux. ProbeOwl now picks that keychain itself
+  instead of taking keyring's default. That default can be a chain that falls back to a file or the
+  Windows registry when the keychain fails, or a backend named by `PYTHON_KEYRING_BACKEND` or a
+  `keyringrc.cfg`. On a machine with none of those keychains, saving a password is refused ("there
+  is no system keychain on this machine"), and a `keyring:` secret is never read from anywhere
+  else. Use an `env:` secret there. This covers Add connection, Change password, the
+  missing-password prompt, `owl init`, `owl connector add` and every run.
+- **Fixed in v0.1:** `PROBEOWL_ALLOW_INSECURE_KEYRING=1`, meant for CI only, let `owl` read and
+  write passwords in a file or registry keyring. It is removed. It only mattered if you set it, with
+  keyrings.alt installed next to ProbeOwl, which `uv tool install probeowl` doesn't do.
+- **If you set `PROBEOWL_ALLOW_INSECURE_KEYRING` with v0.1:**
+  1. Unset it.
+  2. Enter each connection's password again (Connectors, **Change password**), so it goes to the
+     keychain.
+  3. Delete what keyrings.alt wrote: the `[probeowl]` section, or the whole file if nothing else
+     uses it. It is in:
+     - `keyring_pass.cfg` (plaintext) or `crypted_pass.cfg` (encrypted), in
+       `%LOCALAPPDATA%\Python Keyring\` on Windows, or in `~/.local/share/python_keyring/`
+       (`$XDG_DATA_HOME/python_keyring/`) on Linux and macOS;
+     - on Windows, the registry key `HKEY_CURRENT_USER\Software\probeowl\Keyring`.
+- A store URL with an inline password is refused by `owl mcp`: "the store URL contains a password;
+  keep it in PROBEOWL_STORE_URL, not in the assistant's config". `owl serve` and `owl store` warn
+  about one. None of them shows the URL.
+- Testing a connection with a typed password is limited to 5 attempts per connector and
+  environment in any minute. This covers Add connection and Change password, so repeated wrong
+  passwords can't lock the database account; Oracle's default profile locks one after 10 failed
+  logins. The sixth answers "too many attempts, wait a minute", with `Retry-After`, tries
+  nothing, and is recorded in the audit. Testing with the saved password isn't limited.
+- **Fixed in v0.1:** an entity whose key is PII (`pii: true` on its root key, such as a national
+  ID, phone number or email) had its runs' subject stored and shown unmasked. Now it shows as
+  `[masked]` in the store, the runs list, the API, the audit and the CLI.
+- A PII identifier is now masked wherever it shows, whatever each location's own `pii` list says:
+  in rows, in lookup parameters and in runbook step results.
+- Where a run needs the real value later, it asks for it to be pasted for that one action: a
+  runbook step, the healthy comparison, or an Ambiguous run's matches, which are then picked by
+  number. `owl check` warns about such entities, and doesn't refuse them.
+- **If you used v0.1 with an entity whose key or identifiers are PII,** mask the runs it already
+  stored. With owl serve stopped, run `owl store mask-pii <config folder>` to see what would
+  change, then add `--apply`. It never prints a value. It names how many audit events still hold
+  one: the audit is append-only, so those are kept.
+
+### Fixed
+
+- The guide no longer asks GitHub for the latest release, which answered 404 while every release
+  is a pre-release. Its repository link is a plain footer link.
+- First-run setup's "Add its first connection", clicked as soon as it appears, opens Add connection.
+  It showed before the new application was loaded, and a quick click went back to setup.
+- `owl serve` started without `--config` or `PROBEOWL_CONFIG` no longer tries to load the folder it
+  was started in when that folder's YAML isn't ProbeOwl's, such as `C:\Windows\System32` or a
+  project with its own `application.yaml`: it uses `./probeowl` (or `~/probeowl`) instead and says
+  why. A folder named with `--config` or `PROBEOWL_CONFIG` is loaded as before, with its errors.
+- `owl serve`'s log and owl's own output use colour only where the console shows it: `NO_COLOR`
+  unset, a terminal, and on Windows the console's virtual terminal processing on. An
+  administrator PowerShell without it no longer shows codes such as `←[32mINFO←[0m`.
+
 ## [0.1.0] - 2026-11-12
 
 The first pre-release: phase 1, milestones M0 to M4, verified on test databases only.
@@ -66,5 +187,6 @@ The first pre-release: phase 1, milestones M0 to M4, verified on test databases 
   `owl store ddl`, `owl catalog import`, `owl kill on`, `owl kill off`, `owl kill list`,
   `owl runbook hash`.
 
-[Unreleased]: https://github.com/saadzarook/probeowl/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/saadzarook/probeowl/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/saadzarook/probeowl/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/saadzarook/probeowl/releases/tag/v0.1.0

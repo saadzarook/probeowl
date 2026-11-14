@@ -10,22 +10,6 @@ async function chooseApplication(page: Page, name: RegExp) {
   await page.getByRole("button", { name }).last().click();
 }
 
-test("with no applications, every screen says to run owl init and links to the guide", async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem("mock-no-applications", "1"));
-  for (const screen of ["/inspect", "/validate", "/probes", "/tables", "/connectors"]) {
-    await page.goto(screen);
-    const empty = page.getByRole("region", { name: "No applications yet" });
-    await expect(empty).toContainText("owl init");
-    await expect(empty).toContainText("owl serve --config <folder>");
-  }
-  await expect(page.getByRole("link", { name: "Getting started" })).toHaveAttribute("href", `${GUIDE}getting-started/`);
-  await expect(page.getByRole("link", { name: "Try the examples" })).toHaveAttribute("href", `${GUIDE}getting-started/#try-the-examples`);
-  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
-  // A tool needs no application, so it still opens.
-  await page.goto("/tools/compare-files");
-  await expect(page.getByRole("region", { name: "No applications yet" })).toHaveCount(0);
-});
-
 test("no Validate probe for the entity offers a new one, which opens as a validate draft", async ({ page }) => {
   await page.goto("/validate");
   await chooseApplication(page, /Card access/);

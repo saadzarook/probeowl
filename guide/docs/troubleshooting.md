@@ -12,6 +12,12 @@ uv tool update-shell
 
 once, and open a new terminal. `uv tool dir --bin` shows the folder it adds.
 
+## `owl serve` is slow to start the first time
+
+`owl serve` prints `Starting ProbeOwl…` at once, then its version and address once it's up. The
+first start after installing can take about 20 seconds on Windows while antivirus checks the new
+files. Later starts take 3–4 seconds.
+
 ## The web app shows 422 or 404 errors on first load
 
 Fixed in ProbeOwl's first-run work: the Probe editor no longer checks an empty draft, and the
@@ -79,7 +85,9 @@ the store has no ProbeOwl tables yet; run: owl store init
 the store schema is at <version>, this release needs <version>; run: owl store upgrade
 ```
 
-`owl serve` needs ProbeOwl's own store, at this release's version:
+`owl serve` needs ProbeOwl's own store, at this release's version. It creates the default one,
+`~/.probeowl/store.db`, the first time, so this comes from a store named by `--url` or
+`PROBEOWL_STORE_URL`, or one made by an older release:
 
 ```sh
 owl store init          # creates ~/.probeowl/store.db, or upgrades an existing store
@@ -93,17 +101,69 @@ Set `PROBEOWL_STORE_URL` for a server database. A store on a network share is re
 authentication failed; check the binding's login and secret
 ```
 
-The login or its password is wrong. Check the binding's `user`, and that its `secret` names an
-entry that exists:
+The login or its password is wrong. Check the binding's `user`. If the password changed, use
+**Change password** on the **Connectors** screen: it tests the new one before replacing the saved
+one ([Change password](web-app/connectors.md#change-password)).
+
+From a terminal, check that the binding's `secret` names an entry that exists. Copy it to the
+clipboard rather than printing it, so it never lands in your terminal's scrollback:
 
 ```sh
-uvx keyring get probeowl wallet_db.prod     # prints nothing if there's no such entry
-uvx keyring set probeowl wallet_db.prod     # to save it again
+uvx keyring get probeowl wallet_db.prod | Set-Clipboard              # Windows PowerShell
+uvx keyring get probeowl wallet_db.prod | pbcopy                     # macOS
+uvx keyring get probeowl wallet_db.prod | xclip -selection clipboard # Linux
+uvx keyring set probeowl wallet_db.prod                              # to save it again
 ```
 
-`no keychain entry for service 'probeowl' and user 'wallet_db.prod'` means the entry is missing.
-On Linux without a desktop keychain, ProbeOwl refuses a keyring that keeps secrets in files.
-Use an `env:` secret instead.
+An empty clipboard means there's no such entry.
+
+`no keychain entry for service 'probeowl' and user 'wallet_db.prod'` means the entry is missing,
+as when the connector's file came from a teammate. The web app asks for it where it's needed
+([A password missing on this machine](web-app/connectors.md#a-password-missing-on-this-machine)).
+
+## "there is no system keychain on this machine"
+
+```text
+there is no system keychain on this machine: ProbeOwl keeps passwords only in Windows Credential
+Manager, the macOS Keychain, or Secret Service or KWallet on Linux
+```
+
+ProbeOwl keeps a `keyring:` password only in your operating system's keychain, and found none
+here. This is usual on a Linux server, or in WSL, where no desktop session runs Secret Service
+or KWallet. It never falls back to a file or the registry instead. So the setup screen, **Add
+connection** and **Change password** refuse to save a password, and a `keyring:` secret can't be
+read.
+
+On such a machine, use an `env:` secret: the binding names an environment variable, and you set
+that variable in the shell that runs `owl serve`.
+
+1. In the connector's file, point the binding's `secret` at a variable. Use one variable per
+   connector and environment:
+
+    ```yaml
+    environments:
+      uat:
+        secret: env:PROBEOWL_ACCESS_DB_UAT
+    ```
+
+    This names the variable only. The password itself is never in the file.
+
+2. In the shell that will run `owl serve`, set the variable without it showing on screen or in
+   your shell's history, then start `owl serve` from that same shell:
+
+    ```sh
+    read -rs PROBEOWL_ACCESS_DB_UAT && export PROBEOWL_ACCESS_DB_UAT   # type it, then Enter
+    owl serve
+    ```
+
+    `owl serve` reads the variable when it starts. After changing it, restart `owl serve`.
+
+Never put the password in a file in the config folder, such as a `.env` file or a script that
+exports it: the folder is meant to be shared and committed, and ProbeOwl never reads passwords
+from files. Also keep it out of shell startup files (`~/.bashrc`, `~/.profile`).
+
+On a machine with a desktop, a locked or missing keychain gives this message too. Unlock it, or on
+Linux check that Secret Service is running (as `gnome-keyring` or KWallet), then try again.
 
 ## "connection refused"
 

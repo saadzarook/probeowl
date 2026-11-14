@@ -1,0 +1,30 @@
+# Author: @SaadZarook
+name: site
+
+# The landing page's own checks (dev/site/check.sh). Only on changes to the page, its fonts or its
+# checks: so it must not be a required check, which a skipped run would leave unmergeable.
+on:
+  pull_request:
+    paths: ["site/**", "dev/site/**", ".github/workflows/site.yml"]
+  push:
+    branches: [main, develop]
+    paths: ["site/**", "dev/site/**", ".github/workflows/site.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  site-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install Playwright (from web/)
+        working-directory: web
+        run: npm ci && npx playwright install --with-deps chromium
+      - name: No external requests, CSP, fonts, 390 px
+        run: bash dev/site/check.sh

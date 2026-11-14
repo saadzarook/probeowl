@@ -1,6 +1,6 @@
 // Author: @SaadZarook
 import { useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import type { Entity } from "../api/client";
 import { useEntities, useEntity, useEntityYaml } from "../api/useEntities";
@@ -129,6 +129,17 @@ export function ProbeEditorPage({ item }: { item: NavItem }) {
       setOpenError({ probe, message: e instanceof Error ? e.message : "The probe's file could not be opened." });
     }
   }
+
+  // ?probe= from search opens that probe, and ?entity= its entity's first: once per link.
+  const linked =
+    params.get("probe") ?? (params.get("new") ? undefined : probes.data?.find((p) => p.entity === params.get("entity"))?.name);
+  const followed = useRef<string>();
+  useEffect(() => {
+    const key = `${name ?? ""}/${linked ?? ""}`;
+    if (linked === undefined || followed.current === key || !probes.data?.some((p) => p.name === linked)) return;
+    followed.current = key;
+    void openProbe(linked);
+  });
 
   /** Ask for the new probe's id and title; its draft starts once they are given. */
   function newProbe() {

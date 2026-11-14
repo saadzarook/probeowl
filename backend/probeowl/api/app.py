@@ -32,6 +32,7 @@ from probeowl.errors import (
     ConnectorError,
     GuardViolation,
     InputTooLarge,
+    KeychainUnavailable,
     KillSwitchEngaged,
     KillSwitchUnknown,
     NotFoundError,
@@ -41,12 +42,15 @@ from probeowl.errors import (
 from probeowl.plugins.registry import LoadedPlugin, mount_plugins
 from probeowl.reload import ConfigReloader
 from probeowl.runs import RunService
+from probeowl.secret_writes import SecretWrites
+from probeowl.setup_writes import SetupWrites
 
 DEFAULT_PORT = 7878
 
 _STATUS_BY_ERROR: dict[type[ProbeOwlError], int] = {
     NotFoundError: 404,
     RequestError: 422,
+    KeychainUnavailable: 503,  # before ConfigError, which it is
     ConfigError: 422,
     ConflictError: 409,
     CapacityError: 429,
@@ -64,11 +68,18 @@ def _no_audit(action: str, details: dict[str, JsonValue]) -> None:
 
 
 def problem(
-    request: Request, status: int, detail: str | None, fields: dict[str, str] | None = None
+    request: Request,
+    status: int,
+    detail: str | None,
+    fields: dict[str, str] | None = None,
+    problem_type: str = "about:blank",
+    extensions: dict[str, str] | None = None,
+    headers: dict[str, str] | None = None,
 ) -> JSONResponse:
     """Build a problem details response, with the fields not accepted when there are any."""
     redactor: Redactor = request.app.state.redactor
     body = Problem(
+        type=problem_type,
         title=HTTPStatus(status).phrase,
         status=status,
         detail=redactor.text(detail) if detail is not None else None,
@@ -78,11 +89,13 @@ def problem(
             if fields
             else None
         ),
+        **(extensions or {}),
     )
     return JSONResponse(
         body.model_dump(exclude_none=True),
         status_code=status,
         media_type="application/problem+json",
+        headers=headers,
     )
 
 
@@ -100,9 +113,12 @@ async def _validation_error(request: Request, exc: Exception) -> JSONResponse:
 
 
 async def _probeowl_error(request: Request, exc: Exception) -> JSONResponse:
+    assert isinstance(exc, ProbeOwlError)  # registered for ProbeOwlError only
     status = next((s for t, s in _STATUS_BY_ERROR.items() if isinstance(exc, t)), 500)
     fields = exc.fields if isinstance(exc, RequestError) else None
-    return problem(request, status, str(exc), fields)
+    return problem(
+        request, status, str(exc), fields, exc.problem_type, exc.extensions(), exc.headers()
+    )
 
 
 async def _unexpected_error(request: Request, exc: Exception) -> JSONResponse:
@@ -190,6 +206,8 @@ def create_app(
     web_build: Path | None = None,
     guide_build: Path | None = None,
     reloader: ConfigReloader | None = None,
+    setup: SetupWrites | None = None,
+    secrets: SecretWrites | None = None,
 ) -> FastAPI:
     """Create the ProbeOwl API; without runs or the catalog, their routes answer 501.
 
@@ -210,6 +228,8 @@ def create_app(
     app.state.probes = probes
     app.state.connectors = connectors
     app.state.reloader = reloader
+    app.state.setup = setup
+    app.state.secrets = secrets
     loaded = runs or catalog or connectors
     app.state.redactor = Redactor(loaded.applications if loaded else {})
     app.state.kill = runs.kill if runs else None

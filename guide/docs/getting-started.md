@@ -10,16 +10,15 @@ uv tool update-shell
 ```
 
 `uv tool update-shell` adds uv's tool folder to your PATH, once per machine. Open a new terminal
-after it, then check:
+after it. `owl serve` prints its version on its first line as it starts, which shows the install
+worked. If a new terminal says `owl` isn't found, run `uv tool update-shell` again and open another
+one.
 
-```sh
-owl --version
-```
+Then [Your first application](first-application.md) sets it up for one of your own systems, in
+the browser. To see what it does first, try the examples.
 
-If a new terminal says `owl` isn't found, run `uv tool update-shell` again and open another one.
-
-Then [Your first application](first-application.md) sets it up for one of your own systems. To
-see what it does first, try the examples.
+With an AI assistant, such as Claude or GitHub Copilot, it can draft entities and probes for you
+to check and paste in: see [Draft with an AI assistant](drafting-with-an-assistant.md).
 
 ## The examples
 

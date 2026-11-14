@@ -1,0 +1,3 @@
+# The landing page's CSP pins its inline script by hash: its bytes must stay as committed.
+site/*.html text eol=lf
+site/fonts/*.woff2 binary

@@ -523,6 +523,8 @@ The platform verifies records against a known happy path. It is the wrong tool w
 
 ## AI agent access (MCP) — parked
 
+v0.2 adds a narrower, drafting-only MCP server (`owl mcp`), outlined in [v0.2.md](v0.2.md#mcp-server-drafting-with-an-ai-assistant); the validation-running agent below stays parked.
+
 **Parked for now.** The MCP server is not in phase 1, but the design keeps room for it, so adding it later is a thin layer rather than a rework:
 
 - The UI is a client of an internal runner API; nothing it does is UI-only, so an MCP server can call the same API.

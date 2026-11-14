@@ -36,7 +36,16 @@ export interface paths {
          * @description Get one application.
          */
         get: operations["get_application"];
-        put?: never;
+        /**
+         * Save Application
+         * @description Write a new application's application.yaml into the folder owl serve loaded.
+         *
+         *     As every save: first without `base`, nothing is written and the response is the change;
+         *     then with that `base` to write exactly that change. Loaded at once, so the next screen
+         *     finds it. 409 if an application of that id is loaded already, if the file changed since
+         *     its preview, or while a run is running. Never commits or pushes; audited.
+         */
+        put: operations["save_application"];
         post?: never;
         delete?: never;
         options?: never;
@@ -469,6 +478,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search Everything
+         * @description Global search: names and titles, imported tables and columns, and runs. Not audited.
+         *
+         *     Prefix matches rank before substring matches, names before titles. A run is found by its
+         *     id (4 or more characters) or by its subject or identifier as stored: exactly, or by a
+         *     prefix of 4 or more characters when it isn't PII. A masked value matches nothing. Never
+         *     matched: run results, evidence, lookups' SQL, runbook steps, hosts, URLs, logins or
+         *     keychain names. application: omitted, every application. limit: per group.
+         */
+        get: operations["search_everything"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runs/{run_id}": {
         parameters: {
             query?: never;
@@ -643,6 +678,107 @@ export interface paths {
          *     circuit breaker paused is left alone, and reported as not reached with the reason.
          */
         post: operations["test_connection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/setup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Setup
+         * @description What first run needs: applications loaded, where new ones go, the store and the keychain.
+         *
+         *     Never the store's URL or login.
+         */
+        get: operations["get_setup"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/applications/{application}/connectors/{connector}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Save Connector
+         * @description Write a new connector with one binding, or a binding for an environment not bound yet.
+         *
+         *     Preview, then write, as every save. The binding's secret is always the keychain reference
+         *     keyring:probeowl/<connector>.<environment>, chosen here: the request never carries one,
+         *     and no password goes into a file. A Production SQL binding must be a replica (422). 409
+         *     if the binding exists already: editing one is done in its file. Loaded at once; audited
+         *     without host, login or URL.
+         */
+        put: operations["save_connector"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/applications/{application}/connectors/test-draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Test Draft Connection
+         * @description Connect once to a binding that is not saved yet, and say how it went. Audited.
+         *
+         *     With the password given, used for this one connection and never stored, logged or
+         *     returned; or with the one this machine's keychain has. The same fixed reasons as Test
+         *     connection, never the server's own text. Reads no data. 403 if a kill switch covers the
+         *     application, or the connector if it exists. With a password given, at most 5 attempts per
+         *     connector and environment in any minute: then 429 too-many-attempts, "too many attempts,
+         *     wait a minute", with Retry-After, and nothing is tried (#61). The refusal is audited.
+         */
+        post: operations["test_draft_connection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/applications/{application}/connectors/{connector}/environments/{environment}/secret": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Save Secret
+         * @description Save a binding's password or token in this machine's keychain. 204, with no body.
+         *
+         *     Write-only: no route returns it. It is never written to a file, logged, or put in an error
+         *     or the audit, which records only that it changed. Saved under the name the binding's file
+         *     gives; 409 secret-exists if one is saved there already and `replace` is false, perhaps for
+         *     another application's connector of the same id. 422 if the binding reads its secret from
+         *     an environment variable; 503 if this machine has no system keychain.
+         */
+        put: operations["save_secret"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1273,6 +1409,8 @@ export interface components {
             health: components["schemas"]["BindingHealth"];
             /** Reason */
             reason?: string | null;
+            /** @description Whether this machine has the binding's password or token: missing means its keychain entry does not exist here, so ask for it. Null with no binding here. */
+            secret?: components["schemas"]["SecretState"] | null;
             /**
              * Replica
              * @default false
@@ -1330,6 +1468,40 @@ export interface components {
             text: string;
             /** Unfilled */
             unfilled?: components["schemas"]["UnfilledParameter"][];
+        };
+        /**
+         * DraftConnection
+         * @description A binding that is not saved yet, to connect to once; or a saved one, with a new password.
+         */
+        DraftConnection: {
+            /**
+             * Connector
+             * @description Its connector, which may not exist yet.
+             */
+            connector: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "sqlserver" | "oracle" | "mariadb" | "rest";
+            /** Environment */
+            environment: string;
+            /**
+             * Binding
+             * @description Where it points. Omitted for a connector already bound in environment: its saved binding is tested with the password given, as Change password does before saving.
+             */
+            binding?: components["schemas"]["SqlBindingDraft"] | components["schemas"]["RestBindingDraft"] | null;
+            /**
+             * Password
+             * @description Used for this one test only: never stored, logged or returned.
+             */
+            password?: string | null;
+            /**
+             * Use Saved Password
+             * @description Use the password this machine's keychain has for the binding.
+             * @default false
+             */
+            use_saved_password: boolean;
         };
         /**
          * DraftProbe
@@ -1449,6 +1621,21 @@ export interface components {
             /** Written */
             written: boolean;
             report: components["schemas"]["SaveCheckReport"];
+        };
+        /**
+         * EnvironmentDraft
+         * @description One environment of a new application.
+         */
+        EnvironmentDraft: {
+            /** Name */
+            name: string;
+            /** Title */
+            title: string;
+            /**
+             * Production
+             * @default false
+             */
+            production: boolean;
         };
         /**
          * EnvironmentSummary
@@ -1900,6 +2087,19 @@ export interface components {
         };
         JsonValue: unknown;
         /**
+         * KeychainInfo
+         * @description Whether this machine has a system keychain to keep passwords in.
+         */
+        KeychainInfo: {
+            /** Available */
+            available: boolean;
+            /**
+             * Reason
+             * @description Why not, when it is not available.
+             */
+            reason?: string | null;
+        };
+        /**
          * KillScope
          * @description How much one kill switch stops.
          * @enum {string}
@@ -2137,14 +2337,27 @@ export interface components {
         Outcome: "found" | "missing" | "waiting" | "blocked" | "ambiguous" | "error" | "stale" | "not_configured";
         /**
          * PickMatches
-         * @description Subjects picked from an Ambiguous run's matches, to run its probe for.
+         * @description Matches picked from an Ambiguous run, to run its probe for: by subject, or by number.
+         *
+         *     By number when the entity's key is PII, so its matches show [masked]: the value searched
+         *     for is pasted again, and the same lookup runs again to find them (#66).
          */
         PickMatches: {
             /**
              * Subjects
              * @description Root key values from the run's matches; up to 5 run together.
              */
-            subjects: string[];
+            subjects?: string[] | null;
+            /**
+             * Value
+             * @description With picks: the value the Ambiguous run searched for, pasted again. Never stored, logged, audited or returned.
+             */
+            value?: string | null;
+            /**
+             * Picks
+             * @description With value: the matches' numbers as the run lists them, from 1.
+             */
+            picks?: number[] | null;
         };
         /**
          * PlanAccess
@@ -2290,6 +2503,16 @@ export interface components {
              * @description For a 422: each field that was not accepted, and why.
              */
             errors?: components["schemas"]["FieldError"][] | null;
+            /**
+             * Connector
+             * @description password-missing and secret-exists: the binding's connector, so a client can ask for its password where the problem shows.
+             */
+            connector?: string | null;
+            /**
+             * Environment
+             * @description password-missing and secret-exists: the binding's environment.
+             */
+            environment?: string | null;
         };
         /**
          * Range
@@ -2341,6 +2564,19 @@ export interface components {
          * @enum {string}
          */
         Reason: "incident" | "customer_complaint" | "deploy_verification" | "audit_or_compliance" | "proactive_check";
+        /**
+         * RestBindingDraft
+         * @description Where a REST connector points in one environment.
+         */
+        RestBindingDraft: {
+            /** Base Url */
+            base_url: string;
+            /**
+             * Needs Token
+             * @description Whether the API needs a token, kept in the keychain.
+             */
+            needs_token: boolean;
+        };
         /**
          * Review
          * @description Who reviewed a read query, when, and exactly what they read.
@@ -2472,7 +2708,7 @@ export interface components {
         };
         /**
          * RunRunbookStep
-         * @description Run a step, named in the path. It carries no SQL and no values: the server has both.
+         * @description Run a step, named in the path. It carries no SQL: the server has it, and the run's values.
          */
         RunRunbookStep: {
             /**
@@ -2481,6 +2717,11 @@ export interface components {
              * @default false
              */
             run_without_plan_check: boolean;
+            /**
+             * Subject
+             * @description The run's subject, pasted when its entity's key is PII and so stored masked. Used for this step only: never stored, logged, audited or returned.
+             */
+            subject?: string | null;
         };
         /**
          * RunStarted
@@ -2616,6 +2857,26 @@ export interface components {
             runs: components["schemas"]["RunStarted"][];
         };
         /**
+         * SaveApplication
+         * @description A new application. Without base: preview its file. With it: write exactly that.
+         */
+        SaveApplication: {
+            /** Title */
+            title: string;
+            /**
+             * Owner
+             * @description The team responsible for it.
+             */
+            owner: string;
+            /** Environments */
+            environments: components["schemas"]["EnvironmentDraft"][];
+            /**
+             * Base
+             * @description The base of the preview being confirmed. Omitted: nothing is written and the change is returned. Given: written only if the file is still as it was then.
+             */
+            base?: string | null;
+        };
+        /**
          * SaveCheck
          * @description One check, such as Read-only SQL or the plan of one lookup.
          */
@@ -2678,6 +2939,32 @@ export interface components {
             plans_not_run: number;
         };
         /**
+         * SaveConnector
+         * @description A new connector with one binding, or a binding for an environment not bound yet.
+         */
+        SaveConnector: {
+            /**
+             * Type
+             * @description An existing connector's type must match.
+             * @enum {string}
+             */
+            type: "sqlserver" | "oracle" | "mariadb" | "rest";
+            /**
+             * Owner
+             * @description Used for a new connector only.
+             */
+            owner?: string | null;
+            /** Environment */
+            environment: string;
+            /** Binding */
+            binding: components["schemas"]["SqlBindingDraft"] | components["schemas"]["RestBindingDraft"];
+            /**
+             * Base
+             * @description The base of the preview being confirmed. Omitted: nothing is written and the change is returned. Given: written only if the file is still as it was then.
+             */
+            base?: string | null;
+        };
+        /**
          * SaveEntity
          * @description A new entity to save on its own. Without base: preview it. With it: write it.
          */
@@ -2737,6 +3024,24 @@ export interface components {
             save_without_plan_check: boolean;
         };
         /**
+         * SaveSecret
+         * @description A binding's password or token, for this machine's keychain only.
+         */
+        SaveSecret: {
+            /**
+             * Password
+             * Format: password
+             * @description Saved to the system keychain; never written to a file, logged or returned.
+             */
+            password: string;
+            /**
+             * Replace
+             * @description Overwrite a password already saved under the binding's keychain name. Without it, an existing one is a 409 secret-exists, so the person can be asked first.
+             * @default false
+             */
+            replace: boolean;
+        };
+        /**
          * SchemaSnapshot
          * @description The schema of one connector's database in one environment, as imported.
          */
@@ -2760,6 +3065,74 @@ export interface components {
              */
             truncated?: string | null;
         };
+        /**
+         * SearchGroup
+         * @description The matches of one kind, best first.
+         */
+        SearchGroup: {
+            kind: components["schemas"]["SearchKind"];
+            /** Items */
+            items: components["schemas"]["SearchItem"][];
+            /**
+             * More
+             * @description Matches beyond the limit.
+             */
+            more: number;
+        };
+        /**
+         * SearchItem
+         * @description One match: enough to show it and to build its link.
+         */
+        SearchItem: {
+            kind: components["schemas"]["SearchKind"];
+            /**
+             * Application
+             * @description Its application; null only for an application.
+             */
+            application: string | null;
+            /**
+             * Id
+             * @description entity: visitor; location: visitor.cards; table: <connector>.<table>; column: <connector>.<table>.<column>; run: its id; otherwise its name.
+             */
+            id: string;
+            /**
+             * Title
+             * @description The human title, or the id when there is none.
+             */
+            title: string;
+            /**
+             * Detail
+             * @description entity: its root key; probe: Validate · visitor; connector: mariadb · uat, prod; run: Failed · 12 Nov 14:02 · visitor_cards.
+             */
+            detail?: string | null;
+            /**
+             * Labels
+             * @description table: its catalog label, or the suggested one and 'suggested'; column: its roles.
+             */
+            labels?: string[];
+        };
+        /**
+         * SearchKind
+         * @description What a result is. Groups come back in this order.
+         * @enum {string}
+         */
+        SearchKind: "application" | "entity" | "probe" | "location" | "connector" | "runbook" | "table" | "column" | "run";
+        /**
+         * SearchResults
+         * @description Every group with a match, in SearchKind's order; a kind with none is left out.
+         */
+        SearchResults: {
+            /** Query */
+            query: string;
+            /** Groups */
+            groups: components["schemas"]["SearchGroup"][];
+        };
+        /**
+         * SecretState
+         * @description Whether this machine has what a binding signs in with. Never the value.
+         * @enum {string}
+         */
+        SecretState: "saved" | "missing" | "from_environment" | "not_needed";
         /**
          * SetKillSwitch
          * @description Turn one kill switch on or off, and say why: both are audited with the actor.
@@ -2788,6 +3161,71 @@ export interface components {
             reference?: string | null;
         };
         /**
+         * SetupState
+         * @description What first run needs to know before it asks anything.
+         */
+        SetupState: {
+            /**
+             * Applications
+             * @description Applications loaded; none opens the first-run setup.
+             */
+            applications: number;
+            /**
+             * Config Folder
+             * @description Where new applications are written.
+             */
+            config_folder: string;
+            store: components["schemas"]["StoreInfo"];
+            keychain: components["schemas"]["KeychainInfo"];
+        };
+        /**
+         * SqlBindingDraft
+         * @description Where a SQL connector points in one environment, as the Add connection form asks it.
+         *
+         *     Never a secret or its reference: the server names the keychain entry itself.
+         */
+        SqlBindingDraft: {
+            /** Host */
+            host: string;
+            /** Port */
+            port: number;
+            /**
+             * Database
+             * @description Database (SQL Server, MariaDB) or service name.
+             */
+            database: string;
+            /**
+             * Schema
+             * @description Oracle only.
+             */
+            schema?: string | null;
+            /**
+             * User
+             * @description The read-only login.
+             */
+            user: string;
+            /**
+             * Replica
+             * @default false
+             */
+            replica: boolean;
+            /**
+             * Encrypt
+             * @description MariaDB and Oracle; always on for SQL Server.
+             * @default true
+             */
+            encrypt: boolean;
+            /** Encrypt Reason */
+            encrypt_reason?: string | null;
+            /**
+             * Trust Server Certificate
+             * @default false
+             */
+            trust_server_certificate: boolean;
+            /** Trust Server Certificate Reason */
+            trust_server_certificate_reason?: string | null;
+        };
+        /**
          * StartHealthyComparison
          * @description How to find the known-good subject. Neither field: the newest that passes.
          */
@@ -2802,6 +3240,11 @@ export interface components {
              * @description A known-good ID a person pasted.
              */
             subject?: string | null;
+            /**
+             * Failing Subject
+             * @description This run's subject, pasted when its entity's key is PII and so stored masked: the sample needs it to leave this run out. Never stored, logged, audited or returned.
+             */
+            failing_subject?: string | null;
         };
         /**
          * StartRun
@@ -2885,6 +3328,22 @@ export interface components {
              * Format: date-time
              */
             at: string;
+        };
+        /**
+         * StoreInfo
+         * @description ProbeOwl's own store, as first run reports it: never its URL or login.
+         */
+        StoreInfo: {
+            /**
+             * Dialect
+             * @enum {string}
+             */
+            dialect: "sqlite" | "postgresql" | "mssql" | "oracle" | "mariadb";
+            /**
+             * Created Now
+             * @description owl serve created it when it started.
+             */
+            created_now: boolean;
         };
         /**
          * SuggestedRunbook
@@ -3140,6 +3599,77 @@ export interface operations {
                 };
             };
             /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    save_application: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveApplication"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogChange"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Unprocessable Entity */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -4647,6 +5177,75 @@ export interface operations {
             };
         };
     };
+    search_everything: {
+        parameters: {
+            query: {
+                q: string;
+                application?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchResults"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     get_run: {
         parameters: {
             query?: never;
@@ -5191,6 +5790,305 @@ export interface operations {
                 };
             };
             /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_setup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetupState"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    save_connector: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application: string;
+                connector: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveConnector"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogChange"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    test_draft_connection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DraftConnection"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectionTest"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Seconds until this binding may be tried again. */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    save_secret: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application: string;
+                connector: string;
+                environment: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveSecret"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Unprocessable Entity */
             422: {
                 headers: {
                     [name: string]: unknown;

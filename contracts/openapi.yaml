@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: ProbeOwl API
   description: Validate production data across databases and APIs, safely.
-  version: 0.1.0
+  version: 0.2.0
 paths:
   /api/applications:
     get:
@@ -90,6 +90,79 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
+    put:
+      tags:
+      - setup
+      summary: Save Application
+      description: 'Write a new application''s application.yaml into the folder owl
+        serve loaded.
+
+
+        As every save: first without `base`, nothing is written and the response is
+        the change;
+
+        then with that `base` to write exactly that change. Loaded at once, so the
+        next screen
+
+        finds it. 409 if an application of that id is loaded already, if the file
+        changed since
+
+        its preview, or while a run is running. Never commits or pushes; audited.'
+      operationId: save_application
+      parameters:
+      - name: application
+        in: path
+        required: true
+        schema:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Application
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveApplication'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogChange'
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+        '501':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Implemented
+        '409':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Conflict
+        '422':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Unprocessable Entity
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      security:
+      - ProbeOwlRequest: []
   /api/applications/{application}/environments:
     get:
       tags:
@@ -1465,6 +1538,94 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
+  /api/search:
+    get:
+      tags:
+      - search
+      summary: Search Everything
+      description: 'Global search: names and titles, imported tables and columns,
+        and runs. Not audited.
+
+
+        Prefix matches rank before substring matches, names before titles. A run is
+        found by its
+
+        id (4 or more characters) or by its subject or identifier as stored: exactly,
+        or by a
+
+        prefix of 4 or more characters when it isn''t PII. A masked value matches
+        nothing. Never
+
+        matched: run results, evidence, lookups'' SQL, runbook steps, hosts, URLs,
+        logins or
+
+        keychain names. application: omitted, every application. limit: per group.'
+      operationId: search_everything
+      parameters:
+      - name: q
+        in: query
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+          title: Q
+      - name: application
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 64
+            pattern: ^[a-z][a-z0-9_]*$
+          - type: 'null'
+          title: Application
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 20
+          minimum: 1
+          default: 8
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResults'
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+        '501':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Implemented
+        '404':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Found
+        '422':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Unprocessable Entity
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
   /api/runs/{run_id}:
     get:
       tags:
@@ -2002,6 +2163,316 @@ paths:
           description: Service Unavailable
         '422':
           description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      security:
+      - ProbeOwlRequest: []
+  /api/setup:
+    get:
+      tags:
+      - setup
+      summary: Get Setup
+      description: 'What first run needs: applications loaded, where new ones go,
+        the store and the keychain.
+
+
+        Never the store''s URL or login.'
+      operationId: get_setup
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SetupState'
+        '500':
+          description: Internal Server Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '501':
+          description: Not Implemented
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/applications/{application}/connectors/{connector}:
+    put:
+      tags:
+      - setup
+      summary: Save Connector
+      description: 'Write a new connector with one binding, or a binding for an environment
+        not bound yet.
+
+
+        Preview, then write, as every save. The binding''s secret is always the keychain
+        reference
+
+        keyring:probeowl/<connector>.<environment>, chosen here: the request never
+        carries one,
+
+        and no password goes into a file. A Production SQL binding must be a replica
+        (422). 409
+
+        if the binding exists already: editing one is done in its file. Loaded at
+        once; audited
+
+        without host, login or URL.'
+      operationId: save_connector
+      parameters:
+      - name: application
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Application
+      - name: connector
+        in: path
+        required: true
+        schema:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Connector
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveConnector'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogChange'
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+        '501':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Implemented
+        '404':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Found
+        '409':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Conflict
+        '422':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Unprocessable Entity
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      security:
+      - ProbeOwlRequest: []
+  /api/applications/{application}/connectors/test-draft:
+    post:
+      tags:
+      - setup
+      summary: Test Draft Connection
+      description: 'Connect once to a binding that is not saved yet, and say how it
+        went. Audited.
+
+
+        With the password given, used for this one connection and never stored, logged
+        or
+
+        returned; or with the one this machine''s keychain has. The same fixed reasons
+        as Test
+
+        connection, never the server''s own text. Reads no data. 403 if a kill switch
+        covers the
+
+        application, or the connector if it exists. With a password given, at most
+        5 attempts per
+
+        connector and environment in any minute: then 429 too-many-attempts, "too
+        many attempts,
+
+        wait a minute", with Retry-After, and nothing is tried (#61). The refusal
+        is audited.'
+      operationId: test_draft_connection
+      parameters:
+      - name: application
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Application
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DraftConnection'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectionTest'
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+        '501':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Implemented
+        '403':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Forbidden
+        '404':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Found
+        '422':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Unprocessable Entity
+        '429':
+          headers:
+            Retry-After:
+              description: Seconds until this binding may be tried again.
+              schema:
+                type: integer
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Too Many Requests
+      security:
+      - ProbeOwlRequest: []
+  /api/applications/{application}/connectors/{connector}/environments/{environment}/secret:
+    put:
+      tags:
+      - setup
+      summary: Save Secret
+      description: 'Save a binding''s password or token in this machine''s keychain.
+        204, with no body.
+
+
+        Write-only: no route returns it. It is never written to a file, logged, or
+        put in an error
+
+        or the audit, which records only that it changed. Saved under the name the
+        binding''s file
+
+        gives; 409 secret-exists if one is saved there already and `replace` is false,
+        perhaps for
+
+        another application''s connector of the same id. 422 if the binding reads
+        its secret from
+
+        an environment variable; 503 if this machine has no system keychain.'
+      operationId: save_secret
+      parameters:
+      - name: application
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Application
+      - name: connector
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Connector
+      - name: environment
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Environment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveSecret'
+      responses:
+        '204':
+          description: Successful Response
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+        '501':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Implemented
+        '404':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Found
+        '409':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Conflict
+        '422':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Unprocessable Entity
+        '503':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Service Unavailable
+        '403':
+          description: Forbidden
           content:
             application/problem+json:
               schema:
@@ -3277,6 +3748,13 @@ components:
           - type: string
           - type: 'null'
           title: Reason
+        secret:
+          anyOf:
+          - $ref: '#/components/schemas/SecretState'
+          - type: 'null'
+          description: 'Whether this machine has the binding''s password or token:
+            missing means its keychain entry does not exist here, so ask for it. Null
+            with no binding here.'
         replica:
           type: boolean
           title: Replica
@@ -3383,6 +3861,60 @@ components:
       title: CopiedWriteQuery
       description: A write query to take to a change request. Copying it was recorded
         in the audit.
+    DraftConnection:
+      properties:
+        connector:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Connector
+          description: Its connector, which may not exist yet.
+        type:
+          type: string
+          enum:
+          - sqlserver
+          - oracle
+          - mariadb
+          - rest
+          title: Type
+        environment:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Environment
+        binding:
+          anyOf:
+          - $ref: '#/components/schemas/SqlBindingDraft'
+          - $ref: '#/components/schemas/RestBindingDraft'
+          - type: 'null'
+          title: Binding
+          description: 'Where it points. Omitted for a connector already bound in
+            environment: its saved binding is tested with the password given, as Change
+            password does before saving.'
+        password:
+          anyOf:
+          - type: string
+            maxLength: 1024
+            minLength: 1
+            format: password
+            writeOnly: true
+          - type: 'null'
+          title: Password
+          description: 'Used for this one test only: never stored, logged or returned.'
+        use_saved_password:
+          type: boolean
+          title: Use Saved Password
+          description: Use the password this machine's keychain has for the binding.
+          default: false
+      additionalProperties: false
+      type: object
+      required:
+      - connector
+      - type
+      - environment
+      title: DraftConnection
+      description: A binding that is not saved yet, to connect to once; or a saved
+        one, with a new password.
     DraftProbe:
       properties:
         probe:
@@ -3564,6 +4096,29 @@ components:
       - report
       title: EntityChange
       description: A new entity's YAML file, and the save checks it passed.
+    EnvironmentDraft:
+      properties:
+        name:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Name
+        title:
+          type: string
+          maxLength: 80
+          minLength: 1
+          title: Title
+        production:
+          type: boolean
+          title: Production
+          default: false
+      additionalProperties: false
+      type: object
+      required:
+      - name
+      - title
+      title: EnvironmentDraft
+      description: One environment of a new application.
     EnvironmentSummary:
       properties:
         name:
@@ -4241,6 +4796,23 @@ components:
       title: InvestigationRecord
       description: Why a person ran an investigation. Reference is mandatory in Production.
     JsonValue: {}
+    KeychainInfo:
+      properties:
+        available:
+          type: boolean
+          title: Available
+        reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Reason
+          description: Why not, when it is not available.
+      additionalProperties: false
+      type: object
+      required:
+      - available
+      title: KeychainInfo
+      description: Whether this machine has a system keychain to keep passwords in.
     KillScope:
       type: string
       enum:
@@ -4600,20 +5172,46 @@ components:
     PickMatches:
       properties:
         subjects:
-          items:
-            type: string
-          type: array
-          maxItems: 5
-          minItems: 1
+          anyOf:
+          - items:
+              type: string
+            type: array
+            maxItems: 5
+            minItems: 1
+          - type: 'null'
           title: Subjects
           description: Root key values from the run's matches; up to 5 run together.
+        value:
+          anyOf:
+          - type: string
+            maxLength: 256
+            minLength: 1
+          - type: 'null'
+          title: Value
+          description: 'With picks: the value the Ambiguous run searched for, pasted
+            again. Never stored, logged, audited or returned.'
+        picks:
+          anyOf:
+          - items:
+              type: integer
+            type: array
+            maxItems: 5
+            minItems: 1
+          - type: 'null'
+          title: Picks
+          description: 'With value: the matches'' numbers as the run lists them, from
+            1.'
       additionalProperties: false
       type: object
-      required:
-      - subjects
       title: PickMatches
-      description: Subjects picked from an Ambiguous run's matches, to run its probe
-        for.
+      description: 'Matches picked from an Ambiguous run, to run its probe for: by
+        subject, or by number.
+
+
+        By number when the entity''s key is PII, so its matches show [masked]: the
+        value searched
+
+        for is pasted again, and the same lookup runs again to find them (#66).'
     PlanAccess:
       type: string
       enum:
@@ -4823,6 +5421,19 @@ components:
           - type: 'null'
           title: Errors
           description: 'For a 422: each field that was not accepted, and why.'
+        connector:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Connector
+          description: 'password-missing and secret-exists: the binding''s connector,
+            so a client can ask for its password where the problem shows.'
+        environment:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Environment
+          description: 'password-missing and secret-exists: the binding''s environment.'
       additionalProperties: false
       type: object
       required:
@@ -4907,6 +5518,24 @@ components:
       - proactive_check
       title: Reason
       description: Why an investigation was run.
+    RestBindingDraft:
+      properties:
+        base_url:
+          type: string
+          maxLength: 2048
+          minLength: 1
+          title: Base Url
+        needs_token:
+          type: boolean
+          title: Needs Token
+          description: Whether the API needs a token, kept in the keychain.
+      additionalProperties: false
+      type: object
+      required:
+      - base_url
+      - needs_token
+      title: RestBindingDraft
+      description: Where a REST connector points in one environment.
     Review:
       properties:
         by:
@@ -5121,11 +5750,21 @@ components:
           description: In Production, the person's acknowledgement that the step's
             plan could not be read. Recorded in the audit with the actor.
           default: false
+        subject:
+          anyOf:
+          - type: string
+            maxLength: 256
+            minLength: 1
+          - type: 'null'
+          title: Subject
+          description: 'The run''s subject, pasted when its entity''s key is PII and
+            so stored masked. Used for this step only: never stored, logged, audited
+            or returned.'
       additionalProperties: false
       type: object
       title: RunRunbookStep
-      description: 'Run a step, named in the path. It carries no SQL and no values:
-        the server has both.'
+      description: 'Run a step, named in the path. It carries no SQL: the server has
+        it, and the run''s values.'
     RunStarted:
       properties:
         id:
@@ -5351,6 +5990,43 @@ components:
       - runs
       title: RunsStarted
       description: Runs that have started, one per picked subject, in the order picked.
+    SaveApplication:
+      properties:
+        title:
+          type: string
+          maxLength: 80
+          minLength: 1
+          title: Title
+        owner:
+          type: string
+          maxLength: 80
+          minLength: 1
+          title: Owner
+          description: The team responsible for it.
+        environments:
+          items:
+            $ref: '#/components/schemas/EnvironmentDraft'
+          type: array
+          maxItems: 6
+          minItems: 1
+          title: Environments
+        base:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Base
+          description: 'The base of the preview being confirmed. Omitted: nothing
+            is written and the change is returned. Given: written only if the file
+            is still as it was then.'
+      additionalProperties: false
+      type: object
+      required:
+      - title
+      - owner
+      - environments
+      title: SaveApplication
+      description: 'A new application. Without base: preview its file. With it: write
+        exactly that.'
     SaveCheck:
       properties:
         check:
@@ -5443,6 +6119,52 @@ components:
       title: SaveCheckReport
       description: Every save check of one draft probe. It can be saved when none
         failed.
+    SaveConnector:
+      properties:
+        type:
+          type: string
+          enum:
+          - sqlserver
+          - oracle
+          - mariadb
+          - rest
+          title: Type
+          description: An existing connector's type must match.
+        owner:
+          anyOf:
+          - type: string
+            maxLength: 80
+            minLength: 1
+          - type: 'null'
+          title: Owner
+          description: Used for a new connector only.
+        environment:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Environment
+        binding:
+          anyOf:
+          - $ref: '#/components/schemas/SqlBindingDraft'
+          - $ref: '#/components/schemas/RestBindingDraft'
+          title: Binding
+        base:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Base
+          description: 'The base of the preview being confirmed. Omitted: nothing
+            is written and the change is returned. Given: written only if the file
+            is still as it was then.'
+      additionalProperties: false
+      type: object
+      required:
+      - type
+      - environment
+      - binding
+      title: SaveConnector
+      description: A new connector with one binding, or a binding for an environment
+        not bound yet.
     SaveEntity:
       properties:
         entity:
@@ -5520,6 +6242,30 @@ components:
       - environment
       title: SaveProbe
       description: 'A probe to save. Without base: preview it. With it: write it.'
+    SaveSecret:
+      properties:
+        password:
+          type: string
+          maxLength: 1024
+          minLength: 1
+          format: password
+          title: Password
+          description: Saved to the system keychain; never written to a file, logged
+            or returned.
+          writeOnly: true
+        replace:
+          type: boolean
+          title: Replace
+          description: Overwrite a password already saved under the binding's keychain
+            name. Without it, an existing one is a 409 secret-exists, so the person
+            can be asked first.
+          default: false
+      additionalProperties: false
+      type: object
+      required:
+      - password
+      title: SaveSecret
+      description: A binding's password or token, for this machine's keychain only.
     SchemaSnapshot:
       properties:
         application:
@@ -5562,6 +6308,114 @@ components:
       - tables
       title: SchemaSnapshot
       description: The schema of one connector's database in one environment, as imported.
+    SearchGroup:
+      properties:
+        kind:
+          $ref: '#/components/schemas/SearchKind'
+        items:
+          items:
+            $ref: '#/components/schemas/SearchItem'
+          type: array
+          title: Items
+        more:
+          type: integer
+          minimum: 0.0
+          title: More
+          description: Matches beyond the limit.
+      additionalProperties: false
+      type: object
+      required:
+      - kind
+      - items
+      - more
+      title: SearchGroup
+      description: The matches of one kind, best first.
+    SearchItem:
+      properties:
+        kind:
+          $ref: '#/components/schemas/SearchKind'
+        application:
+          anyOf:
+          - type: string
+            maxLength: 64
+            pattern: ^[a-z][a-z0-9_]*$
+          - type: 'null'
+          title: Application
+          description: Its application; null only for an application.
+        id:
+          type: string
+          title: Id
+          description: 'entity: visitor; location: visitor.cards; table: <connector>.<table>;
+            column: <connector>.<table>.<column>; run: its id; otherwise its name.'
+        title:
+          type: string
+          title: Title
+          description: The human title, or the id when there is none.
+        detail:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Detail
+          description: 'entity: its root key; probe: Validate · visitor; connector:
+            mariadb · uat, prod; run: Failed · 12 Nov 14:02 · visitor_cards.'
+        labels:
+          items:
+            type: string
+          type: array
+          title: Labels
+          description: 'table: its catalog label, or the suggested one and ''suggested'';
+            column: its roles.'
+      additionalProperties: false
+      type: object
+      required:
+      - kind
+      - application
+      - id
+      - title
+      title: SearchItem
+      description: 'One match: enough to show it and to build its link.'
+    SearchKind:
+      type: string
+      enum:
+      - application
+      - entity
+      - probe
+      - location
+      - connector
+      - runbook
+      - table
+      - column
+      - run
+      title: SearchKind
+      description: What a result is. Groups come back in this order.
+    SearchResults:
+      properties:
+        query:
+          type: string
+          title: Query
+        groups:
+          items:
+            $ref: '#/components/schemas/SearchGroup'
+          type: array
+          title: Groups
+      additionalProperties: false
+      type: object
+      required:
+      - query
+      - groups
+      title: SearchResults
+      description: Every group with a match, in SearchKind's order; a kind with none
+        is left out.
+    SecretState:
+      type: string
+      enum:
+      - saved
+      - missing
+      - from_environment
+      - not_needed
+      title: SecretState
+      description: Whether this machine has what a binding signs in with. Never the
+        value.
     SetKillSwitch:
       properties:
         scope:
@@ -5602,6 +6456,101 @@ components:
       title: SetKillSwitch
       description: 'Turn one kill switch on or off, and say why: both are audited
         with the actor.'
+    SetupState:
+      properties:
+        applications:
+          type: integer
+          title: Applications
+          description: Applications loaded; none opens the first-run setup.
+        config_folder:
+          type: string
+          title: Config Folder
+          description: Where new applications are written.
+        store:
+          $ref: '#/components/schemas/StoreInfo'
+        keychain:
+          $ref: '#/components/schemas/KeychainInfo'
+      additionalProperties: false
+      type: object
+      required:
+      - applications
+      - config_folder
+      - store
+      - keychain
+      title: SetupState
+      description: What first run needs to know before it asks anything.
+    SqlBindingDraft:
+      properties:
+        host:
+          type: string
+          maxLength: 255
+          minLength: 1
+          title: Host
+        port:
+          type: integer
+          maximum: 65535.0
+          minimum: 1.0
+          title: Port
+        database:
+          type: string
+          maxLength: 128
+          minLength: 1
+          title: Database
+          description: Database (SQL Server, MariaDB) or service name.
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 128
+            minLength: 1
+          - type: 'null'
+          title: Schema
+          description: Oracle only.
+        user:
+          type: string
+          maxLength: 128
+          minLength: 1
+          title: User
+          description: The read-only login.
+        replica:
+          type: boolean
+          title: Replica
+          default: false
+        encrypt:
+          type: boolean
+          title: Encrypt
+          description: MariaDB and Oracle; always on for SQL Server.
+          default: true
+        encrypt_reason:
+          anyOf:
+          - type: string
+            maxLength: 200
+            minLength: 1
+          - type: 'null'
+          title: Encrypt Reason
+        trust_server_certificate:
+          type: boolean
+          title: Trust Server Certificate
+          default: false
+        trust_server_certificate_reason:
+          anyOf:
+          - type: string
+            maxLength: 200
+            minLength: 1
+          - type: 'null'
+          title: Trust Server Certificate Reason
+      additionalProperties: false
+      type: object
+      required:
+      - host
+      - port
+      - database
+      - user
+      title: SqlBindingDraft
+      description: 'Where a SQL connector points in one environment, as the Add connection
+        form asks it.
+
+
+        Never a secret or its reference: the server names the keychain entry itself.'
     StartHealthyComparison:
       properties:
         narrow:
@@ -5619,6 +6568,16 @@ components:
           - type: 'null'
           title: Subject
           description: A known-good ID a person pasted.
+        failing_subject:
+          anyOf:
+          - type: string
+            maxLength: 256
+            minLength: 1
+          - type: 'null'
+          title: Failing Subject
+          description: 'This run''s subject, pasted when its entity''s key is PII
+            and so stored masked: the sample needs it to leave this run out. Never
+            stored, logged, audited or returned.'
       additionalProperties: false
       type: object
       title: StartHealthyComparison
@@ -5756,6 +6715,29 @@ components:
       title: StepResult
       description: What running a read query found. Values are masked, and it is linked
         to its run.
+    StoreInfo:
+      properties:
+        dialect:
+          type: string
+          enum:
+          - sqlite
+          - postgresql
+          - mssql
+          - oracle
+          - mariadb
+          title: Dialect
+        created_now:
+          type: boolean
+          title: Created Now
+          description: owl serve created it when it started.
+      additionalProperties: false
+      type: object
+      required:
+      - dialect
+      - created_now
+      title: StoreInfo
+      description: 'ProbeOwl''s own store, as first run reports it: never its URL
+        or login.'
     SuggestedRunbook:
       properties:
         runbook:

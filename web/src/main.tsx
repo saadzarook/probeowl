@@ -24,6 +24,10 @@ async function enableMocking() {
   if (import.meta.env.VITE_MOCK_API !== "true") return;
   const { worker } = await import("../mocks/browser");
   await worker.start({ quiet: true });
+  // For the e2e tests only (mock builds; a release build drops this with the mocks): what the
+  // mutation cache still holds, so a test can prove no password outlives its form.
+  (window as unknown as { probeowlMutations?: () => unknown[] }).probeowlMutations = () =>
+    queryClient.getMutationCache().getAll().map((m) => m.state);
 }
 
 void enableMocking().then(() => {

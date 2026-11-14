@@ -121,3 +121,68 @@ export function mergeColumns(marked: string[], imported: TableSchema | undefined
   const extra = marked.filter((name) => !imported.columns.some((c) => sameName(c.name, name))).map((name) => ({ name, type: undefined }));
   return [...fromImport, ...extra];
 }
+
+export interface ColumnDraft {
+  roles: ColumnRole[];
+  indexed: boolean;
+  values: string;
+  target: string;
+}
+
+export interface Draft {
+  label: TableLabel | "";
+  owner: string;
+  description: string;
+  columns: Record<string, ColumnDraft>;
+}
+
+export const NO_MARKS: ColumnDraft = { roles: [], indexed: false, values: "", target: "" };
+
+/** Start from the confirmed entry, else the suggestion; the owner starts from the application's. */
+export function startingDraft(row: TableRow, applicationOwner: string): Draft {
+  const columns = Object.fromEntries(
+    Object.entries(startingColumns(row)).map(([name, c]) => [
+      name,
+      { roles: c.roles, indexed: c.indexed === true, values: (c.values ?? []).join(", "), target: formatTarget(c.links_to) },
+    ]),
+  );
+  return {
+    label: row.confirmed?.label ?? row.suggestion?.label ?? "",
+    owner: row.confirmed?.owner ?? applicationOwner,
+    description: row.confirmed?.description ?? "",
+    columns,
+  };
+}
+
+/** The entry to send; a column is written only with the fields its roles use. Undefined until a label is chosen. */
+export function toEntry(row: TableRow, draft: Draft): CatalogTable | undefined {
+  if (draft.label === "") return undefined;
+  const columns: CatalogTable["columns"] = {};
+  for (const [name, c] of Object.entries(draft.columns)) {
+    if (c.roles.length === 0) continue;
+    const values = c.values.split(",").map((v) => v.trim()).filter(Boolean);
+    const links = c.roles.includes("link") || c.roles.includes("external_key") ? parseTarget(c.target) : undefined;
+    columns[name] = {
+      roles: c.roles,
+      ...(c.roles.includes("time") && c.indexed ? { indexed: true } : {}),
+      ...(c.roles.includes("status") && values.length > 0 ? { values } : {}),
+      ...(links ? { links_to: links } : {}),
+    };
+  }
+  const description = draft.description.trim();
+  return {
+    connector: row.connector,
+    table: row.table,
+    label: draft.label,
+    owner: draft.owner.trim(),
+    ...(description ? { description } : {}),
+    ...(row.confirmed?.retention ? { retention: row.confirmed.retention } : {}),
+    ...(row.confirmed?.approx_rows != null ? { approx_rows: row.confirmed.approx_rows } : {}),
+    columns,
+  };
+}
+
+/** A table's entry as its import suggests it, unchanged: what Confirm all writes. Undefined without a suggested label. */
+export function suggestedEntry(row: TableRow, applicationOwner: string): CatalogTable | undefined {
+  return toEntry(row, startingDraft(row, applicationOwner));
+}

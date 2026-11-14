@@ -1,5 +1,6 @@
 // Author: @SaadZarook
 import { useState } from "react";
+import { Link as RouterLink, useSearchParams } from "react-router-dom";
 import type { KillTarget } from "../api/client";
 import { useConnectors } from "../api/useConnectors";
 import { useKillSwitches } from "../api/useKillSwitches";
@@ -21,7 +22,9 @@ const GLOBAL: KillTarget = { scope: "global" };
 export function ConnectorsPage({ item }: { item: NavItem }) {
   const { application, environment, selectEnvironment } = useSelection();
   const connectors = useConnectors(application?.name, environment?.name);
-  const [pick, setPick] = useState<string>();
+  // ?connector= from search opens that one.
+  const [params] = useSearchParams();
+  const [pick, setPick] = useState<string | undefined>(() => params.get("connector") ?? undefined);
   const switches = useKillSwitches();
   const [changing, setChanging] = useState<{ target: KillTarget; on: boolean }>();
   const reload = useReloadConfiguration();
@@ -56,8 +59,11 @@ export function ConnectorsPage({ item }: { item: NavItem }) {
           </>
         }
       >
+        <RouterLink className="btn" to="/connectors/new">
+          Add connection
+        </RouterLink>
         <p className="cli-command">
-          <code>{command}</code> <CopyButton text={command} label="Copy command" />
+          Or from a terminal: <code>{command}</code> <CopyButton text={command} label="Copy command" />
         </p>
         <GuideLink page="connectors/#adding-a-connector">Adding a connector</GuideLink>
       </EmptyState>
@@ -112,6 +118,11 @@ export function ConnectorsPage({ item }: { item: NavItem }) {
           <p className="hint">Bound per environment · production always uses read replicas</p>
         </div>
         <div className="editor-actions">
+          {application && (
+            <RouterLink className="btn" to="/connectors/new">
+              Add connection
+            </RouterLink>
+          )}
           <button className="btn btn-outline" type="button" disabled={reload.isPending} onClick={() => reload.mutate()}>
             {reload.isPending ? "Reloading…" : "Reload configuration"}
           </button>

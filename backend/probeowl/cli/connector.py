@@ -9,17 +9,20 @@ Passwords go to the system keychain only, and only once the file is kept.
 """
 
 import getpass
-import io
 from pathlib import Path
 from typing import Annotated, Any
 
 import typer
-import yaml
-from ruamel.yaml import YAML
 from sqlalchemy.engine import make_url
 
 from probeowl.cli import connector_setup as setup
-from probeowl.cli.defaults import config_path, default_store_url
+from probeowl.cli.defaults import config_path, default_store_url, ensure_default_store
+from probeowl.connector_files import (
+    DEFAULT_ROW_CEILING,
+    file_of,
+    new_connector_text,
+    with_bindings,
+)
 from probeowl.errors import ConfigError, ProbeOwlError, unknown_application
 from probeowl.model.check import LoadedApplication, check_folder, load_applications
 from probeowl.model.connector import RestConnector, SqlConnector
@@ -40,7 +43,10 @@ def add(
     config: Annotated[
         Path | None,
         typer.Option(
-            help="Folder of application YAML. Default: $PROBEOWL_CONFIG, else this folder.",
+            help=(
+                "Folder of application YAML. Default: $PROBEOWL_CONFIG, else this folder if it "
+                "holds applications, else ./probeowl"
+            ),
             show_default=False,
         ),
     ] = None,
@@ -53,6 +59,7 @@ def add(
     Passwords go to the system keychain, never to a file. Then it offers to test the new
     bindings and import the connector's schema. owl reload loads the change into owl serve.
     """
+    ensure_default_store(None)  # so the change is audited from a first run on
     run(config_path(config), application, default_store_url())
 
 
@@ -63,6 +70,13 @@ def run(folder: Path, application: str | None, store_url: str) -> None:
         "never in a file."
     )
     check_keychain()  # before any question: without a keychain nothing could be saved
+    if _usable_store(store_url) is None:
+        # Before any question too: nothing is written that the audit could not record.
+        shown = make_url(store_url).render_as_string(hide_password=True)
+        raise ConfigError(
+            f"the store at {shown} has no ProbeOwl tables at this release, so the change could "
+            "not be audited; run: owl store init"
+        )
     # Errors are refused here, as at start, except probes waiting for the binding this may add.
     applications = load_applications(folder, allow_unbound=True)
     app = _pick(applications, application)
@@ -152,13 +166,13 @@ def _new_connector(app: LoadedApplication, connector: str) -> _Change:
         "owner": app.application.owner,
     }
     if kind != "rest":
-        document["guards"] = {"row_ceiling": 1000}
+        document["guards"] = {"row_ceiling": DEFAULT_ROW_CEILING}
     passwords: dict[str, str] = {}
     document["environments"] = _ask_bindings(
         app, document, list(app.application.environments), {}, passwords
     )
     (RestConnector if kind == "rest" else SqlConnector).model_validate(document)
-    text = HEADER + yaml.safe_dump(document, sort_keys=False, allow_unicode=True)
+    text = new_connector_text(HEADER, document)
     change = _Change(path, None, text, kind, list(document["environments"]))
     change.passwords = passwords
     return change
@@ -176,7 +190,7 @@ def _bind_more(app: LoadedApplication, connector: str) -> _Change:
         f"{connector} ({current.type}) is bound in {', '.join(current.environments) or 'none'}; "
         f"not in {', '.join(missing)}"
     )
-    path = _file_of(app, connector)
+    path = file_of(app, connector)
     before = path.read_text(encoding="utf-8")
     first = next(iter(current.environments.values()), None)
     # The existing binding's answers are the defaults: often only the host or database differs.
@@ -185,40 +199,9 @@ def _bind_more(app: LoadedApplication, connector: str) -> _Change:
     document = {"connector": connector, "type": current.type}
     passwords: dict[str, str] = {}
     bindings = _ask_bindings(app, document, missing, previous, passwords)
-    change = _Change(path, before, _with_bindings(before, bindings), current.type, list(bindings))
+    change = _Change(path, before, with_bindings(before, bindings), current.type, list(bindings))
     change.passwords = passwords
     return change
-
-
-def _file_of(app: LoadedApplication, connector: str) -> Path:
-    """The file that defines the connector; ConfigError if it shares the file with others."""
-    assert app.folder is not None  # loaded from a folder
-    for path in sorted(app.folder.rglob("*.yaml")):
-        documents = list(yaml.safe_load_all(path.read_text(encoding="utf-8")))
-        if any(isinstance(d, dict) and d.get("connector") == connector for d in documents):
-            if len(documents) > 1:
-                raise ConfigError(f"{path} holds more than {connector}; move it to its own file")
-            return path
-    raise ConfigError(f"no file in {app.folder} defines connector {connector}")
-
-
-def _round_trip() -> YAML:
-    # As the examples are written: two-space mappings, list items indented under their key.
-    editor = YAML()
-    editor.width = 100
-    editor.indent(mapping=2, sequence=4, offset=2)
-    return editor
-
-
-def _with_bindings(text: str, bindings: dict[str, dict[str, Any]]) -> str:
-    """The connector's file with the new bindings added, its comments and order kept."""
-    editor = _round_trip()
-    document = editor.load(text)
-    for env, binding in bindings.items():
-        document["environments"][env] = binding
-    out = io.StringIO()
-    editor.dump(document, out)
-    return out.getvalue()
 
 
 def _write(folder: Path, change: _Change) -> None:
@@ -266,12 +249,7 @@ def _write_audited(
     The event is written first, in a transaction that commits last: if the file, a password or
     the commit fails, the file is put back and nothing is recorded. The keychain entries names.
     """
-    store = _usable_store(store_url)
-    if store is None:
-        typer.echo("Not recorded in the audit: no store at this release yet (owl store init).")
-        _write(folder, change)
-        return setup.save_passwords(connector, change.passwords)
-    engine = create_store_engine(store)
+    engine = create_store_engine(store_url)  # run() checked it is at this release
     written = False
     try:
         with engine.begin() as conn:

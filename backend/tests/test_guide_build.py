@@ -1,5 +1,5 @@
 # Author: @SaadZarook
-"""The guide's bundled build, as a release wheel carries it: guide_build.py and guide/hooks.py."""
+"""The guide's offline build, as the wheel and GitHub Pages carry it: guide_build.py, hooks.py."""
 
 import importlib.util
 from pathlib import Path
@@ -125,11 +125,20 @@ def test_after_the_build_the_fonts_and_licence_are_in_and_the_unused_files_out(
     assert licence.startswith("Material for MkDocs 9.8.1") and "Martin Donath" in licence
 
 
-def test_the_pages_build_is_left_as_it_is(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_the_pages_build_is_the_same_offline_build_at_the_pages_address(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     monkeypatch.delenv("PROBEOWL_GUIDE_BUNDLED", raising=False)
     pages = load("guide_hooks_pages", BACKEND.parent / "guide" / "hooks.py")
+    monkeypatch.setattr(pages, "FONTSOURCE", fontsource(tmp_path / "fontsource"))
     built = pages.on_config(config(tmp_path / "site"))
     assert built["site_url"] == "https://saadzarook.github.io/probeowl/guide/"
-    assert built["repo_url"] == "https://github.com/saadzarook/probeowl"
+    # The rest is exactly the bundled build's: no Google Fonts, no GitHub API.
+    assert built["theme"]["font"] is False
+    assert (built["repo_url"], built["repo_name"], built["edit_uri"]) == (None, None, None)
+    assert built["extra_css"] == ["assets/probeowl.css", "assets/plex.css"]
+    material = type("Material", (), {"version": "9.8.1", "files": [Licence()]})()
+    monkeypatch.setattr(pages, "distribution", lambda name: material)
     pages.on_post_build(config(tmp_path / "site"))
-    assert not (tmp_path / "site").exists()
+    fonts = tmp_path / "site" / "assets" / "fonts"
+    assert (fonts / "ibm-plex-sans-latin-400-normal.woff2").is_file()

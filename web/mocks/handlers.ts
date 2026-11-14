@@ -2,11 +2,12 @@
 import { stringify } from "yaml";
 import { parse } from "yaml";
 import { delay, http, HttpResponse } from "msw";
-import type { CatalogChange, CatalogReview, CatalogTable, KillSwitch, KillTarget, ProbeChange, SaveEntity, SaveProbe, SetKillSwitch, StartRun } from "../src/api/client";
+import type { ApplicationSummary, CatalogChange, CatalogReview, CatalogTable, TableReview, DraftConnection, KillSwitch, KillTarget, ProbeChange, SaveApplication, SaveConnector, SaveEntity, SaveSecret, SaveProbe, SetKillSwitch, StartRun } from "../src/api/client";
 import type { CompareRequest } from "../../plugins/compare_files/web/types";
 import { compareFilesManifest, compareFilesResult } from "./fixtures/compareFiles";
 import type { HealthyAttempt, HealthyComparison, Run, RunbookView, StepInRun } from "../src/api/client";
 import { CONFIGURATION_HEADER } from "../src/api/configuration";
+import { mockSearch, type Searchable } from "./search";
 import { detectIdentifier } from "../src/identifiers";
 import {
   ambiguousEmailRun,
@@ -42,6 +43,7 @@ import {
   walletCatalog,
   walletProbes,
   walletReviewTables,
+  addedConnectorSnapshot,
   topUpDifferences,
   afterARestart,
   allSame,
@@ -129,6 +131,34 @@ function entityFailures(application: string, text: string): { field: string; mes
 }
 
 function reviewOf(application: string): CatalogReview | undefined {
+  const base = baseReviewOf(application);
+  const added = addedImports.get(application) ?? [];
+  if (!base || added.length === 0) return base;
+  // A connector added through Add connection: its tables suggested, until each is confirmed.
+  const confirmed = catalogOf(application) ?? [];
+  const labelOf = (connector: string, table: string) => confirmed.find((c) => c.connector === connector && c.table === table)?.label ?? null;
+  const tables = added.flatMap(({ connector, environment }): TableReview[] => [
+    {
+      connector,
+      schema: null,
+      table: "visitor_profile",
+      imported_in: [environment],
+      label: labelOf(connector, "visitor_profile"),
+      suggestion: { label: "master", reasons: ["one row per visitor, keyed by id"], columns: { id: ["primary_key"], email: ["pii"] } },
+    },
+    {
+      connector,
+      schema: null,
+      table: "cards",
+      imported_in: [environment],
+      label: labelOf(connector, "cards"),
+      suggestion: { label: "transaction", reasons: ["many rows per visitor", "valid_to looks like its time column"], columns: { card_id: ["primary_key"], valid_to: ["time"] } },
+    },
+  ]);
+  return { ...base, tables: [...base.tables, ...tables], unconfirmed: base.unconfirmed + tables.filter((t) => t.label === null).length };
+}
+
+function baseReviewOf(application: string): CatalogReview | undefined {
   if (application === "card_access") return cardAccessReview;
   // As owl serve answers: an application with nothing imported or confirmed has an empty review.
   if (application !== "wallet") return applications.some((a) => a.name === application) ? { application, tables: [], unconfirmed: 0, drifted: 0 } : undefined;
@@ -299,9 +329,28 @@ function matchingRunbooks(url: URL): RunbookView[] {
   });
 }
 
+/** Typed-password connection tests per binding, for the 5-a-minute limit. */
+const draftAttempts = new Map<string, number[]>();
+
+// "mock-prod-only-app": an application whose only environment is Production, for search's notice.
+function prodOnly(): ApplicationSummary[] {
+  if (localStorage.getItem("mock-prod-only-app") !== "1") return [];
+  return [{ name: "settlements", title: "Settlements", owner: "payments-team", environments: [{ name: "prod", title: "Production", production: true }] }];
+}
+
+// "mock-pii-key": the entity's key is PII (#66): subjects and matches show [masked], and what needs
+// the real value later asks for it to be pasted.
+const PII_KEY_REASON = "topup's key is PII and stored masked: paste its topup_id";
+function piiKey(): boolean {
+  return localStorage.getItem("mock-pii-key") === "1";
+}
+function masked<T extends { subject?: string | null }>(item: T): T {
+  return piiKey() && item.subject ? { ...item, subject: "[masked]" } : item;
+}
+
 function comparisonOf(id: string, value: string): HealthyComparison {
   const choices = [{ name: "same_payment_method", title: "Same payment method" }];
-  const base = { run: id, has_sample: value !== "tp_nosamp", choices: value === "tp_nosamp" ? [] : choices, failing_subject: value };
+  const base = { run: id, has_sample: value !== "tp_nosamp", choices: value === "tp_nosamp" ? [] : choices, failing_subject: piiKey() ? "[masked]" : value };
   const entry = comparisons.get(id);
   if (entry === undefined) return { ...base, attempt: null, differences: [] };
   if (entry.seen < 1) return { ...base, attempt: entry.attempt, differences: [] };
@@ -317,9 +366,57 @@ function comparisonOf(id: string, value: string): HealthyComparison {
   };
 }
 
+/** A file's change as a save previews or writes it: written only when the preview's base is sent. */
+function fileChange(path: string, text: string, base: string | null | undefined): CatalogChange {
+  return {
+    path,
+    diff: `--- /dev/null\n+++ b/${path}\n@@ -0,0 +1 @@\n${text.split("\n").map((l) => `+${l}`).join("\n")}`,
+    base: "absent",
+    after: "sha256:mock-after",
+    written: base !== undefined && base !== null,
+  };
+}
+
+// A binding whose password this machine lacks, as a teammate's would: opt in with localStorage
+// "mock-password-missing" = "<application>/<connector>/<environment>"; saving it fills it.
+const savedPasswords = new Set<string>();
+function passwordMissing(application: string, connector: string, environment: string): boolean {
+  const key = `${application}/${connector}/${environment}`;
+  return localStorage.getItem("mock-password-missing") === key && !savedPasswords.has(key);
+}
+function missingFor(application: string, environment: string): { connector: string; environment: string } | undefined {
+  const [app, connector, env] = (localStorage.getItem("mock-password-missing") ?? "").split("/");
+  if (app !== application || env !== environment || !connector) return undefined;
+  return passwordMissing(application, connector, environment) ? { connector, environment } : undefined;
+}
+function passwordMissingProblem(connector: string, environment: string) {
+  return HttpResponse.json(
+    {
+      type: "urn:probeowl:problem:password-missing",
+      title: "Unprocessable Content",
+      status: 422,
+      detail: `${connector} needs your password for ${environment === "prod" ? "Production" : environment.toUpperCase()}: save it on this machine first`,
+      connector,
+      environment,
+    },
+    { status: 422, headers: { "Content-Type": "application/problem+json" } },
+  );
+}
+
+// Connectors written through Add connection, and their imports, in this page's life.
+const addedConnectors = new Set<string>();
+const addedImports = new Map<string, { connector: string; environment: string }[]>();
+
+// Applications created through first run in this page's life, listed after the examples.
+const createdApplications: ApplicationSummary[] = [];
+
 export const handlers = [
   // A config folder with no applications, as owl init has not been run yet.
-  http.get("/api/applications", () => json(localStorage.getItem("mock-no-applications") ? [] : applications)),
+  // "mock-slow-applications": the list is slow to come back once one is created, as on a busy machine.
+  http.get("/api/applications", async () => {
+    if (createdApplications.length > 0 && localStorage.getItem("mock-slow-applications")) await delay(1500);
+    return json([...(localStorage.getItem("mock-no-applications") ? [] : applications), ...createdApplications, ...prodOnly()]);
+  }),
 
   http.get("/api/applications/:application", ({ params }) => {
     const found = applications.find((a) => a.name === params["application"]);
@@ -365,6 +462,8 @@ export const handlers = [
     const body = (await request.json()) as DraftBody;
     if (!applications.some((a) => a.name === application)) return problem(404, "Not Found", "No such application.");
     if (!knownEnvironment(application, body.environment)) return problem(404, "Not Found", "No such environment.");
+    const missing = missingFor(application, body.environment ?? "");
+    if (missing) return passwordMissingProblem(missing.connector, missing.environment);
     return json(checksOf(body));
   }),
 
@@ -373,6 +472,8 @@ export const handlers = [
     const body = (await request.json()) as DraftBody & Pick<StartRun, "value" | "identifier" | "investigation"> & { environment: string };
     if (!applications.some((a) => a.name === application)) return problem(404, "Not Found", "No such application.");
     if (!knownEnvironment(application, body.environment)) return problem(404, "Not Found", "No such environment.");
+    const missing = missingFor(application, body.environment);
+    if (missing) return passwordMissingProblem(missing.connector, missing.environment);
     const failed = checksOf(body).checks.filter((c) => c.status === "fail");
     if (failed.length > 0) {
       return problem(422, "Unprocessable Content", `${failed[0]?.check ?? "Probe"}: ${failed[0]?.message ?? ""}`, failed.map((c) => ({ field: c.location ? `${c.check}: ${c.location}` : c.check, message: c.message })));
@@ -543,7 +644,11 @@ export const handlers = [
     return json(
       statuses.map((status) => {
         const reason = stoppedBy(application.name, status.connector);
-        return reason ? { ...status, health: "stopped" as const, reason } : status;
+        if (reason) return { ...status, health: "stopped" as const, reason };
+        if (passwordMissing(application.name, status.connector, environment.name)) {
+          return { ...status, secret: "missing" as const, health: "not_configured" as const, reason: `no password saved on this machine for ${environment.name}` };
+        }
+        return { ...status, secret: status.type === "rest" ? ("not_needed" as const) : ("saved" as const) };
       }),
     );
   }),
@@ -559,6 +664,104 @@ export const handlers = [
     // payout_db stands for a database that cannot be reached, so that answer can be seen.
     const reason = connector === "payout_db" ? "the connection was refused or could not be made; check the database is up and the binding is right" : null;
     return json({ connector, environment, reachable: reason === null, reason, duration_ms: 42 });
+  }),
+
+  // First run: no applications until one is created; the store is new; the keychain works.
+  http.get("/api/setup", () => {
+    const none = localStorage.getItem("mock-no-applications") !== null;
+    return json({
+      applications: (none ? 0 : applications.length) + createdApplications.length,
+      config_folder: "C:/Users/you/probeowl",
+      store: { dialect: "sqlite", created_now: none },
+      keychain: { available: true, reason: null },
+    });
+  }),
+
+  http.put("/api/applications/:application", async ({ params, request }) => {
+    const application = String(params["application"]);
+    const body = (await request.json()) as SaveApplication;
+    if (applications.some((a) => a.name === application) && localStorage.getItem("mock-no-applications") === null) {
+      return problem(409, "Conflict", `an application named ${application} is already loaded`);
+    }
+    const environments = body.environments.map((e) => `  ${e.name}:\n    title: ${e.title}\n    production: ${String(e.production ?? false)}`);
+    const text = `application: ${application}\ntitle: ${body.title}\nowner: ${body.owner}\nenvironments:\n${environments.join("\n")}`;
+    const change = fileChange(`${application}/application.yaml`, text, body.base);
+    if (change.written) {
+      createdApplications.push({
+        name: application,
+        title: body.title,
+        owner: body.owner,
+        environments: body.environments.map((e) => ({ name: e.name, title: e.title, production: e.production ?? false })),
+      });
+    }
+    return json(change);
+  }),
+
+  http.put("/api/applications/:application/connectors/:connector", async ({ params, request }) => {
+    const application = String(params["application"]);
+    const connector = String(params["connector"]);
+    const body = (await request.json()) as SaveConnector;
+    const binding = "host" in body.binding
+      ? `    host: ${body.binding.host}\n    port: ${body.binding.port}\n    database: ${body.binding.database}\n    user: ${body.binding.user}\n    secret: keyring:probeowl/${connector}.${body.environment}`
+      : `    base_url: ${body.binding.base_url}`;
+    const text = `connector: ${connector}\ntype: ${body.type}\nenvironments:\n  ${body.environment}:\n${binding}`;
+    const change = fileChange(`${application}/connectors/${connector}.yaml`, text, body.base);
+    if (change.written) addedConnectors.add(`${application}/${connector}`);
+    return json(change);
+  }),
+
+  // A password is saved with no body. wallet_db in Production has one already, so the question
+  // before overwriting can be seen.
+  http.put("/api/applications/:application/connectors/:connector/environments/:environment/secret", async ({ params, request }) => {
+    const connector = String(params["connector"]);
+    const environment = String(params["environment"]);
+    const body = (await request.json()) as SaveSecret;
+    if (connector === "wallet_db" && environment === "prod" && !body.replace) {
+      return HttpResponse.json(
+        {
+          type: "urn:probeowl:problem:secret-exists",
+          title: "Conflict",
+          status: 409,
+          detail: `a password is already saved as probeowl/${connector}.${environment}, perhaps for another application's connector named ${connector}; overwrite it only if it is this one's`,
+          connector,
+          environment,
+        },
+        { status: 409, headers: { "Content-Type": "application/problem+json" } },
+      );
+    }
+    savedPasswords.add(`${String(params["application"])}/${connector}/${environment}`);
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  // A draft connects unless its password is "wrong", so a failed test and its fixed reason can be seen.
+  http.post("/api/applications/:application/connectors/test-draft", async ({ params, request }) => {
+    const body = (await request.json()) as DraftConnection;
+    // As the backend (#61): 5 tests with a typed password per binding in any minute, then a 429.
+    if (body.password) {
+      const key = `${String(params["application"])}/${body.connector}/${body.environment}`;
+      const now = Date.now();
+      const recent = (draftAttempts.get(key) ?? []).filter((at) => now - at < 60_000);
+      if (recent.length >= 5) {
+        const wait = Math.max(1, Math.ceil((60_000 - (now - (recent[0] ?? now))) / 1000));
+        return HttpResponse.json(
+          { type: "urn:probeowl:problem:too-many-attempts", title: "Too Many Requests", status: 429, detail: "too many attempts, wait a minute" },
+          { status: 429, headers: { "Content-Type": "application/problem+json", "Retry-After": String(wait) } },
+        );
+      }
+      draftAttempts.set(key, [...recent, now]);
+    }
+    // No binding: a saved one, tested with a new password before Change password saves it.
+    if (!body.binding && !body.password) {
+      return problem(422, "Unprocessable Content", "give the new password to test", [{ field: "password", message: "required when no binding is given" }]);
+    }
+    const sql = !body.binding || "host" in body.binding;
+    if (sql && !body.password && !body.use_saved_password) {
+      return problem(422, "Unprocessable Content", "give the password, or use the one saved on this machine", [
+        { field: "password", message: "required unless use_saved_password is true" },
+      ]);
+    }
+    const reason = body.password === "wrong" ? "authentication failed; check the binding's login and secret" : null;
+    return json({ connector: body.connector, environment: body.environment, reachable: reason === null, reason, duration_ms: 31 });
   }),
 
   http.get("/api/applications/:application/catalog", ({ params }) => {
@@ -623,6 +826,12 @@ export const handlers = [
     if (connector === "checkout_api") {
       return problem(422, "Unprocessable Content", "checkout_api is a REST connector; only SQL connectors can be imported.");
     }
+    if (addedConnectors.has(`${application}/${connector}`)) {
+      const added = addedConnectorSnapshot(application, connector, environment);
+      imported.set(importKey(application, connector, environment), added);
+      addedImports.set(application, [...(addedImports.get(application) ?? []), { connector, environment }]);
+      return json(added, { status: 201 });
+    }
     const found =
       connector === "access_db" && application === "card_access"
         ? truncatedAccessSnapshot(environment)
@@ -639,6 +848,8 @@ export const handlers = [
     if (!applications.some((a) => a.name === body.application)) {
       return problem(404, "Not Found", "No such application.");
     }
+    const missing = missingFor(body.application, body.environment);
+    if (missing) return passwordMissingProblem(missing.connector, missing.environment);
     // As the server does when the value is a time typed with an offset and its column stores none.
     const offset = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?\s*(Z|[+-]\d{2}(?::?\d{2})?)$/i.exec(body.value)?.[1];
     if (offset !== undefined) {
@@ -665,6 +876,56 @@ export const handlers = [
   }),
 
   // Wallet in UAT has two pages of runs; every other application and environment has none.
+  // The bundled guide's own search index, as MkDocs writes it: pages and their sections.
+  http.get("/guide/search/search_index.json", () =>
+    json({
+      docs: [
+        { location: "getting-started/", title: "Getting started" },
+        { location: "troubleshooting/", title: "Troubleshooting" },
+        { location: "troubleshooting/#owl-serve-is-slow-to-start-the-first-time", title: "owl serve is slow to start the first time" },
+        { location: "writing-probes/", title: "Writing probes" },
+      ],
+    }),
+  ),
+
+  // Global search over the mocks' configuration and runs, by the backend's rules.
+  http.get("/api/search", ({ request }) => {
+    const query = new URL(request.url).searchParams;
+    const q = (query.get("q") ?? "").trim();
+    // A query that fails, for the palette's error state and its retry.
+    if (q === "fail-search") return problem(500, "Internal Server Error", "Search could not be run.");
+    const limit = Number(query.get("limit") ?? "8");
+    const application = query.get("application");
+    if (q.length < 1 || q.length > 128) return problem(422, "Unprocessable Content", "give 1 to 128 characters to search for", [{ field: "q", message: "1 to 128 characters" }]);
+    if (!Number.isInteger(limit) || limit < 1 || limit > 20) return problem(422, "Unprocessable Content", "limit is 1 to 20", [{ field: "limit", message: "1 to 20" }]);
+    const shown = [...applications, ...createdApplications, ...prodOnly()];
+    if (application !== null && !shown.some((a) => a.name === application)) return problem(404, "Not Found", `no application named ${application}`);
+    const scope = shown.filter((a) => application === null || a.name === application);
+    const items: Searchable[] = scope.flatMap((app): Searchable[] => {
+      const probes = app.name === "wallet" ? walletProbes : app.name === "card_access" ? cardAccessProbes : [];
+      const connectors = app.name === "wallet" ? walletConnectors("uat", false) : app.name === "card_access" ? cardAccessConnectors("uat", false) : [];
+      const environments = app.environments.map((e) => e.name).join(", ");
+      return [
+        { kind: "application", application: null, id: app.name, title: app.title, detail: app.owner },
+        ...entitiesOf(app.name).flatMap((entity): Searchable[] => [
+          { kind: "entity", application: app.name, id: entity.entity, title: entity.title || entity.entity, detail: entity.root_key },
+          ...Object.entries(entity.locations).map(([name, location]): Searchable => ({
+            kind: "location", application: app.name, id: `${entity.entity}.${name}`, title: location.title || name, detail: `${entity.entity} · ${location.using}`,
+          })),
+        ]),
+        ...probes.map((probe): Searchable => ({
+          kind: "probe", application: app.name, id: probe.name, title: probe.title || probe.name, detail: `${probe.kind === "inspect" ? "Inspect" : "Validate"} · ${probe.entity}`,
+        })),
+        ...connectors.map((c): Searchable => ({ kind: "connector", application: app.name, id: c.connector, title: c.connector, detail: `${c.type} · ${environments}` })),
+        ...(app.name === "wallet"
+          ? [{ kind: "runbook" as const, application: app.name, id: topUpNotCredited.runbook, title: topUpNotCredited.title, detail: topUpNotCredited.applies_to.entity, also: ["ledger missing"] }]
+          : []),
+      ];
+    });
+    const runs = walletRunPages.flat().filter((run) => scope.some((a) => a.name === run.application));
+    return json(mockSearch(q, limit, items, runs));
+  }),
+
   http.get("/api/runs", ({ request }) => {
     const query = new URL(request.url).searchParams;
     const wallet = query.get("application") === "wallet" && query.get("environment") === "uat";
@@ -683,14 +944,16 @@ export const handlers = [
     const running = poll.seen < POLLS_BEFORE_FINISHED;
     const { request } = poll;
     const run = runFor(id, request, running);
-    return json({
+    const matches = piiKey() ? [...(run.matches ?? [])].sort((a, b) => a.subject.localeCompare(b.subject)).map(masked) : run.matches;
+    return json(masked({
       ...run,
+      matches,
       environment: request.environment,
       identifier_value: run.status === "ambiguous" ? run.identifier_value : request.value,
       investigation: request.investigation,
       from_run: poll.fromRun ?? null,
       subject: run.subject ?? (run.status === "passed" || run.status === "failed" ? request.value : null),
-    });
+    }));
   }),
 
   http.get("/api/applications/:application/runbooks", ({ params, request }) => {
@@ -746,9 +1009,12 @@ export const handlers = [
   http.post("/api/runs/:run_id/runbooks/:runbook/steps/:step/run", async ({ params, request }) => {
     const id = String(params["run_id"]);
     const step = String(params["step"]);
-    const body = (await request.json()) as { run_without_plan_check?: boolean };
+    const body = (await request.json()) as { run_without_plan_check?: boolean; subject?: string };
     const poll = polls.get(id);
     if (poll === undefined) return problem(404, "Not Found", "No such run.");
+    if (piiKey() && (step === "revalidate" || step === "check-outbox") && !body.subject) {
+      return problem(422, "Unprocessable Content", PII_KEY_REASON, [{ field: "subject", message: PII_KEY_REASON }]);
+    }
     if (step === "revalidate") {
       const again = `run_${nextRun++}`;
       polls.set(again, { seen: 0, request: poll.request });
@@ -765,7 +1031,9 @@ export const handlers = [
       }
       warnings = ["index use not checked: the connection was refused"];
     }
-    const result = outboxResult(warnings);
+    const plain = outboxResult(warnings);
+    // As the backend: a PII key, pasted for this step, is masked in what is kept and returned.
+    const result = piiKey() && plain?.evidence ? { ...plain, evidence: { ...plain.evidence, parameters: { topup_id: "[masked]" } } } : plain;
     const results = stepResults.get(id) ?? new Map<string, StepInRun["result"]>();
     results.set(step, result);
     stepResults.set(id, results);
@@ -810,7 +1078,10 @@ export const handlers = [
     const id = String(params["run_id"]);
     const poll = polls.get(id);
     if (poll === undefined) return problem(404, "Not Found", "No such run.");
-    const body = (await request.json()) as { narrow?: string | null; subject?: string | null };
+    const body = (await request.json()) as { narrow?: string | null; subject?: string | null; failing_subject?: string | null };
+    if (piiKey() && !body.subject && !body.failing_subject) {
+      return problem(422, "Unprocessable Content", PII_KEY_REASON, [{ field: "failing_subject", message: PII_KEY_REASON }]);
+    }
     const stopped = body.subject ? undefined : stoppedBy(poll.request.application, "wallet_db");
     if (stopped) return problem(403, "Forbidden", stopped);
     if (body.subject === poll.request.value) return problem(422, "Unprocessable Content", "that is the subject of this run");
@@ -837,10 +1108,20 @@ export const handlers = [
     const id = String(params["run_id"]);
     const from = polls.get(id);
     if (from === undefined) return problem(404, "Not Found", "No such run.");
-    const { subjects } = (await request.json()) as { subjects: string[] };
+    const body = (await request.json()) as { subjects?: string[]; value?: string; picks?: number[] };
     const run = runFor(id, from.request, false);
-    const known = (run.matches ?? []).map((m) => m.subject);
-    if (run.status !== "ambiguous" || subjects.some((s) => !known.includes(s))) {
+    const known = (run.matches ?? []).map((m) => m.subject).sort();
+    let subjects = body.subjects ?? [];
+    if (piiKey()) {
+      // Picked by number: the same lookup again, which here only the original value finds.
+      if (body.value !== from.request.value) return problem(422, "Unprocessable Content", "the matches have changed since this run: start again");
+      const picks = body.picks ?? [];
+      if (picks.length === 0 || new Set(picks).size !== picks.length || picks.some((n) => n < 1 || n > known.length)) {
+        return problem(422, "Unprocessable Content", `pick each number once, from 1 to ${known.length}`);
+      }
+      subjects = picks.map((n) => known[n - 1] ?? "");
+    }
+    if (run.status !== "ambiguous" || subjects.length === 0 || subjects.some((s) => !known.includes(s))) {
       return problem(422, "Unprocessable Content", "Pick subjects from the matches of an Ambiguous run.");
     }
     const runs = subjects.map((subject) => {

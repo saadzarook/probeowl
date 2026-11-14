@@ -3,9 +3,9 @@
 
 from dataclasses import asdict
 from datetime import date, datetime
-from typing import Any, NoReturn
+from typing import Annotated, Any, NoReturn
 
-from fastapi import APIRouter, HTTPException, Request, Response, status
+from fastapi import APIRouter, HTTPException, Query, Request, Response, status
 
 from probeowl.api.models import (
     ApplicationSummary,
@@ -41,10 +41,16 @@ from probeowl.checks.saving import ProbeWrites
 from probeowl.checks.service import check_draft, runnable
 from probeowl.checks.time_offsets import ColumnTypes, imported_types
 from probeowl.connector_status import ConnectorStatuses
-from probeowl.errors import NotFoundError, RequestError, unknown_application
+from probeowl.errors import (
+    TOO_MANY_ATTEMPTS,
+    NotFoundError,
+    RequestError,
+    TooManyAttempts,
+    unknown_application,
+)
 from probeowl.model import Catalog, Entity, Run, RunStatus
 from probeowl.model.check import LoadedApplication
-from probeowl.model.common import humanized
+from probeowl.model.common import Name, humanized
 from probeowl.model.connector_status import ConnectionTest, ConnectorStatus
 from probeowl.model.healthy import HealthyComparison
 from probeowl.model.kill_switch import KillSwitch, KillTarget
@@ -54,11 +60,22 @@ from probeowl.model.run import Actor
 from probeowl.model.runbook_step import CopiedWriteQuery, StepInRun, StepRan
 from probeowl.model.save_check import SaveCheckReport
 from probeowl.model.schema import SchemaSnapshot
+from probeowl.model.search import SearchResults
+from probeowl.model.setup import (
+    DraftConnection,
+    SaveApplication,
+    SaveConnector,
+    SaveSecret,
+    SetupState,
+)
 from probeowl.plugins.api import PluginManifest
 from probeowl.reload import ConfigReloader
 from probeowl.runbook_steps import RunbookSteps
 from probeowl.runbooks import matching, runbook_view, suggested
 from probeowl.runs import RunService
+from probeowl.search import MAX_QUERY, search
+from probeowl.secret_writes import SecretWrites
+from probeowl.setup_writes import SetupWrites
 
 # The media type is set to application/problem+json in app.py.
 _PROBLEM = {"model": Problem}
@@ -443,7 +460,7 @@ def pick_matches(run_id: str, body: PickMatches, http: Request) -> RunsStarted:
     the limit. 404 for an unknown run; 422 when the run is not Ambiguous or a subject is not
     one of its matches; 429 when the maximum number of runs is already running.
     """
-    ids = _runs(http).start_matches(run_id, body.subjects)
+    ids = _runs(http).start_matches(run_id, body.subjects, body.value, body.picks)
     return RunsStarted(runs=[RunStarted(id=i, status=RunStatus.RUNNING) for i in ids])
 
 
@@ -466,7 +483,7 @@ def start_healthy_comparison(
     sample needs. 429 when the maximum number of runs is already running.
     """
     runs = _runs(http)
-    runs.start_healthy(run_id, body.narrow, body.subject)
+    runs.start_healthy(run_id, body.narrow, body.subject, body.failing_subject)
     redactor: Redactor = http.app.state.redactor
     return runs.comparison(run_id, redactor.run)
 
@@ -476,6 +493,25 @@ def get_healthy_comparison(run_id: str, http: Request) -> HealthyComparison:
     """A run's latest comparison, field by field. A masked field says only whether it matches."""
     redactor: Redactor = http.app.state.redactor
     return _runs(http).comparison(run_id, redactor.run)
+
+
+@router.get("/search", tags=["search"], responses=_problems(404, 422))
+def search_everything(
+    q: Annotated[str, Query(min_length=1, max_length=MAX_QUERY)],
+    http: Request,
+    application: Name | None = None,
+    limit: Annotated[int, Query(ge=1, le=20)] = 8,
+) -> SearchResults:
+    """Global search: names and titles, imported tables and columns, and runs. Not audited.
+
+    Prefix matches rank before substring matches, names before titles. A run is found by its
+    id (4 or more characters) or by its subject or identifier as stored: exactly, or by a
+    prefix of 4 or more characters when it isn't PII. A masked value matches nothing. Never
+    matched: run results, evidence, lookups' SQL, runbook steps, hosts, URLs, logins or
+    keychain names. application: omitted, every application. limit: per group.
+    """
+    service = _runs(http)
+    return search(service.applications, service.store, q, application, limit)
 
 
 @router.get("/runs", tags=["runs"], responses=_problems(404, 422))
@@ -672,6 +708,137 @@ def test_connection(
     return result
 
 
+@router.get("/setup", tags=["setup"])
+def get_setup(http: Request) -> SetupState:
+    """What first run needs: applications loaded, where new ones go, the store and the keychain.
+
+    Never the store's URL or login.
+    """
+    return _setup(http).state()
+
+
+@router.put("/applications/{application}", tags=["setup"], responses=_problems(409, 422))
+def save_application(application: Name, body: SaveApplication, http: Request) -> CatalogChange:
+    """Write a new application's application.yaml into the folder owl serve loaded.
+
+    As every save: first without `base`, nothing is written and the response is the change;
+    then with that `base` to write exactly that change. Loaded at once, so the next screen
+    finds it. 409 if an application of that id is loaded already, if the file changed since
+    its preview, or while a run is running. Never commits or pushes; audited.
+    """
+    return CatalogChange(**asdict(_setup(http).save_application(application, body)))
+
+
+@router.put(
+    "/applications/{application}/connectors/{connector}",
+    tags=["setup"],
+    responses=_problems(404, 409, 422),
+)
+def save_connector(
+    application: str, connector: Name, body: SaveConnector, http: Request
+) -> CatalogChange:
+    """Write a new connector with one binding, or a binding for an environment not bound yet.
+
+    Preview, then write, as every save. The binding's secret is always the keychain reference
+    keyring:probeowl/<connector>.<environment>, chosen here: the request never carries one,
+    and no password goes into a file. A Production SQL binding must be a replica (422). 409
+    if the binding exists already: editing one is done in its file. Loaded at once; audited
+    without host, login or URL.
+    """
+    return CatalogChange(**asdict(_setup(http).save_connector(application, connector, body)))
+
+
+@router.post(
+    "/applications/{application}/connectors/test-draft",
+    tags=["setup"],
+    responses={
+        **_problems(403, 404, 422),
+        429: {
+            **_PROBLEM,
+            "headers": {
+                "Retry-After": {
+                    "description": "Seconds until this binding may be tried again.",
+                    "schema": {"type": "integer"},
+                }
+            },
+        },
+    },
+)
+def test_draft_connection(application: str, body: DraftConnection, http: Request) -> ConnectionTest:
+    """Connect once to a binding that is not saved yet, and say how it went. Audited.
+
+    With the password given, used for this one connection and never stored, logged or
+    returned; or with the one this machine's keychain has. The same fixed reasons as Test
+    connection, never the server's own text. Reads no data. 403 if a kill switch covers the
+    application, or the connector if it exists. With a password given, at most 5 attempts per
+    connector and environment in any minute: then 429 too-many-attempts, "too many attempts,
+    wait a minute", with Retry-After, and nothing is tried (#61). The refusal is audited.
+    """
+    try:
+        result = _setup(http).test_draft(application, body)
+    except TooManyAttempts:
+        _runs(http).audit(
+            "connection_test_refused",
+            {
+                "application": application,
+                "connector": body.connector,
+                "environment": body.environment,
+                "reason": TOO_MANY_ATTEMPTS,
+                "draft": True,
+            },
+        )
+        raise
+    _runs(http).audit(
+        "connection_tested",
+        {
+            "application": application,
+            "connector": body.connector,
+            "environment": body.environment,
+            "reachable": result.reachable,
+            "draft": True,
+        },
+    )
+    return result
+
+
+@router.put(
+    "/applications/{application}/connectors/{connector}/environments/{environment}/secret",
+    tags=["setup"],
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    responses=_problems(404, 409, 422, 503),
+)
+def save_secret(
+    application: str, connector: str, environment: str, body: SaveSecret, http: Request
+) -> Response:
+    """Save a binding's password or token in this machine's keychain. 204, with no body.
+
+    Write-only: no route returns it. It is never written to a file, logged, or put in an error
+    or the audit, which records only that it changed. Saved under the name the binding's file
+    gives; 409 secret-exists if one is saved there already and `replace` is false, perhaps for
+    another application's connector of the same id. 422 if the binding reads its secret from
+    an environment variable; 503 if this machine has no system keychain.
+    """
+    writes = getattr(http.app.state, "secrets", None)
+    if not isinstance(writes, SecretWrites):
+        raise HTTPException(
+            status.HTTP_501_NOT_IMPLEMENTED,
+            "saving a password needs owl serve: start it with owl serve --config <folder>",
+        )
+    writes.save(application, connector, environment, body)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+def _setup(http: Request) -> SetupWrites:
+    setup = getattr(http.app.state, "setup", None)
+    if not isinstance(setup, SetupWrites):
+        raise HTTPException(
+            status.HTTP_501_NOT_IMPLEMENTED,
+            "setting up needs a config folder: start the API with owl serve --config <folder>",
+        )
+    return setup
+
+
 @router.get("/applications/{application}/runbooks", tags=["runbooks"], responses=_problems(404))
 def list_runbooks(
     application: str,
@@ -743,7 +910,7 @@ def run_step(run_id: str, runbook: str, step: str, body: RunRunbookStep, http: R
     Production a plan that cannot be read needs run_without_plan_check. A write query is always
     refused. 403 if a kill switch covers it; 429 when the maximum number of runs is running.
     """
-    return _steps(http).run_step(run_id, runbook, step, body.run_without_plan_check)
+    return _steps(http).run_step(run_id, runbook, step, body.run_without_plan_check, body.subject)
 
 
 @router.post(
