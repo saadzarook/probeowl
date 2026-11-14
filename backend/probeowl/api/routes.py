@@ -3,9 +3,9 @@
 
 from dataclasses import asdict
 from datetime import date, datetime
-from typing import Any, NoReturn
+from typing import Annotated, Any, NoReturn
 
-from fastapi import APIRouter, HTTPException, Request, Response, status
+from fastapi import APIRouter, HTTPException, Query, Request, Response, status
 
 from probeowl.api.models import (
     ApplicationSummary,
@@ -54,6 +54,7 @@ from probeowl.model.run import Actor
 from probeowl.model.runbook_step import CopiedWriteQuery, StepInRun, StepRan
 from probeowl.model.save_check import SaveCheckReport
 from probeowl.model.schema import SchemaSnapshot
+from probeowl.model.search import SearchResults
 from probeowl.model.setup import (
     DraftConnection,
     SaveApplication,
@@ -66,6 +67,7 @@ from probeowl.reload import ConfigReloader
 from probeowl.runbook_steps import RunbookSteps
 from probeowl.runbooks import matching, runbook_view, suggested
 from probeowl.runs import RunService
+from probeowl.search import MAX_QUERY, search
 from probeowl.secret_writes import SecretWrites
 from probeowl.setup_writes import SetupWrites
 
@@ -485,6 +487,25 @@ def get_healthy_comparison(run_id: str, http: Request) -> HealthyComparison:
     """A run's latest comparison, field by field. A masked field says only whether it matches."""
     redactor: Redactor = http.app.state.redactor
     return _runs(http).comparison(run_id, redactor.run)
+
+
+@router.get("/search", tags=["search"], responses=_problems(404, 422))
+def search_everything(
+    q: Annotated[str, Query(min_length=1, max_length=MAX_QUERY)],
+    http: Request,
+    application: Name | None = None,
+    limit: Annotated[int, Query(ge=1, le=20)] = 8,
+) -> SearchResults:
+    """Global search: names and titles, imported tables and columns, and runs. Not audited.
+
+    Prefix matches rank before substring matches, names before titles. A run is found by its
+    id (4 or more characters) or by its subject or identifier as stored: exactly, or by a
+    prefix of 4 or more characters when it isn't PII. A masked value matches nothing. Never
+    matched: run results, evidence, lookups' SQL, runbook steps, hosts, URLs, logins or
+    keychain names. application: omitted, every application. limit: per group.
+    """
+    service = _runs(http)
+    return search(service.applications, service.store, q, application, limit)
 
 
 @router.get("/runs", tags=["runs"], responses=_problems(404, 422))
