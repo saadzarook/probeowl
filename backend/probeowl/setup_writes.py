@@ -18,6 +18,7 @@ from pydantic import ValidationError
 from pydantic.types import JsonValue
 from sqlalchemy import Engine
 
+from probeowl.attempts import AttemptLimit
 from probeowl.config_folder import Change, ConfigFolder
 from probeowl.connector_files import (
     DEFAULT_ROW_CEILING,
@@ -79,6 +80,7 @@ class SetupWrites:
         actor_name: str | None = None,
         workspace_id: str = LOCAL_WORKSPACE,
         keychain: Callable[[], None] = check_keychain,
+        attempts: AttemptLimit | None = None,
     ):
         self._applications = applications
         self._store = store
@@ -89,6 +91,7 @@ class SetupWrites:
         self._actor = Actor(kind=ActorKind.PERSON, name=actor_name or getpass.getuser())
         self._workspace = workspace_id
         self._keychain = keychain
+        self._attempts = attempts or AttemptLimit()
 
     def state(self) -> SetupState:
         """How many applications are loaded, where new ones go, the store and the keychain."""
@@ -212,6 +215,9 @@ class SetupWrites:
                 "give the password, or use the one saved on this machine",
                 {"password": "required unless use_saved_password is true"},
             )
+        if body.password is not None:
+            # A typed password, so limited: the saved one is the same each time and isn't (#61).
+            self._attempts.attempt((application, body.connector, body.environment))
         return self._statuses.test_draft(application, model, body.environment, secrets)
 
     def _test_new_password(
@@ -239,6 +245,7 @@ class SetupWrites:
                 {"password": "required when no binding is given"},
             )
         secrets = _given(body.password.get_secret_value())
+        self._attempts.attempt((application, body.connector, body.environment))
         return self._statuses.test_draft(application, existing, body.environment, secrets)
 
     def _loaded(self, application: str, environment: str) -> LoadedApplication:

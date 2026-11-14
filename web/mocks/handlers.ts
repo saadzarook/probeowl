@@ -329,6 +329,9 @@ function matchingRunbooks(url: URL): RunbookView[] {
   });
 }
 
+/** Typed-password connection tests per binding, for the 5-a-minute limit. */
+const draftAttempts = new Map<string, number[]>();
+
 // "mock-prod-only-app": an application whose only environment is Production, for search's notice.
 function prodOnly(): ApplicationSummary[] {
   if (localStorage.getItem("mock-prod-only-app") !== "1") return [];
@@ -731,8 +734,22 @@ export const handlers = [
   }),
 
   // A draft connects unless its password is "wrong", so a failed test and its fixed reason can be seen.
-  http.post("/api/applications/:application/connectors/test-draft", async ({ request }) => {
+  http.post("/api/applications/:application/connectors/test-draft", async ({ params, request }) => {
     const body = (await request.json()) as DraftConnection;
+    // As the backend (#61): 5 tests with a typed password per binding in any minute, then a 429.
+    if (body.password) {
+      const key = `${String(params["application"])}/${body.connector}/${body.environment}`;
+      const now = Date.now();
+      const recent = (draftAttempts.get(key) ?? []).filter((at) => now - at < 60_000);
+      if (recent.length >= 5) {
+        const wait = Math.max(1, Math.ceil((60_000 - (now - (recent[0] ?? now))) / 1000));
+        return HttpResponse.json(
+          { type: "urn:probeowl:problem:too-many-attempts", title: "Too Many Requests", status: 429, detail: "too many attempts, wait a minute" },
+          { status: 429, headers: { "Content-Type": "application/problem+json", "Retry-After": String(wait) } },
+        );
+      }
+      draftAttempts.set(key, [...recent, now]);
+    }
     // No binding: a saved one, tested with a new password before Change password saves it.
     if (!body.binding && !body.password) {
       return problem(422, "Unprocessable Content", "give the new password to test", [{ field: "password", message: "required when no binding is given" }]);

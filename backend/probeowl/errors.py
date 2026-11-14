@@ -14,6 +14,10 @@ class ProbeOwlError(Exception):
         """Members a problem details response carries beside detail; none by default."""
         return {}
 
+    def headers(self) -> dict[str, str]:
+        """HTTP headers the problem details response carries; none by default."""
+        return {}
+
 
 class ConfigError(ProbeOwlError):
     """A configuration file or value is invalid."""
@@ -124,3 +128,24 @@ class PasswordMissing(RequestError):
 
 class CapacityError(ProbeOwlError):
     """ProbeOwl is already doing as much of this as it allows at once; try again shortly."""
+
+
+TOO_MANY_ATTEMPTS = "too many attempts, wait a minute"
+
+
+class TooManyAttempts(CapacityError):
+    """Too many connection tests with a password given, on one binding: wait, then try (#61).
+
+    So repeated wrong passwords can't lock the database account: Oracle's default profile locks
+    one after 10 failed logins.
+    """
+
+    problem_type = "urn:probeowl:problem:too-many-attempts"
+
+    def __init__(self, retry_after: int):
+        super().__init__(TOO_MANY_ATTEMPTS)
+        self.retry_after = retry_after
+
+    def headers(self) -> dict[str, str]:
+        """When the next attempt is allowed, in seconds."""
+        return {"Retry-After": str(self.retry_after)}

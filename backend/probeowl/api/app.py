@@ -74,6 +74,7 @@ def problem(
     fields: dict[str, str] | None = None,
     problem_type: str = "about:blank",
     extensions: dict[str, str] | None = None,
+    headers: dict[str, str] | None = None,
 ) -> JSONResponse:
     """Build a problem details response, with the fields not accepted when there are any."""
     redactor: Redactor = request.app.state.redactor
@@ -94,6 +95,7 @@ def problem(
         body.model_dump(exclude_none=True),
         status_code=status,
         media_type="application/problem+json",
+        headers=headers,
     )
 
 
@@ -114,7 +116,9 @@ async def _probeowl_error(request: Request, exc: Exception) -> JSONResponse:
     assert isinstance(exc, ProbeOwlError)  # registered for ProbeOwlError only
     status = next((s for t, s in _STATUS_BY_ERROR.items() if isinstance(exc, t)), 500)
     fields = exc.fields if isinstance(exc, RequestError) else None
-    return problem(request, status, str(exc), fields, exc.problem_type, exc.extensions())
+    return problem(
+        request, status, str(exc), fields, exc.problem_type, exc.extensions(), exc.headers()
+    )
 
 
 async def _unexpected_error(request: Request, exc: Exception) -> JSONResponse:
