@@ -26,6 +26,7 @@ dependencies = [
     # Through uvicorn and typer; bounded to what the release check has run.
     "click>=8.1,<9",
     "uvicorn>=0.30",
+    "mcp>=2.3,<3",
 ]
 
 [project.scripts]
@@ -58,6 +59,8 @@ packages = ["probeowl"]
 
 [tool.hatch.build.targets.wheel.force-include]
 "../plugins" = "plugins"
+# owl mcp's examples tool reads them (#39); a checkout reads ../examples instead.
+"../examples" = "probeowl/bundled_examples"
 
 # A release wheel carries the web app's build (hatch_build.py); editable installs do not.
 [tool.hatch.build.targets.wheel.hooks.custom]

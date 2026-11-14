@@ -55,6 +55,7 @@ nav:
   - Writing probes: writing-probes.md
   - Probes across several systems: several-systems.md
   - Writing runbooks: writing-runbooks.md
+  - Draft with an AI assistant: drafting-with-an-assistant.md
   - Connectors: connectors.md
   - Using the web app:
       - web-app/index.md

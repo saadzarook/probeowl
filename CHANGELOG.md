@@ -14,6 +14,15 @@ See docs/implementation-plan.md, Releases. -->
 
 ### Added
 
+- `owl mcp`: ProbeOwl's drafting tools for an AI assistant (Claude Desktop, VS Code with Copilot,
+  Claude Code), over the Model Context Protocol on stdio. The tools are `drafting_guide`,
+  `template`, `examples`, `check_draft`, `list_config` and `schema`. The assistant drafts and
+  checks; you paste and reload.
+  - It writes nothing, runs nothing and never returns a credential, host, URL, login, row or run
+    subject.
+  - `check_draft` flags a secret in a draft by kind and line, and never repeats it.
+  - Every call is audited as you, via MCP.
+  - See the guide's *Draft with an AI assistant*.
 - Search everything from the keyboard: <kbd>Ctrl</kbd>+<kbd>K</kbd>, or <kbd>/</kbd> outside a text
   field. It searches applications, entities, locations, probes, connectors, runbooks, imported
   tables and columns, runs by ID or subject, and the guide. Actions include New entity, New probe,
