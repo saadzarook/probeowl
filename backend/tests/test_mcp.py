@@ -442,7 +442,7 @@ def test_owl_mcp_refuses_a_store_url_with_a_password_and_never_echoes_it(
     from typer.testing import CliRunner
 
     from probeowl.cli import main as cli
-    from probeowl.cli.mcp import INLINE_PASSWORD
+    from probeowl.cli.defaults import INLINE_PASSWORD_REFUSED as INLINE_PASSWORD
 
     def never(self: Any) -> None:
         raise AssertionError("owl mcp started with a password in its store URL")
@@ -462,6 +462,6 @@ def test_owl_mcp_refuses_a_store_url_with_a_password_and_never_echoes_it(
     ["postgresql+psycopg://probeowl@store.example/probeowl", "sqlite:///C:/store/store.db"],
 )
 def test_a_store_url_without_a_password_is_accepted(url: str) -> None:
-    from probeowl.cli.mcp import has_password
+    from probeowl.cli.defaults import has_password
 
     assert has_password(url) is False

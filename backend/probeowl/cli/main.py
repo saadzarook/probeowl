@@ -29,6 +29,7 @@ from probeowl.cli.defaults import (
     create_store,
     default_store_url,
     ensure_default_store,
+    warn_inline_password,
 )
 from probeowl.cli.inspect import inspect
 from probeowl.cli.kill import kill_app
@@ -193,6 +194,7 @@ def serve(
     origins = web_origin or os.environ.get(WEB_ORIGINS_VARIABLE, "").split(",")
     applications = load_applications(folder)
     # So every write from the browser is audited from the first one.
+    warn_inline_password(url)
     store_created = ensure_default_store(url)
     store = create_store_engine(url or default_store_url())
     migrate.check_current(store)
@@ -317,6 +319,7 @@ def init(url: StoreUrl = None) -> None:
 @store_app.command("init")
 def store_init(url: StoreUrl = None) -> None:
     """Create ProbeOwl's tables in the store, or upgrade them to this release."""
+    warn_inline_password(url)
     create_store(url or default_store_url())
 
 
@@ -371,6 +374,7 @@ def store_mask_pii(
 @store_app.command("upgrade")
 def store_upgrade(url: StoreUrl = None) -> None:
     """Upgrade the store's tables to this release."""
+    warn_inline_password(url)
     create_store(url or default_store_url())
 
 

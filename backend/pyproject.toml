@@ -1,7 +1,7 @@
 # Author: @SaadZarook
 [project]
 name = "probeowl"
-version = "0.2.0.dev0"
+version = "0.2.0"
 description = "Validate production data across databases and APIs, safely."
 license = "Apache-2.0"
 authors = [{ name = "Saad Zarook (@SaadZarook)" }]

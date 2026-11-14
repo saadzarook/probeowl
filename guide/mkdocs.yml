@@ -5,8 +5,9 @@
 # served under /guide/; the landing page, site/index.html, at the root.
 site_name: ProbeOwl guide
 site_description: Validate production data across databases and APIs, safely.
-repo_url: https://github.com/saadzarook/probeowl
-edit_uri: edit/develop/guide/docs/
+# No repo_url: Material's repository widget asks GitHub's API for the latest release, which every
+# pre-release answers with a 404 (#45). The repository is a plain footer link instead, which asks
+# for nothing, and so also works when owl serve serves this guide offline.
 copyright: ProbeOwl is by Saad Zarook, under the Apache License 2.0.
 
 hooks:
@@ -69,3 +70,9 @@ nav:
   - Safety: safety.md
   - CLI reference: cli.md
   - Troubleshooting: troubleshooting.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/saadzarook/probeowl
+      name: ProbeOwl on GitHub

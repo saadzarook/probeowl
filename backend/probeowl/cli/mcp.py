@@ -11,16 +11,16 @@ from typing import Annotated
 
 import anyio
 import typer
-from sqlalchemy.engine import make_url
-from sqlalchemy.exc import ArgumentError
 
 from probeowl.checks.plans import open_for_plans
 from probeowl.cli.defaults import (
     CONFIG_VARIABLE,
+    INLINE_PASSWORD_REFUSED,
     STORE_URL_VARIABLE,
     choose_config_folder,
     default_store_url,
     ensure_default_store,
+    has_password,
 )
 from probeowl.drafting.server import create_server, serve_stdio
 from probeowl.errors import ConfigError
@@ -28,23 +28,6 @@ from probeowl.model.check import load_applications
 from probeowl.server_log import configure_server_log
 from probeowl.store import migrate
 from probeowl.store.engine import create_store_engine
-
-INLINE_PASSWORD = (
-    "the store URL contains a password; keep the password in the keychain or "
-    "PROBEOWL_STORE_URL, not in the assistant's config"
-)
-_PASSWORD_PARAMETERS = {"password", "pwd", "passwd"}
-
-
-def has_password(url: str) -> bool:
-    """Whether a store URL carries a password, as user:password@ or as a query parameter."""
-    try:
-        parsed = make_url(url)
-    except ArgumentError:
-        return "@" in url  # unreadable, with credentials of some kind: treated as holding one
-    if parsed.password:
-        return True
-    return any(key.lower() in _PASSWORD_PARAMETERS for key in parsed.query)
 
 
 def mcp(
@@ -85,7 +68,7 @@ def mcp(
     """
     if url is not None and has_password(url):
         # The URL sits in the assistant's config file: never with a password, never echoed.
-        raise ConfigError(INLINE_PASSWORD)
+        raise ConfigError(INLINE_PASSWORD_REFUSED)
     configure_server_log(Path.home() / ".probeowl" / "owl-mcp.log")
     # stdout carries the protocol and nothing else: what setting up says goes to stderr.
     with contextlib.redirect_stdout(sys.stderr):

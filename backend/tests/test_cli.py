@@ -436,7 +436,7 @@ def test_version_is_the_packages() -> None:
     result = runner.invoke(cli.app, ["--version"])
     assert result.exit_code == 0
     assert result.output == f"owl {version('probeowl')}\n"
-    assert version("probeowl") == "0.2.0.dev0"
+    assert version("probeowl") == "0.2.0"
 
 
 @pytest.mark.parametrize(
