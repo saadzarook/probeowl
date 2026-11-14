@@ -57,6 +57,10 @@ Restart the app after adding it. Its list of tools should show `drafting_guide`,
 plan, by default in the application's first environment that isn't Production. It reads it
 through the same guards as saving, never data, and says only pass or fail, with the reason.
 
+Plan checks through an assistant never touch Production. Asking for a Production environment is
+refused, and so is an application with nothing else: *"plan checks through an assistant run in
+non-Production environments only"*.
+
 ## What it will never do
 
 - **Write anything.** No tool writes a file, saves configuration, imports a schema or changes the

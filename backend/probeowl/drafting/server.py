@@ -13,6 +13,7 @@ from collections.abc import Callable
 from typing import TypeVar
 
 from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic.types import JsonValue
 from sqlalchemy import Engine
@@ -20,6 +21,7 @@ from sqlalchemy import Engine
 from probeowl.checks.plans import PlanOpener
 from probeowl.drafting import tools
 from probeowl.drafting.content import DraftKind
+from probeowl.errors import ProbeOwlError
 from probeowl.model.check import LoadedApplication
 from probeowl.model.run import Actor, ActorKind
 from probeowl.store.audit import AuditEvent, append_event
@@ -62,9 +64,14 @@ def create_server(
         }
         try:
             result = call()
-        except Exception:
+        except ProbeOwlError as err:
+            # A refusal with its fixed reason, as the client's tool error; never a traceback.
             _audit(store, actor, details | {"ok": False}, application)
             log.info("mcp %s %s: refused", tool, details["kind"] or "")
+            raise ToolError(str(err)) from err
+        except Exception:
+            _audit(store, actor, details | {"ok": False}, application)
+            log.info("mcp %s %s: failed", tool, details["kind"] or "")
             raise
         ok = getattr(result, "ok", True)
         _audit(store, actor, details | {"ok": bool(ok)}, application)

@@ -85,7 +85,18 @@ async def draft_from_the_tools(
         )
         assert guide["file"] == "<application>/probes/<probe>.yaml"
         checked = await call("check_draft", kind="probe", text=draft, application=app["id"])
-        return {"draft": draft, "checked": checked}
+        # Plan checks through an assistant never touch Production: refused, with its reason.
+        production = await session.call_tool(
+            "check_draft",
+            {"kind": "probe", "text": draft, "application": app["id"], "environment": "prod"},
+        )
+        said = " ".join(getattr(part, "text", "") for part in production.content)
+        transcript.add(
+            "check_draft",
+            {"environment": "prod", "...": "the same draft"},
+            {"is_error": production.is_error, "text": said},
+        )
+        return {"draft": draft, "checked": checked, "production": (production.is_error, said)}
 
 
 def test_a_real_client_drafts_the_card_probe_over_stdio_and_check_draft_passes_it(
@@ -108,6 +119,9 @@ def test_a_real_client_drafts_the_card_probe_over_stdio_and_check_draft_passes_i
         Path(keep).write_text("\n".join(transcript.lines), encoding="utf-8")
 
     assert done["checked"]["ok"] is True, done["checked"]
+    is_error, said = done["production"]
+    assert is_error is True
+    assert "plan checks through an assistant run in non-Production environments only" in said
     # Pasted exactly where it says, the folder loads with it, as Reload configuration would.
     target = Path(done["checked"]["paste_into"])
     assert target == folder / "card-access" / "probes" / "visitor_active_cards.yaml"

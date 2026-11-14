@@ -33,7 +33,7 @@ from probeowl.drafting.content import (
     safe_example,
 )
 from probeowl.drafting.scan import redacted, scan
-from probeowl.errors import ConfigError, NotFoundError, unknown_application
+from probeowl.errors import ConfigError, NotFoundError, RequestError, unknown_application
 from probeowl.model.check import LoadedApplication
 from probeowl.model.common import ProbeOwlModel
 from probeowl.model.load import parse_document, read_text
@@ -43,6 +43,9 @@ from probeowl.store.schemas import latest_snapshot
 from probeowl.store.tables import LOCAL_WORKSPACE
 
 MAX_DRAFT = 64 * 1024
+PLAN_CHECKS_NOT_PRODUCTION = (
+    "plan checks through an assistant run in non-Production environments only"
+)
 REMOVE_THIS = (
     "Remove this: passwords go in the keychain via Add connection or owl connector add; hosts "
     "stay in the connector file you write yourself"
@@ -397,10 +400,12 @@ def _findings(
     app = applications.get(application) if application else None
     if application is not None and app is None:
         return [_Finding("Application", "error", f"no application named {application} is loaded")]
+    if app is not None and environment is not None:
+        _not_production(app, environment)  # named or not, plans are never read in Production
     if kind in (DraftKind.PROBE, DraftKind.ENTITY):
         if app is None:
             return [_Finding("Application", "error", "name the application this draft is for")]
-        where = (environment or _first_not_production(app)) if plans else None
+        where = _plan_environment(app, environment) if plans else None
         report = (
             check_probe_draft(app, text, environment=where, plans=plans)
             if kind is DraftKind.PROBE
@@ -427,12 +432,26 @@ def _findings(
     return []
 
 
-def _first_not_production(app: LoadedApplication) -> str | None:
-    # Plans are read where it's safest unless an environment is named: never Production first.
+def _plan_environment(app: LoadedApplication, environment: str | None) -> str:
+    """Where plans are read for an assistant: the one named, else the first that isn't
+    Production. Never Production: refused, also for an application with nothing else."""
     environments = app.application.environments
-    return next(
-        (n for n, e in environments.items() if not e.production), next(iter(environments), None)
-    )
+    if environment is None:
+        environment = next((n for n, e in environments.items() if not e.production), None)
+        if environment is None:
+            raise RequestError(
+                PLAN_CHECKS_NOT_PRODUCTION, {"environment": PLAN_CHECKS_NOT_PRODUCTION}
+            )
+    _not_production(app, environment)
+    return environment
+
+
+def _not_production(app: LoadedApplication, environment: str) -> None:
+    found = app.application.environments.get(environment)
+    if found is None:
+        raise NotFoundError(f"{app.application.application} has no environment {environment}")
+    if found.production:
+        raise RequestError(PLAN_CHECKS_NOT_PRODUCTION, {"environment": PLAN_CHECKS_NOT_PRODUCTION})
 
 
 def _from_report(report: SaveCheckReport) -> list[_Finding]:

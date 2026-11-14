@@ -3,6 +3,7 @@
 audited; the official SDK, bounded, with tools held to contracts/mcp-tools.json."""
 
 import asyncio
+import dataclasses
 import json
 import shutil
 import tomllib
@@ -12,12 +13,14 @@ from typing import Any
 
 import pytest
 import yaml
+from mcp.server.mcpserver.exceptions import ToolError
 from sqlalchemy import Engine
 
 from probeowl.drafting import server as mcp_server
 from probeowl.drafting.contract import CONTRACT_PATH, build_contract
 from probeowl.drafting.scan import scan
 from probeowl.drafting.server import create_server
+from probeowl.drafting.tools import PLAN_CHECKS_NOT_PRODUCTION
 from probeowl.model import Run
 from probeowl.model.check import LoadedApplication, load_applications
 from probeowl.model.schema import ColumnSchema, SchemaSnapshot, TableSchema
@@ -362,3 +365,61 @@ def test_every_tool_is_read_only_and_closed_world() -> None:
         assert tool["annotations"]["read_only_hint"] is True, tool["name"]
         assert tool["annotations"]["open_world_hint"] is False, tool["name"]
         assert tool["output_schema"], tool["name"]
+
+
+# --- Plan checks through an assistant never touch Production ----------------------------------
+
+
+def refused(mcp: Mcp, **arguments: Any) -> str:
+    """The tool error check_draft is refused with; a client receives it as is_error."""
+    with pytest.raises(ToolError) as error:
+        asyncio.run(mcp.server.call_tool("check_draft", arguments))
+    return str(error.value)
+
+
+@pytest.mark.parametrize("plan_checks", [True, False])
+def test_check_draft_refuses_production_by_name(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, plan_checks: bool
+) -> None:
+    opened: list[str] = []
+    found = Mcp(
+        tmp_path, monkeypatch, plans=(lambda c, env: opened.append(env)) if plan_checks else None
+    )
+    message = refused(
+        found, kind="probe", text=PROBE_DRAFT, application="card_access", environment="prod"
+    )
+    assert PLAN_CHECKS_NOT_PRODUCTION in message
+    assert opened == []
+    [event] = found.events()
+    assert event.details["ok"] is False  # the refusal is audited
+
+
+def test_plan_checks_default_to_the_first_environment_that_isnt_production(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    opened: list[str] = []
+    found = Mcp(tmp_path, monkeypatch, plans=lambda c, env: opened.append(env))
+    found.call("check_draft", kind="probe", text=PROBE_DRAFT, application="card_access")
+    assert opened and set(opened) == {"uat"}  # card access lists prod first: never read there
+
+
+def test_an_application_with_only_production_is_refused_plan_checks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    opened: list[str] = []
+    found = Mcp(tmp_path, monkeypatch, plans=lambda c, env: opened.append(env))
+    card = found.applications["card_access"]
+    only = card.application.model_copy(
+        update={"environments": {"prod": card.application.environments["prod"]}}
+    )
+    found.applications["card_access"] = dataclasses.replace(card, application=only)
+    message = refused(found, kind="probe", text=PROBE_DRAFT, application="card_access")
+    assert PLAN_CHECKS_NOT_PRODUCTION in message
+    assert opened == []
+    # Without --plan-checks nothing is read, so its drafts can still be checked.
+    without = Mcp(tmp_path / "b", monkeypatch)
+    without.applications["card_access"] = dataclasses.replace(
+        without.applications["card_access"], application=only
+    )
+    ok = without.call("check_draft", kind="probe", text=PROBE_DRAFT, application="card_access")
+    assert ok.structured_content["ok"] is True
