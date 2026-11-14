@@ -397,11 +397,14 @@ def _environments(app: LoadedApplication, probe: Probe, entity: Entity) -> list[
             }
         )
         if unbound:
+            # The environment it is about, so an editor can leave that one out of the probe.
             found.append(
-                _fail(
-                    "Environments",
-                    f"enabled in {environment}, where {', '.join(unbound)} has no binding; "
+                SaveCheck(
+                    check="Environments",
+                    status=CheckStatus.FAIL,
+                    message=f"enabled in {environment}, where {', '.join(unbound)} has no binding; "
                     f"bind it or leave {environment} out of the probe's environments",
+                    environment=environment,
                 )
             )
     return found or [

@@ -19,6 +19,7 @@ import {
   cardAccessReview,
   draftRun,
   passingReport,
+  unboundReport,
   piiReport,
   timeFilterReport,
   unreadableReport,
@@ -228,17 +229,24 @@ interface DraftBody {
   environment?: string | null;
 }
 
+// mock-prod-unbound: Card access's access_db has no Production binding, so a probe enabled there fails (#95).
+const prodUnbound = (application: string) => application === "card_access" && localStorage.getItem("mock-prod-unbound") !== null;
+
 /** The save checks the mocks report for a draft: unreadable YAML, a time filter missing on topups, or an unmasked email. */
-function checksOf(body: DraftBody) {
+function checksOf(body: DraftBody, application = "") {
   let name: string | null;
+  let environments: string[] | undefined;
   try {
     const parsed: unknown = parse(body.probe);
     if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("it is not a mapping");
     const probe = (parsed as { probe?: unknown }).probe;
     name = typeof probe === "string" ? probe : null;
+    const listed = (parsed as { environments?: unknown }).environments;
+    environments = Array.isArray(listed) ? listed.map(String) : undefined;
   } catch (e) {
     return unreadableReport(e instanceof Error ? e.message.split("\n")[0] ?? "" : "");
   }
+  if (prodUnbound(application)) return unboundReport(name, (environments ?? ["prod", "uat"]).filter((e) => e === "prod"));
   const entity = body.entity ?? "";
   if (/FROM topups WHERE status = :status/.test(entity)) return timeFilterReport(name);
   if (/SELECT customer_email/.test(entity)) return piiReport(name);
@@ -464,7 +472,7 @@ export const handlers = [
     if (!knownEnvironment(application, body.environment)) return problem(404, "Not Found", "No such environment.");
     const missing = missingFor(application, body.environment ?? "");
     if (missing) return passwordMissingProblem(missing.connector, missing.environment);
-    return json(checksOf(body));
+    return json(checksOf(body, application));
   }),
 
   http.post("/api/applications/:application/probes/test-runs", async ({ params, request }) => {
@@ -474,7 +482,7 @@ export const handlers = [
     if (!knownEnvironment(application, body.environment)) return problem(404, "Not Found", "No such environment.");
     const missing = missingFor(application, body.environment);
     if (missing) return passwordMissingProblem(missing.connector, missing.environment);
-    const failed = checksOf(body).checks.filter((c) => c.status === "fail");
+    const failed = checksOf(body, application).checks.filter((c) => c.status === "fail");
     if (failed.length > 0) {
       return problem(422, "Unprocessable Content", `${failed[0]?.check ?? "Probe"}: ${failed[0]?.message ?? ""}`, failed.map((c) => ({ field: c.location ? `${c.check}: ${c.location}` : c.check, message: c.message })));
     }
@@ -517,7 +525,7 @@ export const handlers = [
     const body = (await request.json()) as SaveProbe;
     if (!applications.some((a) => a.name === application)) return problem(404, "Not Found", "No such application.");
     if (!knownEnvironment(application, body.environment)) return problem(404, "Not Found", "No such environment.");
-    const report = checksOf(body);
+    const report = checksOf(body, application);
     const failed = report.checks.filter((c) => c.status === "fail");
     if (failed.length > 0) {
       return problem(422, "Unprocessable Content", `${failed[0]?.check ?? "Probe"}: ${failed[0]?.message ?? ""}`, failed.map((c) => ({ field: c.location ? `${c.check}: ${c.location}` : c.check, message: c.message })));

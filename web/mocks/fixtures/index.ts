@@ -28,7 +28,7 @@ export { flaggedRunbook, outboxResult, stepsInRun, topUpNotCredited } from "./ru
 export { walletConnectors, cardAccessConnectors, payoutsConnectors } from "./connectors";
 export { walletCatalog, cardAccessCatalog, schemaSnapshots, truncatedAccessSnapshot, UNIMPORTED, addedConnectorSnapshot } from "./catalog";
 export { walletSuggestions, walletReviewTables, cardAccessReview } from "./review";
-export { draftRun, passingReport, piiReport, timeFilterReport, unreadableReport, TIME_FILTER_MESSAGE } from "./probeChecks";
+export { draftRun, passingReport, piiReport, timeFilterReport, unboundReport, unreadableReport, TIME_FILTER_MESSAGE } from "./probeChecks";
 export { runningValidateRun, failedValidateRun, skippedValidateRun, stoppedValidateRun, lateValidateRun, walletRunPages } from "./runs";
 export {
   visitorEntity,

@@ -35,12 +35,16 @@ function ErrorBlock({ message, onRetry }: { message: string; onRetry: () => void
   );
 }
 
-/** Connectors an Environments check says are not bound, by environment name. */
-function unboundBy(checks: { check: string; message: string; environment?: string | null }[]): Map<string, string> {
+/**
+ * Connectors a failed Environments check says are not bound, by environment name. The check names
+ * its environment, and each unbound location with its connector: "cards (access_db) has no binding".
+ */
+function unboundBy(checks: { check: string; status: string; message: string; environment?: string | null }[]): Map<string, string> {
   const unbound = new Map<string, string>();
   for (const c of checks) {
-    const connector = /([\w-]+) not bound/.exec(c.message)?.[1];
-    if (c.check === "Environments" && c.environment && connector) unbound.set(c.environment, connector);
+    if (c.check !== "Environments" || c.status !== "fail" || !c.environment) continue;
+    const connectors = [...new Set([...c.message.matchAll(/\(([\w-]+)\)/g)].map((m) => m[1]))];
+    unbound.set(c.environment, connectors.join(", ") || "a connector");
   }
   return unbound;
 }
@@ -104,6 +108,19 @@ export function ProbeEditorPage({ item }: { item: NavItem }) {
   const entityChanged = edited !== undefined && loadedYaml !== undefined && !sameText(edited.text, loadedYaml);
 
   const checks = useSaveChecks(name ?? "", probeYaml ?? "", entityChanged ? entityText : undefined, environment?.name);
+  // A new draft is enabled where all its entity's connectors are bound: once its first checks say
+  // which are not, "Enabled in" is written from them (#95). An opened probe keeps its own.
+  const [choosingEnvironments, setChoosingEnvironments] = useState(false);
+  // Adjusted while rendering, once, as React advises for state that follows a query's answer.
+  if (choosingEnvironments && application && probeYaml !== undefined && checks.data && !checks.isPlaceholderData && !checks.isFetching) {
+    setChoosingEnvironments(false);
+    const unbound = unboundBy(checks.data.checks);
+    const bound = application.environments.map((e) => e.name).filter((e) => !unbound.has(e));
+    // The person chose already, or none is bound: then the checks say what is missing where.
+    if (readFields(probeYaml)?.environments === undefined && unbound.size > 0 && bound.length > 0) {
+      setDraft({ scope: application.name, yaml: setField(probeYaml, "environments", bound) });
+    }
+  }
   const enabled = name !== undefined && probeYaml !== undefined;
   const savedName = probeYaml === undefined ? "" : probeName(probeYaml);
   const isOpened = opened !== undefined && opened.application === name && opened.name === savedName;
@@ -122,6 +139,7 @@ export function ProbeEditorPage({ item }: { item: NavItem }) {
     try {
       const file = await fetchProbeYaml(name, probe);
       setProbeYaml(file.text);
+      setChoosingEnvironments(false);
       setNaming("done");
       setOpened({ application: name, name: probe, text: file.text });
       setEntityEdit(undefined);
@@ -153,6 +171,7 @@ export function ProbeEditorPage({ item }: { item: NavItem }) {
     if (!application) return;
     const entity = entities.data?.find((e) => e.entity === chosen.entity);
     setProbeYaml(probeTemplate(chosen.entity, chosen.kind, application.owner, chosen.probe, firstLocation(entity), chosen.title));
+    setChoosingEnvironments(true);
     setNaming("done");
     setOpened(undefined);
     setEntityEdit(undefined);
