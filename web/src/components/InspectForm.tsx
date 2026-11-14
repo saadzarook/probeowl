@@ -1,5 +1,6 @@
 // Author: @SaadZarook
 import { useState, type FormEvent } from "react";
+import { useSearchParams } from "react-router-dom";
 import type { Entity, Reason, StartRun } from "../api/client";
 import { useProbes } from "../api/useProbes";
 import { detectIdentifier } from "../identifiers";
@@ -24,7 +25,9 @@ export function InspectForm({ entity, pending, error, valueError, onSubmit }: In
   const [probeChoice, setProbeChoice] = useState<string>();
   const probe = inspectProbes.find((p) => p.name === probeChoice)?.name ?? inspectProbes[0]?.name;
 
-  const [value, setValue] = useState("");
+  // ?value= from search fills the field; nothing runs until the person presses the button.
+  const [params] = useSearchParams();
+  const [value, setValue] = useState(() => params.get("value") ?? "");
   // "" lets the server place the value: by pattern, or by trying each identifier in turn.
   const [chosen, setChosen] = useState("");
   const [reason, setReason] = useState<Reason | "">("");

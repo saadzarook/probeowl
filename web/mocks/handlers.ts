@@ -332,6 +332,12 @@ function matchingRunbooks(url: URL): RunbookView[] {
 /** Typed-password connection tests per binding, for the 5-a-minute limit. */
 const draftAttempts = new Map<string, number[]>();
 
+// "mock-prod-only-app": an application whose only environment is Production, for search's notice.
+function prodOnly(): ApplicationSummary[] {
+  if (localStorage.getItem("mock-prod-only-app") !== "1") return [];
+  return [{ name: "settlements", title: "Settlements", owner: "payments-team", environments: [{ name: "prod", title: "Production", production: true }] }];
+}
+
 // "mock-pii-key": the entity's key is PII (#66): subjects and matches show [masked], and what needs
 // the real value later asks for it to be pasted.
 const PII_KEY_REASON = "topup's key is PII and stored masked: paste its topup_id";
@@ -409,7 +415,7 @@ export const handlers = [
   // "mock-slow-applications": the list is slow to come back once one is created, as on a busy machine.
   http.get("/api/applications", async () => {
     if (createdApplications.length > 0 && localStorage.getItem("mock-slow-applications")) await delay(1500);
-    return json([...(localStorage.getItem("mock-no-applications") ? [] : applications), ...createdApplications]);
+    return json([...(localStorage.getItem("mock-no-applications") ? [] : applications), ...createdApplications, ...prodOnly()]);
   }),
 
   http.get("/api/applications/:application", ({ params }) => {
@@ -870,15 +876,29 @@ export const handlers = [
   }),
 
   // Wallet in UAT has two pages of runs; every other application and environment has none.
+  // The bundled guide's own search index, as MkDocs writes it: pages and their sections.
+  http.get("/guide/search/search_index.json", () =>
+    json({
+      docs: [
+        { location: "getting-started/", title: "Getting started" },
+        { location: "troubleshooting/", title: "Troubleshooting" },
+        { location: "troubleshooting/#owl-serve-is-slow-to-start-the-first-time", title: "owl serve is slow to start the first time" },
+        { location: "writing-probes/", title: "Writing probes" },
+      ],
+    }),
+  ),
+
   // Global search over the mocks' configuration and runs, by the backend's rules.
   http.get("/api/search", ({ request }) => {
     const query = new URL(request.url).searchParams;
     const q = (query.get("q") ?? "").trim();
+    // A query that fails, for the palette's error state and its retry.
+    if (q === "fail-search") return problem(500, "Internal Server Error", "Search could not be run.");
     const limit = Number(query.get("limit") ?? "8");
     const application = query.get("application");
     if (q.length < 1 || q.length > 128) return problem(422, "Unprocessable Content", "give 1 to 128 characters to search for", [{ field: "q", message: "1 to 128 characters" }]);
     if (!Number.isInteger(limit) || limit < 1 || limit > 20) return problem(422, "Unprocessable Content", "limit is 1 to 20", [{ field: "limit", message: "1 to 20" }]);
-    const shown = [...applications, ...createdApplications];
+    const shown = [...applications, ...createdApplications, ...prodOnly()];
     if (application !== null && !shown.some((a) => a.name === application)) return problem(404, "Not Found", `no application named ${application}`);
     const scope = shown.filter((a) => application === null || a.name === application);
     const items: Searchable[] = scope.flatMap((app): Searchable[] => {

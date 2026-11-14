@@ -14,6 +14,14 @@ See docs/implementation-plan.md, Releases. -->
 
 ### Added
 
+- Search everything from the keyboard: <kbd>Ctrl</kbd>+<kbd>K</kbd>, or <kbd>/</kbd> outside a text
+  field. It searches applications, entities, locations, probes, connectors, runbooks, imported
+  tables and columns, runs by ID or subject, and the guide. Actions include New entity, New probe,
+  Add connection, Reload configuration, and Inspect or Validate with the typed value filled in.
+  - A result opens on its own screen in its own application. When that application doesn't have
+    the environment you're in, it opens in its first environment that isn't Production, and says
+    so. It opens in Production only when that's all the application has, and says that too.
+  - A masked subject shows as `[masked]` and matches nothing.
 - A connection whose password isn't on this machine, as when its file came from a teammate, asks
   for it: on Connectors, and wherever Inspect, Validate or a test run needs it. The password goes
   straight to this machine's keychain and is never stored by the page.
