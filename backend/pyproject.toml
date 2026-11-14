@@ -36,7 +36,6 @@ owl = "probeowl.cli.start:main"
 dev = [
     "httpx2>=2.16.0",
     "jsonschema>=4.23",
-    "keyrings-alt>=5",
     "mypy>=1.13",
     "psycopg[binary]>=3.2",
     "pytest>=8.3",
@@ -99,11 +98,6 @@ disallow_subclassing_any = true
 no_implicit_reexport = true
 warn_return_any = true
 extra_checks = true
-
-# keyrings.alt ships no type information; it is only used by tests and CI.
-[[tool.mypy.overrides]]
-module = ["keyrings.alt.*"]
-ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

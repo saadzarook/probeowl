@@ -120,8 +120,10 @@ An empty clipboard means there's no such entry.
 `no keychain entry for service 'probeowl' and user 'wallet_db.prod'` means the entry is missing,
 as when the connector's file came from a teammate. The web app asks for it where it's needed
 ([A password missing on this machine](web-app/connectors.md#a-password-missing-on-this-machine)).
-On Linux without a desktop keychain, ProbeOwl refuses a keyring that keeps secrets in files.
-Use an `env:` secret instead.
+`there is no system keychain on this machine` means ProbeOwl found none of the keychains it keeps
+passwords in: Windows Credential Manager, the macOS Keychain, or Secret Service or KWallet on
+Linux. It never falls back to a file or the registry. On a Linux server with no desktop session,
+use an `env:` secret instead.
 
 ## "connection refused"
 

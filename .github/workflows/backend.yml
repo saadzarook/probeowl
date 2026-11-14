@@ -83,10 +83,6 @@ jobs:
     env:
       # The local stack's documented test password (dev/README.md); not a real credential.
       PROBEOWL_RO_PASSWORD: ProbeOwl_Ro_Local1
-      # CI has no system keychain; the examples' keyring: references read this file one,
-      # which owl refuses unless it is allowed here, in CI only.
-      PYTHON_KEYRING_BACKEND: keyrings.alt.file.PlaintextKeyring
-      PROBEOWL_ALLOW_INSECURE_KEYRING: "1"
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7
@@ -94,6 +90,10 @@ jobs:
       - name: Start the dev stack
         working-directory: .
         run: docker compose -f dev/docker-compose.yml up --wait --wait-timeout 900
+      - name: A system keychain, as on a desktop (Secret Service)
+        # owl keeps passwords only in a system keychain, never a file: dev/ci/keychain.sh
+        working-directory: .
+        run: bash dev/ci/keychain.sh
       - name: Production passwords in the keychain, UAT passwords in the environment
         run: |
           for connector in wallet_db ledger_db access_db; do
@@ -144,10 +144,6 @@ jobs:
     env:
       # The local stack's documented test password (dev/README.md); not a real credential.
       PROBEOWL_RO_PASSWORD: ProbeOwl_Ro_Local1
-      # CI has no system keychain; the examples' keyring: references read this file one,
-      # which owl refuses unless it is allowed here, in CI only.
-      PYTHON_KEYRING_BACKEND: keyrings.alt.file.PlaintextKeyring
-      PROBEOWL_ALLOW_INSECURE_KEYRING: "1"
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7
@@ -155,6 +151,10 @@ jobs:
       - name: Start the dev stack
         working-directory: .
         run: docker compose -f dev/docker-compose.yml up --wait --wait-timeout 900
+      - name: A system keychain, as on a desktop (Secret Service)
+        # owl keeps passwords only in a system keychain, never a file: dev/ci/keychain.sh
+        working-directory: .
+        run: bash dev/ci/keychain.sh
       - name: Production passwords in the keychain, UAT passwords in the environment
         run: |
           for connector in wallet_db ledger_db access_db; do

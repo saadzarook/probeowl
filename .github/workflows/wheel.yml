@@ -34,7 +34,7 @@ jobs:
           if [ "$EVENT" != "pull_request" ]; then echo "run=true" >> "$GITHUB_OUTPUT"; exit 0; fi
           changed=$(git diff --name-only "origin/$BASE...HEAD")
           printf '%s\n' "$changed"
-          if printf '%s\n' "$changed" | grep -qE '^(backend/(pyproject\.toml|uv\.lock|hatch_build\.py|guide_build\.py|release_notices\.py)$|backend/probeowl/cli/|web/(package\.json|package-lock\.json|vite\.config\.ts)$|guide/(mkdocs\.yml|requirements\.txt|hooks\.py)$|dev/release/|\.github/workflows/wheel\.yml$)'; then
+          if printf '%s\n' "$changed" | grep -qE '^(backend/(pyproject\.toml|uv\.lock|hatch_build\.py|guide_build\.py|release_notices\.py)$|backend/probeowl/cli/|backend/probeowl/secrets\.py$|dev/ci/keychain\.sh$|web/(package\.json|package-lock\.json|vite\.config\.ts)$|guide/(mkdocs\.yml|requirements\.txt|hooks\.py)$|dev/release/|\.github/workflows/wheel\.yml$)'; then
             echo "run=true" >> "$GITHUB_OUTPUT"
           else
             echo "Nothing that goes in the wheel changed: the wheel check is not needed."
@@ -46,6 +46,10 @@ jobs:
         if: steps.changed.outputs.run == 'true'
         with:
           node-version: 24
+      - name: A system keychain, as on a desktop (Secret Service)
+        # owl init saves to it, as a user's does: dev/ci/keychain.sh
+        if: steps.changed.outputs.run == 'true'
+        run: bash dev/ci/keychain.sh
       - name: Build, install and check the wheel
         if: steps.changed.outputs.run == 'true'
         run: bash dev/release/wheel_check.sh

@@ -19,10 +19,6 @@ jobs:
       PROBEOWL_LEDGER_DB_UAT: ProbeOwl_Ro_Local1
       PROBEOWL_ACCESS_DB_UAT: ProbeOwl_Ro_Local1
       PROBEOWL_RO_PASSWORD: ProbeOwl_Ro_Local1
-      # CI has no system keychain; the examples' keyring: references read this file one,
-      # which owl refuses unless it is allowed here, in CI only.
-      PYTHON_KEYRING_BACKEND: keyrings.alt.file.PlaintextKeyring
-      PROBEOWL_ALLOW_INSECURE_KEYRING: "1"
       # The preview server's origins, which owl serve accepts on writes.
       PROBEOWL_WEB_ORIGINS: http://127.0.0.1:4173,http://localhost:4173
     steps:
@@ -38,6 +34,9 @@ jobs:
       - name: Install the backend
         working-directory: backend
         run: uv sync --locked
+      - name: A system keychain, as on a desktop (Secret Service)
+        # owl keeps passwords only in a system keychain, never a file: dev/ci/keychain.sh
+        run: bash dev/ci/keychain.sh
       - name: Production passwords in the keychain
         working-directory: backend
         run: |
