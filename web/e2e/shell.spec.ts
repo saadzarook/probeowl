@@ -84,3 +84,64 @@ test("the sidebar shows ProbeOwl's version, as owl --version prints it, and the 
   await page.goto("/inspect");
   await expect(page.locator(".sidebar-footer")).toHaveText(`v${version ?? "?"} · local`);
 });
+
+test("the application and environment survive a reload (#94)", async ({ page }) => {
+  await page.goto("/inspect");
+  await page.getByRole("button", { name: "Application" }).click();
+  await page.getByRole("button", { name: /Card access/ }).last().click();
+  await page.getByLabel("Environment").first().selectOption("UAT");
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Application" })).toContainText("Card access");
+  await expect(page.getByLabel("Environment").first()).toHaveValue("uat");
+  // A new tab in the same browser opens where the person left off, too.
+  const other = await page.context().newPage();
+  await other.goto("/tables");
+  await expect(other.getByRole("button", { name: "Application" })).toContainText("Card access");
+  await expect(other.getByLabel("Environment").first()).toHaveValue("uat");
+});
+
+test("a kept application that no longer exists falls back to the first one", async ({ page }) => {
+  await page.addInitScript(() =>
+    localStorage.setItem("probeowl.selection", JSON.stringify({ application: "gone", environment: "uat" })),
+  );
+  await page.goto("/inspect");
+  await expect(page.getByRole("button", { name: "Application" })).toContainText("Wallet");
+  // Wallet has a UAT too, so the kept environment still applies.
+  await expect(page.getByLabel("Environment").first()).toHaveValue("uat");
+});
+
+test("a kept environment the application doesn't have falls back to its first", async ({ page }) => {
+  await page.addInitScript(() =>
+    localStorage.setItem("probeowl.selection", JSON.stringify({ application: "card_access", environment: "staging" })),
+  );
+  await page.goto("/inspect");
+  await expect(page.getByRole("button", { name: "Application" })).toContainText("Card access");
+  await expect(page.getByLabel("Environment").first()).toHaveValue("prod");
+});
+
+test("with the selection unreadable or blocked, the app starts as on a first visit", async ({ page }) => {
+  await page.addInitScript(() => {
+    const original = Storage.prototype.getItem;
+    // The selection's own key throws, as in a private window; the mocks' flags still read.
+    Storage.prototype.getItem = function (key: string) {
+      if (key === "probeowl.selection") throw new DOMException("blocked", "SecurityError");
+      return original.call(this, key);
+    };
+    Storage.prototype.setItem = function () {
+      throw new DOMException("blocked", "SecurityError");
+    };
+  });
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/inspect");
+  await expect(page.getByRole("button", { name: "Application" })).toContainText("Wallet");
+  await page.getByLabel("Environment").first().selectOption("UAT");
+  await expect(page.getByLabel("Environment").first()).toHaveValue("uat");
+  expect(errors).toEqual([]);
+});
+
+test("a kept value that isn't ProbeOwl's is ignored", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("probeowl.selection", "{not json"));
+  await page.goto("/inspect");
+  await expect(page.getByRole("button", { name: "Application" })).toContainText("Wallet");
+});

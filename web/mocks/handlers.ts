@@ -91,6 +91,9 @@ const KEPT_COMMENT = "# A comment only the real file has.";
 
 // mock-no-catalog: Wallet as owl init leaves it, its schema imported but no catalog.yaml yet.
 const noCatalog = (application: string) => application === "wallet" && localStorage.getItem("mock-no-catalog") !== null;
+// mock-uat-only-imports: Card access imported in UAT only, so Production has no tables (#94).
+const notImportedHere = (application: string, environment: string) =>
+  application === "card_access" && environment === "prod" && localStorage.getItem("mock-uat-only-imports") !== null;
 
 const catalogOf = (application: string): CatalogTable[] | undefined => {
   const added = written.get(application) ?? [];
@@ -131,7 +134,11 @@ function entityFailures(application: string, text: string): { field: string; mes
 }
 
 function reviewOf(application: string): CatalogReview | undefined {
-  const base = baseReviewOf(application);
+  const found = baseReviewOf(application);
+  const base =
+    found && notImportedHere(application, "prod")
+      ? { ...found, tables: found.tables.map((t) => ({ ...t, imported_in: t.imported_in.filter((e) => e !== "prod") })) }
+      : found;
   const added = addedImports.get(application) ?? [];
   if (!base || added.length === 0) return base;
   // A connector added through Add connection: its tables suggested, until each is confirmed.
@@ -806,9 +813,12 @@ export const handlers = [
     const application = String(params["application"]);
     const connector = query.get("connector") ?? "";
     const environment = query.get("environment") ?? "";
+    const neverImported =
+      notImportedHere(application, environment) ||
+      (application === UNIMPORTED.application && connector === UNIMPORTED.connector && environment === UNIMPORTED.environment);
     const found =
       imported.get(importKey(application, connector, environment)) ??
-      (application === UNIMPORTED.application && connector === UNIMPORTED.connector && environment === UNIMPORTED.environment
+      (neverImported
         ? undefined
         : schemaSnapshots.find((s) => s.application === application && s.connector === connector && s.environment === environment));
     return found
