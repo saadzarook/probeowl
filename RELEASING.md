@@ -154,26 +154,23 @@ GitHub Pages serves the landing page (`site/index.html`) at the root,
 <https://saadzarook.github.io/probeowl/>, and the guide under `/guide/`. The guide's address comes
 from `GUIDE_URL` in `backend/probeowl/guide.py`, which `guide/hooks.py` gives MkDocs.
 
-Plain `mkdocs gh-deploy` must not be used: it would replace the landing page with the guide. Build
-both into one staging folder instead, and push that folder to the `gh-pages` branch:
+Plain `mkdocs gh-deploy` must not be used: it would replace the landing page with the guide, and
+build the guide with Google Fonts and the GitHub widget. Build and check what Pages serves, then
+publish it. From the repo root, after `npm ci` in `web/` and `npx playwright install chromium`:
 
 ```sh
 stage="$(mktemp -d)"
-(cd guide && uvx --with-requirements requirements.txt --from mkdocs \
-   mkdocs build --strict -d "$stage/guide")
-cp site/index.html "$stage/index.html"
-touch "$stage/.nojekyll"           # serve the files as they are
-cd "$stage"
-git init -q -b gh-pages
-git add -A
-git commit -q -m "Site for ProbeOwl 0.1.0"
-git push --force https://github.com/saadzarook/probeowl.git gh-pages
+bash dev/site/build.sh "$stage"     # landing page, its fonts and the offline guide, checked in a browser
+bash dev/site/deploy.sh "$stage"    # force-pushes it to gh-pages
+node dev/site/check_stage.mjs https://saadzarook.github.io/probeowl/
 ```
 
-The `gh-pages` branch holds only the built site, so replacing it each time is intended. In the
-repository's **Settings → Pages**, set the source to **Deploy from a branch**, `gh-pages`, `/ (root)`.
-Then check that <https://saadzarook.github.io/probeowl/> shows the landing page, that its Guide link
-opens <https://saadzarook.github.io/probeowl/guide/>, and that the guide's search works.
+`build.sh` builds the guide exactly as the wheel does, offline, and only its address differs. It
+fails if any page requests something from another site, logs a console error or gets an error
+response, or if the guide's search finds nothing. The `gh-pages` branch holds only the built site,
+so replacing it each time is intended. In the repository's **Settings → Pages**, the source is
+**Deploy from a branch**, `gh-pages`, `/ (root)`. Pages takes a minute or two to update; then the
+last command checks the live site the same way, the landing page and every page of the guide.
 
 ## Later: the automated route
 
