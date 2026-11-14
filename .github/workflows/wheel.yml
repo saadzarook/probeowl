@@ -1,0 +1,51 @@
+# Author: @SaadZarook
+name: wheel
+
+# The release check for the wheel as users install it (dev/release/wheel_check.sh): build it,
+# `uv tool install` it with a fresh resolution, not uv.lock, then owl init, owl check and owl
+# serve's first page. It found probeowl-archive#248, a newer Typer than the lock that crashed owl init.
+on:
+  # No paths filter: a required check that did not run leaves the pull request unmergeable. The job
+  # runs on every pull request and stops at its first step when nothing that goes in the wheel changed.
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  wheel-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: What goes in the wheel changed?
+        id: changed
+        env:
+          BASE: ${{ github.base_ref }}
+          EVENT: ${{ github.event_name }}
+        # Packaging: the project and its lock, the CLI, the build hooks that put the web app, the
+        # guide and the licences in the wheel, the web app's and the guide's own dependencies and
+        # build settings, the check itself, and this workflow. Every push to main runs it.
+        run: |
+          if [ "$EVENT" != "pull_request" ]; then echo "run=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          changed=$(git diff --name-only "origin/$BASE...HEAD")
+          printf '%s\n' "$changed"
+          if printf '%s\n' "$changed" | grep -qE '^(backend/(pyproject\.toml|uv\.lock|hatch_build\.py|guide_build\.py|release_notices\.py)$|backend/probeowl/cli/|web/(package\.json|package-lock\.json|vite\.config\.ts)$|guide/(mkdocs\.yml|requirements\.txt|hooks\.py)$|dev/release/|\.github/workflows/wheel\.yml$)'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Nothing that goes in the wheel changed: the wheel check is not needed."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: astral-sh/setup-uv@v7
+        if: steps.changed.outputs.run == 'true'
+      - uses: actions/setup-node@v7
+        if: steps.changed.outputs.run == 'true'
+        with:
+          node-version: 24
+      - name: Build, install and check the wheel
+        if: steps.changed.outputs.run == 'true'
+        run: bash dev/release/wheel_check.sh
