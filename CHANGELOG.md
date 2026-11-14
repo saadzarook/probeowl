@@ -12,8 +12,35 @@ v0.2 phase (a) first-run setup and Add connection, v0.3 phase (b) the entity gra
 v0.4 phase (c) blocks and probe by example, v0.5 phase (d) templates and New runbook.
 See docs/implementation-plan.md, Releases. -->
 
+## [0.2.0] - 2026-11-14
+
+Phase (a) of No YAML required: set up in the browser. The newcomer path, from install to a first
+Validate on the card example, goes from **61 actions and 366 characters typed to 49 and 264**
+(docs/v0.2.md, "Measured after phase (a)").
+- **Setup in the browser:** first-run setup and Add connection replace `owl init`'s questions.
+- **Search:** global search, with <kbd>Ctrl</kbd>+<kbd>K</kbd>.
+- **Drafting with an AI assistant:** `owl mcp`.
+- **A security fix for v0.1, PII root keys:** if you used v0.1 with an entity whose key is PII,
+  run `owl store mask-pii` (see Security).
+
+Still a pre-release: a security review comes before 1.0.
+
 ### Added
 
+- First-run setup in the browser. `owl serve` started with no applications opens a setup screen:
+  - the application's name, its owning team and its environments, with `application.yaml` shown
+    as a diff as you choose;
+  - then its first connection.
+
+  `owl serve` creates its default SQLite store the first time, so that setup is audited, and uses
+  `./probeowl` (or `~/probeowl`) when no folder is named. `owl init` stays, for scripts.
+- Add connection, for a new connector or a binding in an environment not bound yet:
+  - paste a connection string to fill the form, read in the browser and never sent or stored;
+  - Test connection before saving;
+  - a preview of the connector's file;
+  - the password straight to this machine's keychain, through a write-only route.
+
+  Then it imports the tables and offers to **Confirm all** their suggested labels.
 - `owl mcp`: ProbeOwl's drafting tools for an AI assistant (Claude Desktop, VS Code with Copilot,
   Claude Code), over the Model Context Protocol on stdio. The tools are `drafting_guide`,
   `template`, `examples`, `check_draft`, `list_config` and `schema`. The assistant drafts and
@@ -50,6 +77,9 @@ See docs/implementation-plan.md, Releases. -->
 
 ### Security
 
+- A store URL with an inline password is refused by `owl mcp`: "the store URL contains a password;
+  keep it in PROBEOWL_STORE_URL, not in the assistant's config". `owl serve` and `owl store` warn
+  about one. None of them shows the URL.
 - Testing a connection with a typed password is limited to 5 attempts per connector and
   environment in any minute. This covers Add connection and Change password, so repeated wrong
   passwords can't lock the database account; Oracle's default profile locks one after 10 failed
@@ -70,6 +100,8 @@ See docs/implementation-plan.md, Releases. -->
 
 ### Fixed
 
+- The guide no longer asks GitHub for the latest release, which answered 404 while every release
+  is a pre-release. Its repository link is a plain footer link.
 - First-run setup's "Add its first connection", clicked as soon as it appears, opens Add connection.
   It showed before the new application was loaded, and a quick click went back to setup.
 - `owl serve` started without `--config` or `PROBEOWL_CONFIG` no longer tries to load the folder it
@@ -134,5 +166,6 @@ The first pre-release: phase 1, milestones M0 to M4, verified on test databases 
   `owl store ddl`, `owl catalog import`, `owl kill on`, `owl kill off`, `owl kill list`,
   `owl runbook hash`.
 
-[Unreleased]: https://github.com/saadzarook/probeowl/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/saadzarook/probeowl/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/saadzarook/probeowl/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/saadzarook/probeowl/releases/tag/v0.1.0

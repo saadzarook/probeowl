@@ -9,6 +9,7 @@ from pathlib import Path, PurePosixPath, PureWindowsPath
 import typer
 import yaml
 from sqlalchemy.engine import make_url
+from sqlalchemy.exc import ArgumentError
 
 from probeowl.errors import ConfigError
 from probeowl.store import migrate
@@ -22,6 +23,35 @@ DEFAULT_CONFIG_FOLDER = "probeowl"
 def default_store_path() -> Path:
     """The SQLite file a store is kept in when no URL is given: ~/.probeowl/store.db."""
     return Path.home() / ".probeowl" / "store.db"
+
+
+# A store URL given on the command line ends up in shell history and, for owl mcp, in an
+# assistant's plain-text config: its password belongs in the environment instead.
+INLINE_PASSWORD_REFUSED = (
+    "the store URL contains a password; keep it in PROBEOWL_STORE_URL, not in the assistant's "
+    "config"
+)
+INLINE_PASSWORD_WARNING = (
+    "the store URL contains a password; keep it in PROBEOWL_STORE_URL, not on the command line"
+)
+_PASSWORD_PARAMETERS = {"password", "pwd", "passwd"}
+
+
+def has_password(url: str) -> bool:
+    """Whether a store URL carries a password, as user:password@ or as a query parameter."""
+    try:
+        parsed = make_url(url)
+    except ArgumentError:
+        return "@" in url  # unreadable, with credentials of some kind: treated as holding one
+    if parsed.password:
+        return True
+    return any(key.lower() in _PASSWORD_PARAMETERS for key in parsed.query)
+
+
+def warn_inline_password(url: str | None) -> None:
+    """Warn, never echoing the URL, when --url holds a password. It still runs (v0.3: #72)."""
+    if url is not None and has_password(url):
+        typer.echo(f"warning: {INLINE_PASSWORD_WARNING}", err=True)
 
 
 def default_store_url() -> str:

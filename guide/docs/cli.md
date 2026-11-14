@@ -203,3 +203,7 @@ store named by `--url` or `$PROBEOWL_STORE_URL` is never created for you, as a s
 need a DBA.
 SQLite on a network share loses writes when several people use it, so `owl store init` refuses
 one: use a server database for a team store.
+
+Keep a server store's password in `$PROBEOWL_STORE_URL`, never in `--url`, where it would sit in
+your shell's history. `owl serve` and `owl store` warn about one there, without showing it, and
+`owl mcp` refuses one, as it would end up in your assistant's config file.
