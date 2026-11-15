@@ -8,6 +8,7 @@ import { RESULT_LABELS, formatTime, keyLine, locationName, titleCase, withCaveat
 import { useSelection } from "../selection";
 import { CliCommand } from "./CliCommand";
 import { EvidencePanel } from "./EvidencePanel";
+import { NotChecked } from "./NotChecked";
 import { OutcomeChip } from "./OutcomeChip";
 import { RunWarnings } from "./RunWarnings";
 import { StopReason } from "./StopReason";
@@ -117,6 +118,7 @@ export function RunResult({ runId }: { runId: string }) {
         </div>
       )}
       {failure.order && <p className="summary failure">First failure in dependency order: {failure.order}</p>}
+      <NotChecked run={run} />
 
       <div className="run-body">
         <div>

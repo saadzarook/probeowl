@@ -23,7 +23,13 @@ from probeowl.engine.expressions import (
     matching_rows,
     parse,
 )
-from probeowl.engine.locations import Connector, LocationRead, all_connectors, read_locations
+from probeowl.engine.locations import (
+    Connector,
+    LocationRead,
+    all_connectors,
+    read_locations,
+    unreadable,
+)
 from probeowl.engine.masking import MASKED, masked_fields
 from probeowl.errors import ConfigError
 from probeowl.model.entity import Entity
@@ -148,10 +154,11 @@ def run_probe(
     data = _Data(reads)
     masked = {name: masked_fields(entity, loc) for name, loc in _all_locations(entity)}
     expectations: list[ExpectationEvaluation] = []
-    blocked_inputs = False
+    # The data skipped expectations could not use: read and absent, or not readable (#81).
+    unusable: list[Unavailable] = []
     for index, step in enumerate(steps):
         data.read.clear()
-        skip_all, unreadable = _skip_reason(step, data)
+        skip_all, cause = _skip_reason(step, data)
         by_condition = list(data.read)
         for text, node in step.expect:
             if skip_all is not None:
@@ -159,13 +166,14 @@ def run_probe(
                 expectations.append(
                     _evaluation(index, text, ExpectationResult.SKIP, skip_all, caveat)
                 )
-                blocked_inputs = blocked_inputs or unreadable
+                if cause is not None:
+                    unusable.append(cause)
                 continue
             data.read[:] = by_condition
             try:
                 passed = evaluate(node, data) is True
             except Unavailable as err:
-                blocked_inputs = True
+                unusable.append(err)
                 expectations.append(
                     _evaluation(index, text, ExpectationResult.SKIP, str(err), _caveat(data.read))
                 )
@@ -175,16 +183,33 @@ def run_probe(
             detail = None if passed else _detail(node, data, masked, entity)
             expectations.append(_evaluation(index, text, result, detail, caveat))
     locations = [result for read in reads.values() for result in read.results()]
-    failed = (
-        blocked_inputs
-        or any(e.result is ExpectationResult.FAIL for e in expectations)
-        or any(r.outcome is Outcome.ERROR for r in locations)
-    )
     return ProbeResult(
-        status=RunStatus.FAILED if failed else RunStatus.PASSED,
+        status=run_status(expectations, locations, unusable),
         locations=locations,
         expectations=expectations,
     )
+
+
+def run_status(
+    expectations: list[ExpectationEvaluation],
+    locations: list[LocationResult],
+    unusable: list[Unavailable],
+) -> RunStatus:
+    """The run status rule (#81, docs/design.md), in this order: Failed, Not checked, Passed.
+
+    Failed: an expectation was evaluated and did not hold, or a record it needs was read and is
+    absent (Missing, an empty link, a count that is not one). Not checked: nothing failed, and an
+    expectation could not be evaluated because data could not be read (Error, Stale, a row not
+    looked up, or a Blocked chain starting at one of those), or a location is Error even if
+    nothing reads it. Passed: everything evaluated held; a false condition counts against nothing.
+    """
+    if any(e.result is ExpectationResult.FAIL for e in expectations) or any(
+        u.absent for u in unusable
+    ):
+        return RunStatus.FAILED
+    if unusable or any(r.outcome is Outcome.ERROR for r in locations):
+        return RunStatus.NOT_CHECKED
+    return RunStatus.PASSED
 
 
 def check_run(
@@ -213,17 +238,17 @@ def _bound(entity: Entity, connectors: Mapping[str, Connector | None]) -> dict[s
     return {name: c for name, c in connectors.items() if c is not None}
 
 
-def _skip_reason(step: _Step, data: "_Data") -> tuple[str | None, bool]:
-    """Why a step's expectations are skipped, and whether it is because data is unreadable."""
+def _skip_reason(step: _Step, data: "_Data") -> tuple[str | None, Unavailable | None]:
+    """Why a step's expectations are skipped, and the data it could not use, if that is why."""
     if step.when is None:
-        return None, False
+        return None, None
     text, node = step.when
     try:
         holds = evaluate(node, data) is True
     except Unavailable as err:
-        return f"its condition {err}", True
+        return f"its condition {err}", err
     # A condition that does not hold is the probe working as written, not a problem.
-    return (None, False) if holds else (f"when {text} is false", False)
+    return (None, None) if holds else (f"when {text} is false", None)
 
 
 def _evaluation(
@@ -273,6 +298,7 @@ class _Data:
                 _label(read.outcome),
                 f"needs {location}, which is {_label(read.outcome)}: if it may be absent, "
                 f"start the step with when: exists({location})",
+                absent=not unreadable(read),
             )
         return _readable(read, location)
 
@@ -300,6 +326,7 @@ class _Data:
                 location,
                 _label(read.outcome),
                 f"needs {location}, which is {_label(read.outcome)} for {_counted(empty, parent)}",
+                absent=not unreadable(read),
             )
         return _readable(read, location)
 
@@ -317,7 +344,8 @@ def _counted(n: int, location: str) -> str:
 def _readable(read: LocationRead, location: str) -> list[dict[str, Any]]:
     if read.outcome in _UNREADABLE:
         label = _label(read.outcome)
-        raise Unavailable(location, f"{label} ({read.reason})" if read.reason else label)
+        text = f"{label} ({read.reason})" if read.reason else label
+        raise Unavailable(location, text, absent=not unreadable(read))
     return read.rows
 
 

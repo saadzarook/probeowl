@@ -13,7 +13,7 @@ import { TopBar } from "./TopBar";
 
 /** The shared frame around every screen. */
 export function Shell() {
-  const { applications, application, environment, loading, error, retry } = useSelection();
+  const { applications, application, environment, loading, error, retry, restoreNotice, dismissRestoreNotice } = useSelection();
   const location = useLocation();
   // A tool such as Compare files needs no application, so it still opens.
   const noApplications = applications.length === 0 && !isToolPath(location.pathname) && location.pathname !== "/setup";
@@ -51,6 +51,14 @@ export function Shell() {
           <div className="switch-notice" role="status">
             <p>{notice}</p>
             <button className="btn-outline" type="button" onClick={() => setNotice(undefined)}>
+              Dismiss
+            </button>
+          </div>
+        )}
+        {restoreNotice && (
+          <div className="switch-notice" role="status">
+            <p>{restoreNotice}</p>
+            <button className="btn-outline" type="button" onClick={dismissRestoreNotice}>
               Dismiss
             </button>
           </div>

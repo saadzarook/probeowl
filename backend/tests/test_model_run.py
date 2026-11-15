@@ -26,7 +26,14 @@ def test_there_are_eight_outcomes_and_skipped_is_not_one() -> None:
         "stale",
         "not_configured",
     }
-    assert {s.value for s in RunStatus} == {"running", "passed", "failed", "skipped", "ambiguous"}
+    assert {s.value for s in RunStatus} == {
+        "running",
+        "passed",
+        "failed",
+        "not_checked",
+        "skipped",
+        "ambiguous",
+    }
     assert {r.value for r in ExpectationResult} == {"pass", "fail", "skip"}
 
 

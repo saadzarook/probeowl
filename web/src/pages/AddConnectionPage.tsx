@@ -1,6 +1,6 @@
 // Author: @SaadZarook
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link as RouterLink, useSearchParams } from "react-router-dom";
 import {
   saveConnector,
@@ -15,7 +15,7 @@ import {
 import { ChangePreview } from "../components/ChangePreview";
 import { ConfirmSuggested } from "../components/ConfirmSuggested";
 import { EmptyState, GuideLink } from "../components/EmptyState";
-import { DEFAULT_PORTS, parseConnectionString, type ConnectionType } from "../connectionString";
+import { DEFAULT_PORTS, parseConnectionString, withoutPassword, type ConnectionType } from "../connectionString";
 import { useSelection } from "../selection";
 
 const TYPES: { type: ConnectionType; title: string; hint: string }[] = [
@@ -83,7 +83,23 @@ export function AddConnectionPage() {
   const [fields, setFields] = useState<Fields>(EMPTY);
   const [password, setPassword] = useState("");
   const [paste, setPaste] = useState("");
+  // The string as last filled from, password taken out: leaving the field unchanged fills nothing again.
+  const [shown, setShown] = useState("");
   const [pasted, setPasted] = useState<string>();
+  // The fields the last string filled, highlighted for a few seconds (#92).
+  const [justFilled, setJustFilled] = useState<string[]>([]);
+  const [confirming, setConfirming] = useState(false);
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    if (justFilled.length === 0) return;
+    const timer = window.setTimeout(() => setJustFilled([]), 4000);
+    return () => window.clearTimeout(timer);
+  }, [justFilled]);
+  useEffect(() => {
+    const open = dialog.current;
+    if (confirming && open && !open.open) open.showModal();
+    if (!confirming && open?.open) open.close();
+  }, [confirming]);
   const [preview, setPreview] = useState<{ change: CatalogChange; sent: string }>();
   const [saved, setSaved] = useState<{ change: CatalogChange; connector: string; environment: string; sql: boolean }>();
   const [passwordState, setPasswordState] = useState<"saving" | "exists" | "saved" | "kept" | "none">();
@@ -129,6 +145,17 @@ export function AddConnectionPage() {
     (type === "rest"
       ? fields.baseUrl.trim() !== ""
       : fields.host.trim() !== "" && fields.database.trim() !== "" && fields.user.trim() !== "" && !replicaMissing && !reasonMissing);
+  // What Save still needs, said beside it rather than a silently disabled button (#98).
+  const missing = [
+    type === undefined && "a type",
+    !ID.test(connector) && "a connector id",
+    type === "rest" && fields.baseUrl.trim() === "" && "the base URL",
+    sql && fields.host.trim() === "" && "the host",
+    sql && fields.database.trim() === "" && (type === "oracle" ? "the service name" : "the database"),
+    sql && fields.user.trim() === "" && "the login",
+    replicaMissing && "the read replica tick",
+    reasonMissing && "why TLS is not verified",
+  ].filter((m): m is string => typeof m === "string");
   const body: SaveConnector | undefined =
     type && env ? { type, owner: null, environment: env.name, binding: bindingOf(type, fields) } : undefined;
   const sent = JSON.stringify([connector, body]);
@@ -140,11 +167,19 @@ export function AddConnectionPage() {
 
   const fill = (text: string) => {
     const parsed = parseConnectionString(text);
-    setPaste("");
     if (!parsed) {
+      setPaste("");
+      setShown("");
+      setJustFilled([]);
       setPasted("That isn't a connection string ProbeOwl can read: JDBC, ODBC or a URL. Nothing was kept.");
       return;
     }
+    // What stays on screen: the string without its password, which goes to the password field
+    // alone. Should the password still be in it, nothing stays.
+    const kept = withoutPassword(text);
+    const safe = parsed.password !== undefined && kept.includes(parsed.password) ? "" : kept;
+    setPaste(safe);
+    setShown(safe);
     if (parsed.type && !existing) setType(parsed.type);
     update({
       ...(parsed.host !== undefined ? { host: parsed.host } : {}),
@@ -155,10 +190,22 @@ export function AddConnectionPage() {
       ...(parsed.encrypt === false ? { tls: "none" as const } : parsed.trustServerCertificate ? { tls: "trust" as const } : {}),
     });
     if (parsed.password !== undefined) setPassword(parsed.password);
+    const named: [keyof typeof parsed, string][] = [["host", "host"], ["port", "port"], ["database", "database"], ["user", "login"], ["baseUrl", "base URL"]];
+    const filled = named.filter(([key]) => parsed[key] !== undefined);
+    setJustFilled(filled.map(([key]) => key));
+    const count = `${filled.length} ${filled.length === 1 ? "field" : "fields"}`;
+    const which = filled.length > 0 ? ` (${filled.map(([, title]) => title).join(", ")})` : "";
     setPasted(
-      `Filled from the connection string${parsed.password !== undefined ? ", its password moved to the password field" : ""}. The string itself isn't kept or sent.`,
+      `Filled ${count}${which} from the connection string${parsed.password !== undefined ? "; the password moved to the password field" : ""}. The string isn't sent or stored.`,
     );
   };
+  const clearPaste = () => {
+    setPaste("");
+    setShown("");
+    setPasted(undefined);
+    setJustFilled([]);
+  };
+  const lit = (key: string) => (justFilled.includes(key) ? true : undefined);
 
   const write = async () => {
     if (!body || !preview) return;
@@ -254,10 +301,19 @@ export function AddConnectionPage() {
               onChange={(e) => setPaste(e.target.value)}
               onPaste={(e) => { e.preventDefault(); fill(e.clipboardData.getData("text")); }}
               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); fill(paste); } }}
+              // Typed, not pasted: leaving the field fills the form too (#97).
+              onBlur={() => { if (paste.trim() !== "" && paste !== shown) fill(paste); }}
             />
           </label>
-          <p className="hint">Read in this browser into the fields below. It's never sent or stored; a password in it moves to the password field.</p>
-          {pasted && <p role="status" className="hint">{pasted}</p>}
+          <p className="hint">Paste or type a JDBC, ODBC or URL connection string, then press Enter. It's read in this browser into the fields below, and never sent or stored; a password in it moves to the password field.</p>
+          {(pasted || paste !== "") && (
+            <p role="status" className="hint">
+              {pasted}{" "}
+              <button className="btn-link" type="button" onClick={clearPaste}>
+                Clear
+              </button>
+            </p>
+          )}
           <p className="hint">
             For <strong>{env?.title ?? "no environment"}</strong>, the environment in the top bar: choose another there.
           </p>
@@ -277,7 +333,7 @@ export function AddConnectionPage() {
             <>
               <label>
                 Base URL
-                <input className="mono" value={fields.baseUrl} placeholder="https://api.example.com/v1" onChange={(e) => update({ baseUrl: e.target.value })} />
+                <input className="mono" data-filled={lit("baseUrl")} value={fields.baseUrl} placeholder="https://api.example.com/v1" onChange={(e) => update({ baseUrl: e.target.value })} />
               </label>
               <label className="check">
                 <input type="checkbox" checked={fields.needsToken} onChange={(e) => update({ needsToken: e.target.checked })} />
@@ -295,15 +351,15 @@ export function AddConnectionPage() {
               <div className="form-grid">
                 <label>
                   Host
-                  <input className="mono" value={fields.host} placeholder="db.example.internal" onChange={(e) => update({ host: e.target.value })} />
+                  <input className="mono" data-filled={lit("host")} value={fields.host} placeholder="db.example.internal" onChange={(e) => update({ host: e.target.value })} />
                 </label>
                 <label>
                   Port
-                  <input className="mono" inputMode="numeric" value={fields.port} placeholder={String(DEFAULT_PORTS[type])} onChange={(e) => update({ port: e.target.value.replace(/\D/g, "") })} />
+                  <input className="mono" data-filled={lit("port")} inputMode="numeric" value={fields.port} placeholder={String(DEFAULT_PORTS[type])} onChange={(e) => update({ port: e.target.value.replace(/\D/g, "") })} />
                 </label>
                 <label>
                   {type === "oracle" ? "Service name" : "Database"}
-                  <input className="mono" value={fields.database} onChange={(e) => update({ database: e.target.value })} />
+                  <input className="mono" data-filled={lit("database")} value={fields.database} onChange={(e) => update({ database: e.target.value })} />
                 </label>
                 {type === "oracle" && (
                   <label>
@@ -313,7 +369,7 @@ export function AddConnectionPage() {
                 )}
                 <label>
                   Read-only login
-                  <input className="mono" value={fields.user} autoComplete="off" onChange={(e) => update({ user: e.target.value })} />
+                  <input className="mono" data-filled={lit("user")} value={fields.user} autoComplete="off" onChange={(e) => update({ user: e.target.value })} />
                 </label>
                 <label>
                   Password
@@ -357,10 +413,50 @@ export function AddConnectionPage() {
             <button className="btn secondary" type="button" disabled={!complete || !body || save.isPending} onClick={() => body && void save.mutateAsync({ body }).then((change) => setPreview({ change, sent }))}>
               Preview
             </button>
-            <button className="btn" type="button" disabled={!preview || stale || save.isPending} onClick={() => void write()}>
+            <button
+              className="btn"
+              type="button"
+              disabled={!complete || !body || save.isPending}
+              aria-describedby={missing.length > 0 ? "save-needs" : undefined}
+              onClick={() => {
+                // As the probe editor saves: the preview in a dialog, then exactly that is written.
+                setConfirming(true);
+                if (body && (!preview || stale)) void save.mutateAsync({ body }).then((change) => setPreview({ change, sent }));
+              }}
+            >
               Save {connector || "connection"}
             </button>
+            {missing.length > 0 && (
+              <span className="hint" id="save-needs">
+                To save: {missing.join(", ")}.
+              </span>
+            )}
           </div>
+          <dialog ref={dialog} className="import-dialog save-dialog" aria-labelledby="save-connection-title" onClose={() => setConfirming(false)}>
+            <h2 id="save-connection-title">Save {connector}</h2>
+            {confirming && preview && !stale ? (
+              <ChangePreview change={preview.change} stale={false} />
+            ) : save.isError ? null : (
+              <p aria-busy="true">Preparing the preview…</p>
+            )}
+            {confirming && save.isError && <p role="alert" className="form-error">{save.error.message}</p>}
+            <div className="dialog-actions">
+              <button
+                className="btn"
+                type="button"
+                disabled={!preview || stale || save.isPending}
+                onClick={() => {
+                  setConfirming(false);
+                  void write();
+                }}
+              >
+                Write {connector}
+              </button>
+              <button className="btn btn-outline" type="button" onClick={() => setConfirming(false)}>
+                Cancel
+              </button>
+            </div>
+          </dialog>
           {test.data && <TestResult result={test.data} />}
           {test.isError && <p role="alert" className="form-error">{test.error.message}</p>}
           {preview && <ChangePreview change={preview.change} stale={stale} />}

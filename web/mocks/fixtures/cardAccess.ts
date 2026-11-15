@@ -246,7 +246,7 @@ export function stoppedCardRun(id: string, identifier: string, value: string): R
     identifier,
     identifier_value: value,
     subject: "VP00000043",
-    status: "failed",
+    status: "not_checked",
     stop_reason: "stopped by the global kill switch: replica on fire",
     finished_at: "2026-01-01T10:00:01Z",
     locations: [],

@@ -26,7 +26,9 @@ class SaveCheck(ProbeOwlModel):
         default=None, description="The location or identifier it is about, if one."
     )
     environment: Name | None = Field(
-        default=None, description="The environment a plan was read in, for plan checks."
+        default=None,
+        description="The environment the check is about: where a plan was read, or where a "
+        "location has no binding.",
     )
     plan_not_run: bool = Field(
         default=False,

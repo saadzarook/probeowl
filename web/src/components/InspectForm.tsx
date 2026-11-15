@@ -4,7 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import type { Entity, Reason, StartRun } from "../api/client";
 import { useProbes } from "../api/useProbes";
 import { detectIdentifier } from "../identifiers";
-import { REASON_LABELS } from "../reasons";
+import { REASON_LABELS, REFERENCE_PLACEHOLDER } from "../reasons";
 import { useSelection } from "../selection";
 import { NoProbes } from "./NoProbes";
 
@@ -143,7 +143,7 @@ export function InspectForm({ entity, pending, error, valueError, onSubmit }: In
         </label>
         <label>
           Reference{production ? "" : " (optional)"}
-          <input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="SUP-20931" required={production} />
+          <input value={reference} onChange={(e) => setReference(e.target.value)} placeholder={REFERENCE_PLACEHOLDER} required={production} />
         </label>
         <button className="btn" type="submit" disabled={!ready || pending}>
           {pending ? "Starting…" : "Inspect"}

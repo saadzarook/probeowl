@@ -236,7 +236,7 @@ def test_a_run_is_saved_as_each_location_completes(setup: Setup) -> None:
     assert finished(client, run_id)["status"] == "passed"
 
 
-def test_the_run_time_limit_fails_the_run_and_its_unfinished_locations(setup: Setup) -> None:
+def test_the_run_time_limit_leaves_the_run_not_checked(setup: Setup) -> None:
     release = hold(setup, "ledger_db")
     client = setup.client(time_limit_s=0.5)
     started = time.monotonic()
@@ -245,7 +245,7 @@ def test_the_run_time_limit_fails_the_run_and_its_unfinished_locations(setup: Se
     finally:
         release.set()
     assert time.monotonic() - started < 5
-    assert run["status"] == "failed"
+    assert run["status"] == "not_checked"
     assert run["stop_reason"] == "run time limit reached"
     assert outcome(run, "ledger") == outcome(run, "ledger") | {
         "outcome": "error",
@@ -271,14 +271,14 @@ def test_more_runs_than_the_cap_are_refused_not_queued(setup: Setup) -> None:
     assert client.post("/api/runs", json=body()).status_code == 202
 
 
-def test_a_fault_in_probeowl_fails_the_run_instead_of_leaving_it_running(setup: Setup) -> None:
+def test_a_fault_in_probeowl_leaves_the_run_not_checked_not_running(setup: Setup) -> None:
     def broken(lookup: str, p: Mapping[str, object]) -> list[dict[str, Any]]:
         raise RuntimeError("bug")
 
     setup.fakes["ledger_db"].answer = broken
     client = setup.client()
     run = finished(client, start(client))
-    assert run["status"] == "failed"
+    assert run["status"] == "not_checked"
     assert run["stop_reason"] == "stopped by an unexpected error (RuntimeError)"
 
 
@@ -325,7 +325,7 @@ def test_a_run_writes_started_and_finished_audit_events(setup: Setup) -> None:
     }
 
 
-def test_runs_left_running_are_failed_as_interrupted_on_startup(setup: Setup) -> None:
+def test_runs_left_running_are_not_checked_as_interrupted_on_startup(setup: Setup) -> None:
     left = Run.model_validate(
         {
             "id": "left-running",
@@ -348,7 +348,7 @@ def test_runs_left_running_are_failed_as_interrupted_on_startup(setup: Setup) ->
     service = setup.service()
     assert service.recover_interrupted() == ["left-running"]
     run = service.get("left-running")
-    assert (run.status.value, run.stop_reason) == ("failed", "interrupted")
+    assert (run.status.value, run.stop_reason) == ("not_checked", "interrupted")
     assert run.finished_at is not None
     with setup.store.connect() as conn:
         [event] = list_events(conn, LOCAL_WORKSPACE, "left-running")
