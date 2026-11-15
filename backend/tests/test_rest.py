@@ -2,6 +2,7 @@
 """The REST connector against a mock transport: what is sent, and how answers are handled."""
 
 import json
+import re
 from collections.abc import Callable
 from typing import Any
 
@@ -376,3 +377,28 @@ def test_a_lookup_never_returns_more_than_the_row_ceiling() -> None:
     found = adapter(Api(ok(rows)), row_ceiling=3).lookup("GET /topups", {}, 100)
     assert len(found.rows) == 3
     assert found.truncated == "more than 3 rows"
+
+
+EXCEPTION_NAME = re.compile(r"\b[A-Z]\w+(Error|Exception|Timeout)\b")
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        httpx.ConnectError("refused by secret-host.example"),
+        httpx.ConnectTimeout("connect timeout"),
+        httpx.ReadTimeout("read timeout"),
+        httpx.ReadError("reset"),
+        httpx.WriteError("broken pipe"),
+        httpx.RemoteProtocolError("bad frame"),
+        httpx.PoolTimeout("pool"),
+    ],
+)
+def test_no_reason_ever_names_an_exception_class(error: httpx.TransportError) -> None:
+    # #83: what a person reads is a fixed reason, for a connection test and for a lookup alike.
+    found = adapter(Api(error)).unreachable()
+    assert found is not None and not EXCEPTION_NAME.search(found.message), found
+    with pytest.raises(ConnectorError) as failed:
+        adapter(Api(error), retries=0).lookup("GET /payments/{{id}}", {"id": "p"}, 1)
+    assert not EXCEPTION_NAME.search(str(failed.value)), str(failed.value)
+    assert "secret-host" not in str(failed.value)
