@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, ClassVar
 
-from probeowl.connectors.failures import Failure, driver_log_text, failure_message
+from probeowl.connectors.failures import Failure, Unreachable, driver_log_text, failure_message
 from probeowl.connectors.lookup import LookupResult, ReplicaLag
 from probeowl.connectors.plan import PlanStep
 from probeowl.errors import ConnectorError, MissingGrant, ProbeOwlError
@@ -181,15 +181,16 @@ class SqlAdapter(ABC):
             self._connection = None
             raise self._error(err) from None
 
-    def unreachable(self) -> str | None:
+    def unreachable(self) -> Unreachable | None:
         """Why the database cannot be reached, or None once connected."""
         try:
             if self._connection is None:
                 self._connection = self._connect()
         except self._driver_error() as err:
-            return self._safe(err)
+            return Unreachable(self._classify(err), self._safe(err))
         except ProbeOwlError as err:
-            return str(err)
+            # Raised by ProbeOwl itself while connecting, with a message of its own.
+            return Unreachable(Failure.UNKNOWN, str(err))
         return None
 
     def lag_grant(self, refusal: str) -> str:

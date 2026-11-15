@@ -33,6 +33,12 @@ NO_KEYCHAIN = (
 )
 
 
+def without_line_break(value: str) -> str:
+    """value without line breaks at its end (CR, LF or both), as one pasted or exported from a
+    file carries; nothing else is ever changed (#84)."""
+    return value.rstrip("\r\n")
+
+
 def resolve_secret(ref: str) -> str:
     """Return the credential a keyring: or env: reference points at."""
     if ref.startswith("keyring:"):

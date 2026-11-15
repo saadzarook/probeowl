@@ -17,6 +17,7 @@ from typing import Protocol
 
 from probeowl import secrets
 from probeowl.connectors.factory import configured_guards, open_connector, open_sql, sql_adapter
+from probeowl.connectors.failures import Failure, Unreachable
 from probeowl.connectors.lookup import ReplicaLag
 from probeowl.connectors.oracle import time_zone_shown
 from probeowl.connectors.rest import RestLimits, rest_guards
@@ -51,7 +52,7 @@ STATUS_LIMITS = SqlLimits(statement_timeout_s=10)
 class StatusSource(Protocol):
     """What a status needs from a SQL connector."""
 
-    def unreachable(self) -> str | None:
+    def unreachable(self) -> Unreachable | None:
         """Why the database cannot be reached, or None once connected."""
         ...
 
@@ -71,7 +72,7 @@ class StatusSource(Protocol):
 class ConnectionSource(Protocol):
     """What Test connection needs from a connector."""
 
-    def unreachable(self) -> str | None:
+    def unreachable(self) -> Unreachable | None:
         """Why it cannot be reached, or None if it can."""
         ...
 
@@ -156,17 +157,16 @@ class ConnectorStatuses:
             raise KillSwitchEngaged(stopped)
         key = (application, connector, environment)
         start = self._clock()
-        reason = self._breaker.paused(key) or self._try_connecting(definition, environment)
+        paused = self._breaker.paused(key)
+        found = (
+            Unreachable(Failure.PAUSED, paused)
+            if paused is not None
+            else self._try_connecting(definition, environment)
+        )
         # What the screen shows next should agree with what this just found.
         with self._lock:
             self._readings.pop(key, None)
-        return ConnectionTest(
-            connector=connector,
-            environment=environment,
-            reachable=reason is None,
-            reason=reason,
-            duration_ms=round((self._clock() - start) * 1000),
-        )
+        return _tested(connector, environment, found, self._clock() - start)
 
     def test_draft(
         self,
@@ -185,31 +185,25 @@ class ConnectorStatuses:
         if stopped is not None:
             raise KillSwitchEngaged(stopped)
         start = self._clock()
-        reason = self._try_connecting(
+        found = self._try_connecting(
             connector, environment, lambda c, env: self._draft_opener(c, env, secrets)
         )
         if connector.connector in app.connectors:
             # What the Connectors screen shows next should not be an older reading.
             with self._lock:
                 self._readings.pop((application, connector.connector, environment), None)
-        return ConnectionTest(
-            connector=connector.connector,
-            environment=environment,
-            reachable=reason is None,
-            reason=reason,
-            duration_ms=round((self._clock() - start) * 1000),
-        )
+        return _tested(connector.connector, environment, found, self._clock() - start)
 
     def _try_connecting(
         self,
         connector: SqlConnector | RestConnector,
         environment: str,
         opener: ConnectionOpener | None = None,
-    ) -> str | None:
+    ) -> Unreachable | None:
         try:
             source = (opener or self._connection_opener)(connector, environment)
         except ProbeOwlError as err:  # its secret cannot be read
-            return str(err)
+            return Unreachable(Failure.NO_SECRET, str(err))
         assert source is not None  # the caller found the binding
         try:
             return source.unreachable()
@@ -308,8 +302,8 @@ class ConnectorStatuses:
             if cannot is not None:
                 return _Reading(
                     BindingHealth.UNREACHABLE,
-                    cannot,
-                    plan_message=f"plan access not checked: {cannot}",
+                    cannot.message,
+                    plan_message=f"plan access not checked: {cannot.message}",
                 )
             lag = source.replica_lag() if binding.replica else None
             access, message = source.plan_access()
@@ -395,3 +389,16 @@ def _secret_state(connector: SqlConnector | RestConnector, environment: str) -> 
         return SecretState.SAVED if secrets.secret_saved(reference) else SecretState.MISSING
     except ConfigError:
         return SecretState.MISSING
+
+
+def _tested(
+    connector: str, environment: str, found: Unreachable | None, took_s: float
+) -> ConnectionTest:
+    """What Test connection says: reached, or the fixed message why not, with its category."""
+    return ConnectionTest(
+        connector=connector,
+        environment=environment,
+        reachable=found is None,
+        reason=None if found is None else found.message,
+        duration_ms=round(took_s * 1000),
+    ).with_failure(None if found is None else found.failure.value)

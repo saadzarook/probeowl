@@ -12,6 +12,56 @@ v0.2 phase (a) first-run setup and Add connection, v0.3 phase (b) the entity gra
 v0.4 phase (c) blocks and probe by example, v0.5 phase (d) templates and New runbook.
 See docs/implementation-plan.md, Releases. -->
 
+### Added
+
+- Read the audit: the **Audit** screen and `owl audit`, newest first, filtered by actor, action,
+  application and environment, with `--json` for scripts. Both are read-only. Details are masked
+  by today's PII rules, including values stored before an identifier became PII, and never show a
+  host, login or password. They read through a new `GET /api/audit`.
+
+### Changed
+
+- **Exit codes of `owl validate` and `owl inspect`.** 0: passed. 1: a finding (Failed). 2: no
+  finding, but not fully checked: Not checked, Skipped (which used to exit 1) and Ambiguous (which
+  used to exit 3), as well as a run that couldn't start. A 2 always prints why on the run's last
+  line. **If your scripts check owl's exit codes, update them.**
+- A new run status, **Not checked**, for a run whose data couldn't be read. Before, it showed
+  Failed and exited 1, as if a check had found something. The rule, in order:
+  - **Failed:** an expectation was evaluated and didn't hold, or the subject or a record was read
+    and is absent (Missing, an empty link).
+  - **Not checked:** nothing failed, and at least one expectation couldn't be evaluated because
+    data couldn't be read (an Error, Stale data, a row not looked up, or a chain starting at one of
+    those). A run that stopped before checking is Not checked too: a kill switch after its first
+    read, an identifier lookup that errors, or a restart of `owl serve`.
+  - **Passed:** everything evaluated held.
+
+  They exit 1, 2 and 0 (see the exit codes above). A Not checked run names the locations it
+  couldn't read, and isn't compared with a healthy record. Runs stored before keep their status.
+- An `owl mcp` call's audit event records the environment asked for. A call that didn't succeed
+  has a fixed reason: `production_refused`, `not_found`, `invalid`, `credential_found`,
+  `too_large`, `save_checks_failed` or `failed`. It still never records the draft or a value from
+  it.
+- A connection test the audit records as not reached now gives its fixed reason, such as
+  `authentication failed`, `connection refused`, `timed out` or `server error`. That tells a
+  wrong password from a server that's down. It's in `connection_tested` events, for saved bindings
+  and drafts, and never includes the password, host or login.
+- A REST API that doesn't answer says "the API did not answer", or "the API did not answer within
+  5 s" on a timeout, instead of an exception's class name such as `ConnectError`. The class goes
+  to the `owl serve` log only.
+
+### Fixed
+
+- A password that ends in a line break, as one exported from a file or pasted with its newline
+  carries, has it removed. The database used to refuse it with "refused by the database" and no
+  reason. This applies to `env:` and keychain secrets, Change password and `owl connector add`.
+  `owl serve` logs a fixed warning naming the connector and environment, never the value. Only
+  line breaks at the end are removed: a space or tab is kept.
+- `--config` (and `PROBEOWL_CONFIG`) naming a folder that doesn't exist now stops with "config
+  folder … does not exist: create it, or leave out --config and PROBEOWL_CONFIG to use the
+  default". It no longer creates an empty folder, so a typo can't look like missing configuration.
+  Only the default folder is created on first run. A path the system can't use is a fixed error,
+  never a traceback. This covers `owl serve` and `owl mcp`.
+
 ## [0.2.0] - 2026-11-14
 
 Phase (a) of No YAML required: set up in the browser. The newcomer path, from install to a first

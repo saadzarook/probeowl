@@ -14,4 +14,5 @@ export const navItems: NavItem[] = [
   { path: "/tables", label: "Tables", subtitle: "The table catalog" },
   { path: "/connectors", label: "Connectors", subtitle: "Read-only clients and guards" },
   { path: "/runs", label: "Runs", subtitle: "Every investigation and its record" },
+  { path: "/audit", label: "Audit", subtitle: "Who did what, where, and when. Read-only" },
 ];

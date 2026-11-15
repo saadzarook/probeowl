@@ -51,11 +51,11 @@ const base: Omit<Run, "id" | "status" | "finished_at"> = {
   started_at: "2026-01-01T10:00:00Z",
 };
 
-function evidence(connector: string, query: string, rows: Record<string, unknown>[], rowsTotal?: number): LocationResult["evidence"] {
+function evidence(connector: string, query: string, rows: Record<string, unknown>[], rowsTotal?: number, parameters: Record<string, string> = {}): LocationResult["evidence"] {
   return {
     connector,
     query,
-    parameters: {},
+    parameters,
     guards: ["Timeout 2 s", "Rows ≤ 50"],
     rows: rows as Record<string, never>[],
     rows_total: rowsTotal ?? rows.length,
@@ -84,7 +84,8 @@ const controllerLookups: LocationResult[] = plantedCards.map((card, row) => ({
   row,
   outcome: card.card_id === "C204518" ? "found" : "stale",
   reason: [undefined, "valid_to passed 30 days ago, still active", "revoked in database, still opens doors"][row],
-  evidence: evidence("door_controller_api", `GET /cards/${card.card_id}`, [{ status: "active" }]),
+  // As the backend's REST evidence binds it: the parent row's key (#82).
+  evidence: evidence("door_controller_api", `GET /cards/${card.card_id}`, [{ status: "active" }], undefined, { card_id: card.card_id }),
 }));
 
 const expectations: ExpectationEvaluation[] = [
@@ -245,7 +246,7 @@ export function stoppedCardRun(id: string, identifier: string, value: string): R
     identifier,
     identifier_value: value,
     subject: "VP00000043",
-    status: "failed",
+    status: "not_checked",
     stop_reason: "stopped by the global kill switch: replica on fire",
     finished_at: "2026-01-01T10:00:01Z",
     locations: [],
