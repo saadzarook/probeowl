@@ -43,9 +43,19 @@ from probeowl.store.schemas import latest_snapshot
 from probeowl.store.tables import LOCAL_WORKSPACE
 
 MAX_DRAFT = 64 * 1024
+SIZE_CHECK = "Size"  # the check a draft over MAX_DRAFT fails
 PLAN_CHECKS_NOT_PRODUCTION = (
     "plan checks through an assistant run in non-Production environments only"
 )
+
+
+class ProductionRefused(RequestError):
+    """Plans are never read in Production for an assistant; audited as production_refused."""
+
+    def __init__(self) -> None:
+        super().__init__(PLAN_CHECKS_NOT_PRODUCTION, {"environment": PLAN_CHECKS_NOT_PRODUCTION})
+
+
 REMOVE_THIS = (
     "Remove this: passwords go in the keychain via Add connection or owl connector add; hosts "
     "stay in the connector file you write yourself"
@@ -272,7 +282,7 @@ def check_draft(
         return DraftCheck(
             ok=False,
             findings=[
-                DraftFinding(check="Size", severity="error", message="the draft is over 64 KB")
+                DraftFinding(check=SIZE_CHECK, severity="error", message="the draft is over 64 KB")
             ],
             credentials=[],
             paste_into=None,
@@ -439,9 +449,7 @@ def _plan_environment(app: LoadedApplication, environment: str | None) -> str:
     if environment is None:
         environment = next((n for n, e in environments.items() if not e.production), None)
         if environment is None:
-            raise RequestError(
-                PLAN_CHECKS_NOT_PRODUCTION, {"environment": PLAN_CHECKS_NOT_PRODUCTION}
-            )
+            raise ProductionRefused()
     _not_production(app, environment)
     return environment
 
@@ -451,7 +459,7 @@ def _not_production(app: LoadedApplication, environment: str) -> None:
     if found is None:
         raise NotFoundError(f"{app.application.application} has no environment {environment}")
     if found.production:
-        raise RequestError(PLAN_CHECKS_NOT_PRODUCTION, {"environment": PLAN_CHECKS_NOT_PRODUCTION})
+        raise ProductionRefused()
 
 
 def _from_report(report: SaveCheckReport) -> list[_Finding]:

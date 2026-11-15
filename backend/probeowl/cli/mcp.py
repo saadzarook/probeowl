@@ -21,6 +21,7 @@ from probeowl.cli.defaults import (
     default_store_url,
     ensure_default_store,
     has_password,
+    ready_config_folder,
 )
 from probeowl.drafting.server import create_server, serve_stdio
 from probeowl.errors import ConfigError
@@ -72,7 +73,10 @@ def mcp(
     configure_server_log(Path.home() / ".probeowl" / "owl-mcp.log")
     # stdout carries the protocol and nothing else: what setting up says goes to stderr.
     with contextlib.redirect_stdout(sys.stderr):
-        folder = choose_config_folder(config).folder
+        choice = choose_config_folder(config)
+        # A named folder must exist; the default may not yet, and owl mcp never creates it.
+        ready_config_folder(choice, create=False)
+        folder = choice.folder
         applications = load_applications(folder) if folder.exists() else {}
         ensure_default_store(url)
         store = create_store_engine(url or default_store_url())

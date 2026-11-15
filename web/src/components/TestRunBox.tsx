@@ -4,7 +4,7 @@ import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { DraftRefusedError, PasswordMissingError, startDraftRun, type Reason } from "../api/client";
 import { useRun } from "../api/useRun";
-import { REASON_LABELS } from "../reasons";
+import { REASON_LABELS, REFERENCE_PLACEHOLDER } from "../reasons";
 import { titleCase, withCaveat } from "../runFormat";
 import { useSelection } from "../selection";
 import { RunNeedsPassword } from "./RunNeedsPassword";
@@ -103,7 +103,7 @@ export function TestRunBox({ probe, entity, rootKey }: TestRunBoxProps) {
         </label>
         <label>
           Reference{production ? "" : " (optional)"}
-          <input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="WALLET-482" />
+          <input value={reference} onChange={(e) => setReference(e.target.value)} placeholder={REFERENCE_PLACEHOLDER} />
         </label>
         <button className="btn btn-outline" type="submit" disabled={!ready || start.isPending}>
           {start.isPending ? "Starting…" : "Run draft"}

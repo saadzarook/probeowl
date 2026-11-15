@@ -2,7 +2,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import type { Entity } from "../api/client";
+import type { Entity, SaveCheck } from "../api/client";
 import { useEntities, useEntity, useEntityYaml } from "../api/useEntities";
 import { fetchProbeYaml } from "../api/client";
 import { useApplicationProbes } from "../api/useProbes";
@@ -35,14 +35,19 @@ function ErrorBlock({ message, onRetry }: { message: string; onRetry: () => void
   );
 }
 
-/** Connectors an Environments check says are not bound, by environment name. */
-function unboundBy(checks: { check: string; message: string; environment?: string | null }[]): Map<string, string> {
-  const unbound = new Map<string, string>();
+/**
+ * The connectors not bound in each environment, from the failed Environments checks' structured
+ * fields: each names its environment and location, and the entity says which connector that
+ * location uses. Never read from the message (#108).
+ */
+function unboundBy(checks: Pick<SaveCheck, "check" | "status" | "location" | "environment">[], entity: Entity | undefined): Map<string, string> {
+  const unbound = new Map<string, Set<string>>();
   for (const c of checks) {
-    const connector = /([\w-]+) not bound/.exec(c.message)?.[1];
-    if (c.check === "Environments" && c.environment && connector) unbound.set(c.environment, connector);
+    if (c.check !== "Environments" || c.status !== "fail" || !c.environment) continue;
+    const using = c.location ? entity?.locations[c.location]?.using : undefined;
+    unbound.set(c.environment, (unbound.get(c.environment) ?? new Set()).add(using ?? "a connector"));
   }
-  return unbound;
+  return new Map([...unbound].map(([environment, connectors]) => [environment, [...connectors].join(", ")]));
 }
 
 const firstLocation = (entity: Entity | undefined) => Object.keys(entity?.locations ?? {})[0] ?? "record";
@@ -104,6 +109,19 @@ export function ProbeEditorPage({ item }: { item: NavItem }) {
   const entityChanged = edited !== undefined && loadedYaml !== undefined && !sameText(edited.text, loadedYaml);
 
   const checks = useSaveChecks(name ?? "", probeYaml ?? "", entityChanged ? entityText : undefined, environment?.name);
+  // A new draft is enabled where all its entity's connectors are bound: once its first checks say
+  // which are not, "Enabled in" is written from them (#95). An opened probe keeps its own.
+  const [choosingEnvironments, setChoosingEnvironments] = useState(false);
+  // Adjusted while rendering, once, as React advises for state that follows a query's answer.
+  if (choosingEnvironments && application && probeYaml !== undefined && checks.data && !checks.isPlaceholderData && !checks.isFetching) {
+    setChoosingEnvironments(false);
+    const unbound = unboundBy(checks.data.checks, entity.data);
+    const bound = application.environments.map((e) => e.name).filter((e) => !unbound.has(e));
+    // The person chose already, or none is bound: then the checks say what is missing where.
+    if (readFields(probeYaml)?.environments === undefined && unbound.size > 0 && bound.length > 0) {
+      setDraft({ scope: application.name, yaml: setField(probeYaml, "environments", bound) });
+    }
+  }
   const enabled = name !== undefined && probeYaml !== undefined;
   const savedName = probeYaml === undefined ? "" : probeName(probeYaml);
   const isOpened = opened !== undefined && opened.application === name && opened.name === savedName;
@@ -122,6 +140,7 @@ export function ProbeEditorPage({ item }: { item: NavItem }) {
     try {
       const file = await fetchProbeYaml(name, probe);
       setProbeYaml(file.text);
+      setChoosingEnvironments(false);
       setNaming("done");
       setOpened({ application: name, name: probe, text: file.text });
       setEntityEdit(undefined);
@@ -153,6 +172,7 @@ export function ProbeEditorPage({ item }: { item: NavItem }) {
     if (!application) return;
     const entity = entities.data?.find((e) => e.entity === chosen.entity);
     setProbeYaml(probeTemplate(chosen.entity, chosen.kind, application.owner, chosen.probe, firstLocation(entity), chosen.title));
+    setChoosingEnvironments(true);
     setNaming("done");
     setOpened(undefined);
     setEntityEdit(undefined);
@@ -200,7 +220,7 @@ export function ProbeEditorPage({ item }: { item: NavItem }) {
   } else if (!enabled) {
     body = <EmptyState title="Pick a probe or start a new one" message="Open a probe above to edit it, or start a new draft." />;
   } else {
-    const unbound = unboundBy(checks.data?.checks ?? []);
+    const unbound = unboundBy(checks.data?.checks ?? [], entity.data);
     const checked = (env: string) => (fields?.environments ? fields.environments.includes(env) : !unbound.has(env));
     const toggle = (env: string) => {
       const current = application.environments.map((e) => e.name).filter((e) => checked(e));

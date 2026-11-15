@@ -1,6 +1,7 @@
 // Author: @SaadZarook
 import type { Run, SaveCheck, SaveCheckReport } from "../../src/api/client";
 import { failedValidateRun } from "./runs";
+import environmentUnbound from "./backend/save-checks-environment-unbound.json";
 
 /** The message a Transaction table read without a time filter or key fails with. */
 export const TIME_FILTER_MESSAGE =
@@ -30,6 +31,12 @@ export const passingReport = (probe: string | null) => report(probe, allPass);
 export const timeFilterReport = (probe: string | null) => report(probe, failing("Time filter", TIME_FILTER_MESSAGE, "record"));
 export const piiReport = (probe: string | null) =>
   report(probe, failing("PII masked", "customer_email is selected by record but not listed in pii, so it would not be masked", "record"));
+/**
+ * The backend's own answer for a probe enabled in Production while access_db has no binding there:
+ * one failure per location, each naming its location and environment. Written and checked by
+ * backend/tests/test_mock_answers.py, so the mocks can't say anything the backend doesn't (#108).
+ */
+export const unboundReport = (probe: string | null): SaveCheckReport => ({ ...(environmentUnbound as SaveCheckReport), probe });
 export const unreadableReport = (reason: string): SaveCheckReport => ({
   probe: null,
   entity: null,

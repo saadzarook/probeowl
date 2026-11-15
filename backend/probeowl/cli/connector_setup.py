@@ -17,7 +17,7 @@ from probeowl.connector_status import ConnectorStatuses
 from probeowl.errors import ConfigError, ProbeOwlError
 from probeowl.guards.breaker import CircuitBreaker
 from probeowl.model.check import LoadedApplication
-from probeowl.secrets import save_secret
+from probeowl.secrets import save_secret, without_line_break
 from probeowl.store.engine import create_store_engine
 
 TYPES = ("sqlserver", "oracle", "mariadb", "rest")
@@ -184,7 +184,7 @@ def save_passwords(connector: str, passwords: dict[str, str]) -> list[str]:
     saved = []
     for env, password in passwords.items():
         username = f"{connector}.{env}"
-        save_secret(KEYCHAIN_SERVICE, username, password)
+        save_secret(KEYCHAIN_SERVICE, username, without_line_break(password))
         saved.append(f"{KEYCHAIN_SERVICE}/{username}")
     return saved
 

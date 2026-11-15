@@ -1,7 +1,7 @@
 # Author: @SaadZarook
 [project]
 name = "probeowl"
-version = "0.2.0"
+version = "0.2.1"
 description = "Validate production data across databases and APIs, safely."
 license = "Apache-2.0"
 authors = [{ name = "Saad Zarook (@SaadZarook)" }]
@@ -104,4 +104,5 @@ testpaths = ["tests"]
 addopts = "-ra --strict-markers"
 markers = [
     "database: needs a real PostgreSQL, SQL Server, MariaDB or Oracle (URL or CI container)",
+    "keychain: writes to the real macOS Keychain; the keychain job runs them (PROBEOWL_KEYCHAIN_TESTS=1)",
 ]

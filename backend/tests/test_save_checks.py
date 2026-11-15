@@ -1,6 +1,7 @@
 # Author: @SaadZarook
 """Save checks of a draft probe, and its test run: nothing is saved."""
 
+import dataclasses
 import re
 from pathlib import Path
 from typing import Any
@@ -377,6 +378,12 @@ def test_a_draft_that_fails_a_check_does_not_run(setup: Setup) -> None:
     assert "Time filter: record" in fields
     assert "Identifiers: identifier provider_payment_id" in fields
     assert no_lookups(setup) and runs_stored(setup) == 0
+    # Each says its check, and its location when it has one, as fields: never read from text (#108).
+    by_field = {e["field"]: e for e in response.json()["errors"]}
+    time_filter = by_field["Time filter: record"]
+    assert (time_filter["check"], time_filter["location"]) == ("Time filter", "record")
+    identifier = by_field["Identifiers: identifier provider_payment_id"]
+    assert identifier["check"] == "Identifiers"
 
 
 def test_a_test_run_in_production_needs_a_reference(setup: Setup) -> None:
@@ -384,3 +391,24 @@ def test_a_test_run_in_production_needs_a_reference(setup: Setup) -> None:
     assert response.status_code == 422
     assert "reference" in response.json()["detail"]
     assert no_lookups(setup)
+
+
+def test_an_unbound_environment_fails_with_that_environment_named(setup: Setup) -> None:
+    # The Probe editor leaves such environments out of a new probe (#95): it reads which from here.
+    app = wallet(setup)
+    ledger = app.connectors["ledger_db"]
+    without_uat = ledger.model_copy(
+        update={"environments": {k: v for k, v in ledger.environments.items() if k != "uat"}}
+    )
+    unbound = dataclasses.replace(app, connectors={**app.connectors, "ledger_db": without_uat})
+    probe = PROBE.replace("environments: [prod, uat]\n", "")
+    report = check_draft(unbound, probe)
+    environments = [c for c in report.checks if c.check == "Environments"]
+    # One per unbound location, each with its location and environment: the fields an editor reads.
+    assert [(c.status, c.location, c.environment) for c in environments] == [
+        (CheckStatus.FAIL, "ledger", "uat")
+    ]
+    assert environments[0].message == (
+        "enabled in uat, where ledger (ledger_db) has no binding; "
+        "bind ledger_db in uat or leave uat out of the probe's environments"
+    )

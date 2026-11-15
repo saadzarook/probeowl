@@ -5,7 +5,7 @@ import { useSearchParams } from "react-router-dom";
 import { PasswordMissingError, splitError, startRun, type Reason } from "../api/client";
 import { useEntities } from "../api/useEntities";
 import { useProbes } from "../api/useProbes";
-import { REASON_LABELS } from "../reasons";
+import { REASON_LABELS, REFERENCE_PLACEHOLDER } from "../reasons";
 import { useSelection } from "../selection";
 import { NoProbes } from "./NoProbes";
 import { RunNeedsPassword } from "./RunNeedsPassword";
@@ -181,7 +181,7 @@ export function ValidateForm({ onStarted }: ValidateFormProps) {
               <input
                 value={reference}
                 onChange={(e) => setReference(e.target.value)}
-                placeholder="WALLET-482"
+                placeholder={REFERENCE_PLACEHOLDER}
                 required={production}
               />
             </label>

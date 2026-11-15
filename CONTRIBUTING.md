@@ -88,6 +88,15 @@ A pull request merges only when every check passes:
 CI runs them on every pull request. A pull request merges on GitHub once the required checks pass
 on its latest commit, and once a maintainer has approved it if it touches a protected path.
 
+Before you push, run what CI's check jobs run, with the same commands: lint, types (`mypy probeowl
+tests ../plugins`, as CI), examples, unit tests, the web client and mocks, and the UI tests:
+
+```sh
+bash dev/ci/local_checks.sh          # as CI's check and web-check jobs
+bash dev/ci/local_checks.sh --fast   # the same, without the full pytest run and the UI tests
+bash dev/ci/local_checks.sh --live   # all of it, then the UI tests against owl serve (dev/native/)
+```
+
 ## Working with AI coding agents
 
 Much of ProbeOwl has been written with AI coding agents, under the same rules as everyone else: they

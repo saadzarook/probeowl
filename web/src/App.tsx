@@ -10,6 +10,7 @@ import { KnowledgeBasePage } from "./pages/KnowledgeBasePage";
 import { NewEntityPage } from "./pages/NewEntityPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
 import { ProbeEditorPage } from "./pages/ProbeEditorPage";
+import { AuditPage } from "./pages/AuditPage";
 import { RunsPage } from "./pages/RunsPage";
 import { TablesPage } from "./pages/TablesPage";
 import { ValidatePage } from "./pages/ValidatePage";
@@ -43,6 +44,7 @@ function pageFor(item: NavItem) {
   if (item.path === "/knowledge-base") return <KnowledgeBasePage item={item} />;
   if (item.path === "/connectors") return <ConnectorsPage item={item} />;
   if (item.path === "/runs") return <RunsPage item={item} />;
+  if (item.path === "/audit") return <AuditPage item={item} />;
   return <PlaceholderPage item={item} />;
 }
 

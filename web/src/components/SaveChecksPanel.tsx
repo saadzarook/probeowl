@@ -34,7 +34,8 @@ export function SaveChecksPanel({ report, loading, error, onCheck }: SaveChecksP
         </div>
       )}
       {report && !report.can_save && <p className="form-error">Fix the failed checks to save</p>}
-      {!report && !error && <p className="hint">Checking the draft…</p>}
+      {/* "Checking" only while a check runs (#99). */}
+      {!report && !error && <p className="hint">{loading ? "Checking the draft…" : "Not checked yet: press Check."}</p>}
       {report && (
         <ul className="checks">
           {report.checks.map((c, i) => (

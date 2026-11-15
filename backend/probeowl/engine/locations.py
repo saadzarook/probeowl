@@ -42,6 +42,18 @@ class Connector(Protocol):
         ...
 
 
+# What a run could not read, as opposed to what it read and found absent (#81).
+_UNREADABLE_OUTCOMES = {Outcome.ERROR, Outcome.STALE, Outcome.NOT_CONFIGURED, Outcome.WAITING}
+
+
+def unreadable(read: "LocationRead") -> bool:
+    """Whether a location's data could not be read: Error, Stale, Not configured, Waiting (not
+    arrived yet), or Blocked by a chain that starts at one of those. Missing is read and absent."""
+    if read.outcome is Outcome.BLOCKED:
+        return read.unreadable_chain
+    return read.outcome in _UNREADABLE_OUTCOMES
+
+
 @dataclass
 class LocationRead:
     """One location's outcome. Rows stay in memory, unmasked, for the expectations only."""
@@ -57,6 +69,10 @@ class LocationRead:
     row: int | None = None
     # Per fan-out location: one read per row of this location; None past max_fanout.
     fanout: dict[str, list["LocationRead | None"]] = field(default_factory=dict)
+    # Blocked only: True when the chain starts at data that could not be read (Error, Stale,
+    # Not configured), False when it starts at data read and absent (Missing, an empty link, a
+    # count that is not one). The run status rule tells the two apart (#81).
+    unreadable_chain: bool = False
 
     def result(self) -> LocationResult:
         """The masked result that may be stored and shown."""
@@ -183,7 +199,10 @@ class _Reader:
             upstream = done[source]
             if upstream.outcome is not Outcome.FOUND:
                 return LocationRead(
-                    name, Outcome.BLOCKED, reason=f"{source} is {_label(upstream.outcome)}"
+                    name,
+                    Outcome.BLOCKED,
+                    reason=f"{source} is {_label(upstream.outcome)}",
+                    unreadable_chain=unreadable(upstream),
                 )
             if len(upstream.rows) != 1:
                 return LocationRead(

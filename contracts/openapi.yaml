@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: ProbeOwl API
   description: Validate production data across databases and APIs, safely.
-  version: 0.2.0
+  version: 0.2.1
 paths:
   /api/applications:
     get:
@@ -1626,6 +1626,106 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
+  /api/audit:
+    get:
+      tags:
+      - audit
+      summary: List Audit
+      description: 'The audit, newest first, 50 at a time; read-only, and not itself
+        audited (#79).
+
+
+        Each filter given narrows the list, by exact name. actor: who acted, or the
+        person an agent
+
+        acted for, so s.khan finds "s.khan via MCP" too. Details are shown masked
+        by today''s PII
+
+        rules, and with every loaded binding''s host, login and secret redacted. before:
+        the next
+
+        value of the previous page.'
+      operationId: list_audit
+      parameters:
+      - name: before
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Before
+      - name: actor
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            minLength: 1
+            maxLength: 128
+          - type: 'null'
+          title: Actor
+      - name: action
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 64
+            pattern: ^[a-z][a-z0-9_]*$
+          - type: 'null'
+          title: Action
+      - name: application
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 64
+            pattern: ^[a-z][a-z0-9_]*$
+          - type: 'null'
+          title: Application
+      - name: environment
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 64
+            pattern: ^[a-z][a-z0-9_]*$
+          - type: 'null'
+          title: Environment
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditPage'
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+        '501':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Implemented
+        '422':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Unprocessable Entity
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
   /api/runs/{run_id}:
     get:
       tags:
@@ -3185,6 +3285,74 @@ components:
       - by_key
       title: ArrayMatch
       description: How array elements are paired.
+    AuditEvent:
+      properties:
+        id:
+          type: string
+          title: Id
+        occurred_at:
+          type: string
+          format: date-time
+          title: Occurred At
+        action:
+          type: string
+          maxLength: 64
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Action
+          description: What happened, such as run_started or write_query_copied.
+        actor:
+          $ref: '#/components/schemas/Actor'
+        application:
+          anyOf:
+          - type: string
+            maxLength: 64
+            pattern: ^[a-z][a-z0-9_]*$
+          - type: 'null'
+          title: Application
+        environment:
+          anyOf:
+          - type: string
+            maxLength: 64
+            pattern: ^[a-z][a-z0-9_]*$
+          - type: 'null'
+          title: Environment
+        run_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Run Id
+        details:
+          additionalProperties:
+            $ref: '#/components/schemas/JsonValue'
+          type: object
+          title: Details
+          description: Masked values only.
+      additionalProperties: false
+      type: object
+      required:
+      - action
+      - actor
+      title: AuditEvent
+      description: One audit record. Never changed or removed once written.
+    AuditPage:
+      properties:
+        events:
+          items:
+            $ref: '#/components/schemas/AuditEvent'
+          type: array
+          title: Events
+        next:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Next
+          description: Pass as before for the next, older page; null when none.
+      additionalProperties: false
+      type: object
+      required:
+      - events
+      title: AuditPage
+      description: A page of audit events, newest first.
     BindingHealth:
       type: string
       enum:
@@ -4393,6 +4561,19 @@ components:
         message:
           type: string
           title: Message
+        check:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Check
+          description: The save check that failed, when the error is one.
+        location:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Location
+          description: The location or identifier a failed save check is about, as
+            it names it.
       additionalProperties: false
       type: object
       required:
@@ -4768,7 +4949,7 @@ components:
             pattern: ^\S+$
           - type: 'null'
           title: Reference
-          description: Jira key, support case ID or change ID, such as WALLET-482.
+          description: Jira key, support case ID or change ID, such as PROJ-123.
         notes:
           anyOf:
           - type: string
@@ -5788,16 +5969,26 @@ components:
       - running
       - passed
       - failed
+      - not_checked
       - skipped
       - ambiguous
       title: RunStatus
       description: 'Where a run is.
 
 
-        Skipped: a guard or circuit breaker stopped it before any lookup. Ambiguous:
-        the
+        Failed: an expectation was evaluated and failed. Not checked: none failed,
+        but one or more
 
-        identifier matched several subjects, so nothing else ran; see the run''s matches.'
+        could not be evaluated because data they need could not be read, or the run
+        stopped before
+
+        it could check anything. Passed: every expectation that applies was evaluated
+        and passed.
+
+        Skipped: a guard or circuit breaker stopped it before any lookup. Ambiguous:
+        the identifier
+
+        matched several subjects, so nothing else ran; see the run''s matches.'
     RunSummary:
       properties:
         id:
@@ -6052,7 +6243,8 @@ components:
             pattern: ^[a-z][a-z0-9_]*$
           - type: 'null'
           title: Environment
-          description: The environment a plan was read in, for plan checks.
+          description: 'The environment the check is about: where a plan was read,
+            or where a location has no binding.'
         plan_not_run:
           type: boolean
           title: Plan Not Run

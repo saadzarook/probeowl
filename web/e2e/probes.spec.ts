@@ -56,8 +56,11 @@ test("the Test run and Inspect ID fields name this entity's root key, never anot
   await page.getByRole("button", { name: "Retry" }).click();
   const box = page.getByRole("form", { name: "Test run" });
   await expect(box.getByLabel("ID", { exact: true })).toHaveAttribute("placeholder", "a visitor_profile_id or another identifier");
-  // Inspect opens on Wallet: its entity is the top-up, so the field names topup_id.
+  // Inspect keeps Card access (#94): its entity is the visitor. On Wallet, the top-up's topup_id.
   await page.goto("/inspect");
+  await expect(page.getByLabel("Identifier")).toHaveAttribute("placeholder", "a visitor_profile_id or another identifier");
+  await page.getByRole("button", { name: "Application" }).click();
+  await page.getByRole("button", { name: /Wallet/ }).last().click();
   await expect(page.getByLabel("Identifier")).toHaveAttribute("placeholder", "a topup_id or another identifier");
 });
 
@@ -334,4 +337,80 @@ test("a save that would break the folder names the file", async ({ page }) => {
   const dialog = page.getByRole("dialog");
   await dialog.getByRole("button", { name: "Confirm" }).click();
   await expect(dialog.getByRole("alert")).toContainText("saving would break the folder: wallet/connectors/broken.yaml");
+});
+
+/** A new Card access probe, with access_db bound in UAT only (#95). */
+async function newCardProbe(page: Page, name: string) {
+  await page.addInitScript(() => localStorage.setItem("mock-prod-unbound", "1"));
+  await page.goto("/probes");
+  await page.getByRole("button", { name: "Application" }).click();
+  await page.getByRole("button", { name: /Card access/ }).last().click();
+  await page.getByLabel("Environment").first().selectOption("UAT");
+  await page.getByRole("button", { name: "New probe" }).click();
+  const form = page.getByRole("form", { name: "New probe" });
+  await form.getByLabel("Probe id").fill(name);
+  await form.getByLabel("Title").fill(`Draft ${name}`);
+  await form.getByRole("button", { name: "Start the draft" }).click();
+}
+
+test("a new probe is enabled only where all its entity's connectors are bound (#95)", async ({ page }) => {
+  await newCardProbe(page, "visitor_badges");
+  const yaml = page.getByLabel("Probe YAML");
+  // From the draft's first checks: Production has no access_db binding, so only UAT is written.
+  await expect(yaml).toContainText("environments: [uat]");
+  const enabled = page.getByRole("group", { name: "Enabled in" });
+  await expect(enabled.getByLabel("UAT")).toBeChecked();
+  await expect(enabled.getByLabel("Production")).not.toBeChecked();
+  await expect(enabled).toContainText("access_db not bound");
+  await expect(page.getByRole("button", { name: "Save", exact: true })).toBeEnabled();
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+});
+
+test("environments the person lists in a new probe are kept as they are", async ({ page }) => {
+  await newCardProbe(page, "visitor_badges");
+  const yaml = page.getByLabel("Probe YAML");
+  await expect(yaml).toContainText("environments: [uat]");
+  // Unticking UAT again is the person's choice: nothing writes it back.
+  await page.getByRole("group", { name: "Enabled in" }).getByLabel("UAT").uncheck();
+  await expect(yaml).toContainText("environments: []");
+  await page.waitForTimeout(1000); // past the checks' debounce, so a fresh answer has come back
+  await expect(yaml).toContainText("environments: []");
+});
+
+test("an opened probe keeps its own environments", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("mock-prod-unbound", "1"));
+  await page.goto("/probes");
+  await page.getByRole("button", { name: "Application" }).click();
+  await page.getByRole("button", { name: /Card access/ }).last().click();
+  await page.getByLabel("Open probe").selectOption("visitor_cards");
+  await page.getByRole("button", { name: "Retry" }).click(); // the mocks fail this file's first read
+  const yaml = page.getByLabel("Probe YAML");
+  await expect(yaml).toContainText("probe: visitor_cards");
+  await expect(page.getByRole("group", { name: "Enabled in" })).toContainText("access_db not bound");
+  await expect(yaml).not.toContainText("environments:");
+});
+
+test("Enter after a list item keeps its indent, so the next item is a sibling (#96)", async ({ page }) => {
+  await page.goto("/probes?new=validate&entity=topup");
+  const form = page.getByRole("form", { name: "New probe" });
+  await form.getByLabel("Probe id").fill("topup_indent");
+  await form.getByLabel("Title").fill("Indent");
+  await form.getByRole("button", { name: "Start the draft" }).click();
+  const yaml = page.getByLabel("Probe YAML");
+  await expect(yaml).toContainText("  - expect: count(record) >= 1");
+  await yaml.getByText("- expect: count(record) >= 1").click();
+  await page.keyboard.press("End");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("- expect: count(ledger) == 2");
+  const lines = (await yaml.innerText()).split(String.fromCharCode(10));
+  expect(lines).toContain("  - expect: count(record) >= 1");
+  expect(lines).toContain("  - expect: count(ledger) == 2");
+  // "- expect:" with nothing after it still opens a block, indented for its value.
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("- expect:");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("count(ledger) >= 1");
+  const after = (await yaml.innerText()).split(String.fromCharCode(10));
+  const value = after.find((l) => l.trim() === "count(ledger) >= 1") ?? "";
+  expect(value.length - value.trimStart().length).toBeGreaterThan(2); // deeper than the dash: inside expect
 });

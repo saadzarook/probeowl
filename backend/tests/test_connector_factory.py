@@ -87,3 +87,29 @@ def test_an_unreadable_secret_stops_the_run_from_starting(
     assert failure.value.__cause__ is None
     # The person running owl serve still learns what to fix.
     assert "PROBEOWL_DB_UAT is not set" in caplog.text
+
+
+@pytest.mark.parametrize("ending", ["\n", "\r\n", "\r"])
+def test_a_secret_ending_in_a_line_break_loses_it_with_a_fixed_warning(
+    caplog: pytest.LogCaptureFixture, ending: str
+) -> None:
+    # As `echo pw > file` and an export on Windows leave it (#84).
+    adapter = open_connector(sql("mariadb"), "uat", lambda ref: f"s3cret-pw{ending}")
+    assert isinstance(adapter, MariaDbAdapter)
+    assert adapter._password == "s3cret-pw"
+    assert (
+        "connector db in uat: its secret ended with a line break, which was removed" in caplog.text
+    )
+    assert "s3cret-pw" not in caplog.text  # never the value
+
+
+def test_only_line_breaks_are_taken_from_a_secret(caplog: pytest.LogCaptureFixture) -> None:
+    adapter = open_connector(sql("mariadb"), "uat", lambda ref: " pw\t ")
+    assert isinstance(adapter, MariaDbAdapter)
+    assert adapter._password == " pw\t "
+    assert "line break" not in caplog.text
+
+
+def test_a_secret_that_is_only_a_line_break_is_empty() -> None:
+    with pytest.raises(ConfigError, match="the secret of connector db in uat is empty"):
+        open_connector(sql("mariadb"), "uat", lambda ref: "\r\n")

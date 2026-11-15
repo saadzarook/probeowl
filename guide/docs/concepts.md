@@ -102,6 +102,10 @@ such as `payment.amount`. A skip fails the run, because a run can't pass on data
 Without this rule, `sum(credit) == sum(debit)` would pass as 0 == 0 on a ledger that isn't there.
 For a location that may be absent, start the step with `when: exists(refund)`.
 
+**A run is Failed, Not checked or Passed**, in that order. Failed: an expectation was evaluated and didn't hold, or the subject or a record was read and is absent. Not checked: nothing failed, and at least one expectation couldn't be evaluated because data couldn't be read (Error, Stale, an unread row, or a chain starting at one of those). Passed: everything evaluated held. A Not checked run names the
+locations it couldn't read and why; it isn't compared with a healthy record, since nothing in it
+was found wrong. Read the reasons, fix what stopped the read, and run it again.
+
 A filter that leaves no rows of a Found location is different. `all(cards where status ==
 'active', ...)` still holds for a visitor whose cards are all revoked: the rule is about the
 location, not the filter.
