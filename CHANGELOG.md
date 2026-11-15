@@ -27,6 +27,10 @@ in.
   host, login or password. They read through a new `GET /api/audit`.
 - A save check's field error in the API carries `check` and `location`, so a client can tell which
   check failed, and where, without reading the message. The web app reads only these fields.
+- The macOS Keychain is tested for real: a CI job on macOS saves, reads, resolves and deletes a
+  password in the runner's keychain, and checks that a failed write and a locked keychain write
+  nothing anywhere else (#93). On macOS, a save to a locked keychain waits for the system's unlock
+  prompt (#128).
 
 ### Changed
 
@@ -88,6 +92,8 @@ in.
 - Setup's environment cards wrap at narrow widths, with no horizontal scroll.
 - The Reference field's example names no application: "Jira key or case ID, such as PROJ-123", on
   Validate, Inspect and the probe editor's test run.
+- The live first-run tests confirm Add connection's Save dialog, so the release's full native run
+  passes again (#123).
 
 ## [0.2.0] - 2026-11-14
 
