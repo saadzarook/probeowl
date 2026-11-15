@@ -100,6 +100,8 @@ def refuse_failures(report: SaveCheckReport) -> None:
         raise RequestError(
             f"the draft does not pass its save checks: {failures[0].message}",
             {_field(c): c.message for c in failures},
+            {_field(c): c.location for c in failures if c.location},
+            {_field(c): c.check for c in failures},
         )
 
 

@@ -378,6 +378,12 @@ def test_a_draft_that_fails_a_check_does_not_run(setup: Setup) -> None:
     assert "Time filter: record" in fields
     assert "Identifiers: identifier provider_payment_id" in fields
     assert no_lookups(setup) and runs_stored(setup) == 0
+    # Each says its check, and its location when it has one, as fields: never read from text (#108).
+    by_field = {e["field"]: e for e in response.json()["errors"]}
+    time_filter = by_field["Time filter: record"]
+    assert (time_filter["check"], time_filter["location"]) == ("Time filter", "record")
+    identifier = by_field["Identifiers: identifier provider_payment_id"]
+    assert identifier["check"] == "Identifiers"
 
 
 def test_a_test_run_in_production_needs_a_reference(setup: Setup) -> None:

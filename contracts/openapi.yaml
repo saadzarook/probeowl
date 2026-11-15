@@ -4393,6 +4393,19 @@ components:
         message:
           type: string
           title: Message
+        check:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Check
+          description: The save check that failed, when the error is one.
+        location:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Location
+          description: The location or identifier a failed save check is about, as
+            it names it.
       additionalProperties: false
       type: object
       required:
