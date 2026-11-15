@@ -29,9 +29,10 @@ test("a pasted JDBC string fills the fields, moves its password, and is never ke
   const pasted = page.getByLabel("Paste a connection string (optional)");
   await pasted.fill(`jdbc:mariadb://db.example.test:3306/orders_uat?user=probeowl_ro&password=${PASSWORD}`);
   await pasted.press("Enter");
-  await expect(pasted).toHaveValue("");
-  await expect(page.getByRole("status").filter({ hasText: "Filled from the connection string" })).toContainText(
-    "its password moved to the password field. The string itself isn't kept or sent.",
+  // The string stays, without its password (#92); the password is in its own field only.
+  await expect(pasted).toHaveValue("jdbc:mariadb://db.example.test:3306/orders_uat?user=probeowl_ro");
+  await expect(page.getByRole("status").filter({ hasText: "from the connection string" })).toContainText(
+    "Filled 4 fields (host, port, database, login) from the connection string; the password moved to the password field. The string isn't sent or stored.",
   );
   await expect(page.getByRole("button", { name: /^MariaDB/ })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByLabel("Host")).toHaveValue("db.example.test");
@@ -87,10 +88,11 @@ test("saved: the file has the keychain name, the password goes only to the keych
   await page.getByRole("button", { name: "Test connection" }).click();
   await expect(page.getByRole("status").filter({ hasText: "Connected" })).toBeVisible();
   await page.getByRole("button", { name: "Preview" }).click();
-  const diff = page.getByLabel("Diff of orders/connectors/orders_mariadb.yaml");
+  const diff = page.getByLabel("Diff of orders/connectors/orders_mariadb.yaml").first();
   await expect(diff).toContainText("secret: keyring:probeowl/orders_mariadb.uat");
   await expect(diff).not.toContainText(PASSWORD);
   await page.getByRole("button", { name: "Save orders_mariadb" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Write orders_mariadb" }).click();
 
   await expect(page.getByRole("heading", { name: "orders_mariadb is connected in UAT" })).toBeVisible();
   await expect(page.getByRole("status").filter({ hasText: "Written to" })).toContainText("orders/connectors/orders_mariadb.yaml");
@@ -124,6 +126,7 @@ test("a password already saved under the name is overwritten only when asked", a
   await page.getByLabel(/This is a read replica/).check();
   await page.getByRole("button", { name: "Preview" }).click();
   await page.getByRole("button", { name: "Save wallet_db" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Write wallet_db" }).click();
   const question = page.getByRole("alertdialog");
   await expect(question).toContainText("A password is already saved for wallet_db in Production");
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
@@ -185,8 +188,10 @@ test("a pasted string never sits in the field: pasted, read, cleared, the passwo
     input.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
   }, `mariadb://probeowl_ro:${PASSWORD}@db.example.test:3306/orders_uat`);
   await expect(page.getByLabel("Password")).toHaveValue(PASSWORD);
-  await expect(field).toHaveValue("");
-  // One that can't be read is cleared too, and says nothing was kept.
+  // The string stays readable without its password (#92): never in two places.
+  await expect(field).toHaveValue("mariadb://probeowl_ro@db.example.test:3306/orders_uat");
+  await expect(field).not.toHaveValue(new RegExp(PASSWORD));
+  // One that can't be read is cleared, and says nothing was kept.
   await field.fill(`not a connection string ${PASSWORD}`);
   await field.press("Enter");
   await expect(field).toHaveValue("");
@@ -202,4 +207,43 @@ test("password inputs ask the browser not to fill them, and start empty", async 
   await page.getByLabel("It needs a token").check();
   await expect(page.getByLabel("Token", { exact: true })).toHaveAttribute("autocomplete", "new-password");
   await expect(page.getByLabel("Token", { exact: true })).toHaveValue("");
+});
+
+test("a typed string fills the form when the field is left, and Clear empties it (#97, #92)", async ({ page }) => {
+  await open(page, /Orders/, "uat");
+  const field = page.getByLabel("Paste a connection string (optional)");
+  await field.pressSequentially(`Server=tcp:db.example.test,1433;Database=orders_uat;Uid=probeowl_ro;Pwd=${PASSWORD}`);
+  await page.keyboard.press("Tab"); // leaving the field, no Enter
+  await expect(page.getByLabel("Host")).toHaveValue("db.example.test");
+  await expect(page.getByLabel("Password")).toHaveValue(PASSWORD);
+  await expect(field).toHaveValue("Server=tcp:db.example.test,1433;Database=orders_uat;Uid=probeowl_ro");
+  // The fields it filled are marked for a moment, and the status names them.
+  await expect(page.getByLabel("Host")).toHaveAttribute("data-filled", "true");
+  await expect(page.getByRole("status").filter({ hasText: "from the connection string" })).toContainText("(host, port, database, login)");
+  await expect(page.getByLabel("Host")).not.toHaveAttribute("data-filled", "true", { timeout: 6000 });
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await page.getByRole("button", { name: "Clear" }).click();
+  await expect(field).toHaveValue("");
+  await expect(page.getByRole("status").filter({ hasText: "from the connection string" })).toHaveCount(0);
+  await expect(page.getByLabel("Host")).toHaveValue("db.example.test"); // what it filled stays
+});
+
+test("Save shows the preview in its dialog without Preview first, and says what's missing (#98)", async ({ page }) => {
+  await open(page, /Orders/, "uat");
+  await page.getByRole("button", { name: /^MariaDB/ }).click();
+  await expect(page.getByRole("button", { name: "Save orders_mariadb" })).toBeDisabled();
+  await expect(page.getByText("To save: the host, the database, the login.")).toBeVisible();
+  await page.getByLabel("Host").fill("db.example.test");
+  await page.getByLabel("Database").fill("orders_uat");
+  await page.getByLabel("Read-only login").fill("probeowl_ro");
+  await expect(page.getByText(/To save:/)).toHaveCount(0);
+  await page.getByRole("button", { name: "Save orders_mariadb" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByLabel("Diff of orders/connectors/orders_mariadb.yaml")).toContainText("database: orders_uat");
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.getByRole("button", { name: "Save orders_mariadb" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Write orders_mariadb" }).click();
+  await expect(page.getByRole("heading", { name: "orders_mariadb is connected in UAT" })).toBeVisible();
 });
