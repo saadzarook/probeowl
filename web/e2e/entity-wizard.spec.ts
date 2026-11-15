@@ -55,20 +55,22 @@ test("a visitor's cards: the catalog's link is offered, many with 100 rows, and 
   await expect(identifiers.getByRole("listitem").filter({ hasText: "visitor_profile.email" }).getByLabel("PII")).toBeChecked();
 
   await next(page, "Preview");
-  const yaml = page.getByLabel("badge_holder.yaml");
+  const yaml = page.getByLabel("badge_holder.yaml", { exact: true });
   await expect(yaml).toContainText("root_key: badge_holder_id");
   await expect(yaml).toContainText("max_rows: 100");
   await expect(yaml).toContainText("via: cards.card_id");
   await expect(yaml).not.toContainText("key_from"); // cards is keyed by the root key itself
   // ... and exposes its key column as the root key, so card_id can find a subject.
   await expect(yaml).toContainText("SELECT card_id, visitor_profile_id AS badge_holder_id, status");
-  await page.getByRole("button", { name: "Check" }).click();
+  // Reaching Preview ran the save checks: no Check to press first (#99).
   await expect(page.getByLabel("Diff of card-access/entities/badge_holder.yaml")).toBeVisible();
+  await expect(page.getByText(/Not checked yet/)).toHaveCount(0);
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   await page.getByRole("button", { name: "Create badge_holder" }).click();
   const created = page.getByRole("status", { name: "Entity created" });
   await expect(created).toContainText("badge_holder was created");
-  await expect(created.getByRole("link", { name: "Write a probe for badge_holder" })).toHaveAttribute("href", "/probes?new=inspect&entity=badge_holder");
+  // A Validate probe, as the guide's first application goes on to (#101).
+  await expect(created.getByRole("link", { name: "Write a probe for badge_holder" })).toHaveAttribute("href", "/probes?new=validate&entity=badge_holder");
 });
 
 test("Identifiers lists unique and id-like columns first, the rest under More columns", async ({ page }) => {
@@ -99,7 +101,7 @@ test("a top-up's ledger entries come from another connector, keyed from the top-
   await expect(page.getByRole("listitem", { name: "Location ledger_entries" })).toContainText("ledger_db · ledger_entries · by txn_id from topups.ledger_txn_id");
   await next(page, "Identifiers");
   await next(page, "Preview");
-  const yaml = page.getByLabel("topup_ledger.yaml");
+  const yaml = page.getByLabel("topup_ledger.yaml", { exact: true });
   await expect(yaml).toContainText("using: ledger_db");
   await expect(yaml).toContainText("key_from: topups.ledger_txn_id");
   await expect(yaml).toContainText("WHERE txn_id = :ledger_txn_id");
@@ -119,7 +121,7 @@ test("Link by columns makes a lookup the save checks still judge: here the index
   await next(page, "Identifiers");
   await next(page, "Preview");
   await expect(page.getByRole("alert").filter({ hasText: "cards fails a save check" })).toBeVisible();
-  await expect(page.getByLabel("card_status.yaml")).toContainText("cards:");
+  await expect(page.getByLabel("card_status.yaml", { exact: true })).toContainText("cards:");
   await page.getByRole("button", { name: "Check" }).click();
   await expect(page.getByLabel("Failed save checks")).toContainText("Index check: cards: the lookup would read all of cards: no index on status");
   await expect(page.getByRole("button", { name: "Create card_status" })).toBeDisabled();
