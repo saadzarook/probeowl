@@ -324,12 +324,14 @@ def test_every_call_is_audited_via_mcp_with_the_tool_never_its_arguments(mcp: Mc
         "tool": "check_draft",
         "kind": "probe",
         "application": "card_access",
+        "environment": None,
         "ok": True,
     }
     assert events[1].details == {
         "tool": "list_config",
         "kind": None,
         "application": None,
+        "environment": None,
         "ok": True,
     }
     assert "visitor_active_cards" not in str(events)  # the draft's text, never kept
@@ -391,7 +393,16 @@ def test_check_draft_refuses_production_by_name(
     assert PLAN_CHECKS_NOT_PRODUCTION in message
     assert opened == []
     [event] = found.events()
-    assert event.details["ok"] is False  # the refusal is audited
+    # The refusal is audited with the environment asked for and its fixed reason (#80).
+    assert event.details == {
+        "tool": "check_draft",
+        "kind": "probe",
+        "application": "card_access",
+        "environment": "prod",
+        "ok": False,
+        "reason": "production_refused",
+    }
+    assert "visitor_active_cards" not in str(event)  # never the draft
 
 
 def test_plan_checks_default_to_the_first_environment_that_isnt_production(
@@ -465,3 +476,50 @@ def test_a_store_url_without_a_password_is_accepted(url: str) -> None:
     from probeowl.cli.defaults import has_password
 
     assert has_password(url) is False
+
+
+# --- A refused or failing call's audit event: fixed reasons, never the draft (#80) -------------
+
+
+def test_a_draft_holding_a_credential_is_audited_as_credential_found(mcp: Mcp) -> None:
+    draft = f"""connector: wallet_db
+type: sqlserver
+owner: payments-team
+environments:
+  uat:
+    password: {PASSWORD}
+"""
+    mcp.call("check_draft", kind="connector", text=draft, application="wallet")
+    [event] = mcp.events()
+    assert (event.details["ok"], event.details["reason"]) == (False, "credential_found")
+    assert PASSWORD not in str(event)
+
+
+def test_a_draft_over_the_size_limit_is_audited_as_too_large(mcp: Mcp) -> None:
+    mcp.call("check_draft", kind="probe", text="x" * (64 * 1024 + 1), application="card_access")
+    [event] = mcp.events()
+    assert (event.details["ok"], event.details["reason"]) == (False, "too_large")
+
+
+def test_a_draft_that_fails_its_checks_is_audited_as_save_checks_failed(mcp: Mcp) -> None:
+    broken = PROBE_DRAFT.replace("entity: visitor", "entity: nobody")
+    mcp.call("check_draft", kind="probe", text=broken, application="card_access")
+    [event] = mcp.events()
+    assert (event.details["ok"], event.details["reason"]) == (False, "save_checks_failed")
+    assert "visitor_active_cards" not in str(event)
+
+
+def test_an_unknown_environment_is_audited_as_not_found(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    found = Mcp(tmp_path, monkeypatch, plans=lambda c, env: None)
+    refused(found, kind="probe", text=PROBE_DRAFT, application="card_access", environment="qa")
+    [event] = found.events()
+    assert (event.details["environment"], event.details["reason"]) == ("qa", "not_found")
+
+
+def test_a_schema_call_records_its_environment(mcp: Mcp) -> None:
+    mcp.call("schema", application="wallet", connector="wallet_db", environment="uat")
+    [event] = mcp.events()
+    assert (event.details["environment"], event.details["ok"]) == ("uat", True)
+    assert "reason" not in event.details

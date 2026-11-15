@@ -37,6 +37,10 @@ See docs/implementation-plan.md, Releases. -->
 
   They exit 1, 2 and 0 (see the exit codes above). A Not checked run names the locations it
   couldn't read, and isn't compared with a healthy record. Runs stored before keep their status.
+- An `owl mcp` call's audit event records the environment asked for. A call that didn't succeed
+  has a fixed reason: `production_refused`, `not_found`, `invalid`, `credential_found`,
+  `too_large`, `save_checks_failed` or `failed`. It still never records the draft or a value from
+  it.
 
 ## [0.2.0] - 2026-11-14
 
