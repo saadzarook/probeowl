@@ -39,8 +39,9 @@ NoConfig = Annotated[
 """A hidden --config on each command that runs through owl serve: it stops with where it goes."""
 POLL_S = 0.5
 
-# Exit codes: the run passed, the run failed, the run could not be started or followed, or
-# the value matched several subjects so nothing ran (owl inspect).
+# Exit codes: the run passed, the run failed, the run did not check everything it should (not
+# checked) or could not be started or followed, or the value matched several subjects so
+# nothing ran (owl inspect). By the run status rule: failed (1) over not checked (2) over passed.
 PASSED, FAILED, NOT_RUN, AMBIGUOUS = 0, 1, 2, 3
 
 
@@ -145,7 +146,11 @@ def finish(run: Run) -> None:
     why = run.stop_reason or run.skip_reason
     caveat = f" - {run.caveat}" if run.caveat else ""
     typer.echo(f"Run {run.id}: {run.status.value}{caveat}" + (f" ({why})" if why else ""))
-    codes = {RunStatus.PASSED: PASSED, RunStatus.AMBIGUOUS: AMBIGUOUS}
+    codes = {
+        RunStatus.PASSED: PASSED,
+        RunStatus.NOT_CHECKED: NOT_RUN,
+        RunStatus.AMBIGUOUS: AMBIGUOUS,
+    }
     raise typer.Exit(codes.get(run.status, FAILED))
 
 

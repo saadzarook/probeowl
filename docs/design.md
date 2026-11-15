@@ -88,7 +88,7 @@ One word per idea, used the same way in the UI, the YAML and conversation. The f
 | Term | Meaning |
 | --- | --- |
 | Run | One execution of a probe, with every lookup, result and timing stored. |
-| Run status | Where a run is: Running, Passed, Failed, Skipped or Ambiguous. |
+| Run status | Where a run is: Running, Passed, Failed, Not checked, Skipped or Ambiguous. Failed: an expectation was evaluated and didn't hold, or the subject or a record was read and is absent. Not checked: nothing failed, and at least one expectation couldn't be evaluated because data couldn't be read (Error, Stale, an unread row, or a chain starting at one of those). Passed: everything evaluated held. |
 | Investigation | A run started by a person, with its investigation record. |
 | Investigation record | Reason and reference (mandatory in Production), notes, customer reference and conclusion (optional), plus who, when and where. |
 | Outcome | What one location returned: Found, Missing, Waiting, Blocked, Ambiguous, Error, Stale or Not configured. |

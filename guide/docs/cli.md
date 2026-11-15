@@ -118,8 +118,8 @@ status. Exit codes:
 | Code | Meaning |
 | --- | --- |
 | 0 | Passed |
-| 1 | Failed, or skipped (a paused connector, a kill switch) |
-| 2 | Not run: refused before it started, or `owl serve` couldn't be reached or followed |
+| 1 | Failed: an expectation didn't hold, or the subject or a record is absent. Also skipped (a paused connector, a kill switch before any lookup) |
+| 2 | Not checked: nothing failed, but data couldn't be read (an Error, Stale data, a run that stopped). Or not run: refused before it started, or `owl serve` couldn't be reached or followed |
 | 3 | Ambiguous (inspect): the value matched several subjects, and nothing else ran |
 
 The run header names the probe by its title, then its id:
