@@ -101,7 +101,7 @@ export function stoppedValidateRun(id: string): Run {
   };
 }
 
-/** topup_completed on tp_noweb: the ledger check fails, and the webhooks could not be read (#82). */
+/** topup_completed on tp_nohook: the ledger check fails, and the webhooks could not be read (#82). */
 export function partialValidateRun(id: string): Run {
   const failed = failedValidateRun(id);
   const reason = "the API did not answer";

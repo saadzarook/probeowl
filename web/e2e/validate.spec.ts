@@ -367,7 +367,7 @@ test("nothing is suggested until the run has finished", async ({ page }) => {
 
 test("the failed expectation leads, and what could not be read is listed apart (#82)", async ({ page }) => {
   await page.goto("/validate");
-  await page.getByLabel("Any ID").fill("tp_noweb");
+  await page.getByLabel("Any ID").fill("tp_nohook");
   await page.getByLabel("Reason").selectOption("incident");
   await page.getByLabel(/^Reference/).fill("WALLET-482");
   await page.getByRole("button", { name: "Validate" }).click();
