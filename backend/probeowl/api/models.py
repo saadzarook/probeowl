@@ -26,6 +26,13 @@ class FieldError(ProbeOwlModel):
 
     field: str = Field(description="The field, dotted: investigation.reference.")
     message: str
+    check: str | None = Field(
+        default=None, description="The save check that failed, when the error is one."
+    )
+    location: str | None = Field(
+        default=None,
+        description="The location or identifier a failed save check is about, as it names it.",
+    )
 
 
 class Problem(ProbeOwlModel):

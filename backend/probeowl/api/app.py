@@ -75,6 +75,8 @@ def problem(
     problem_type: str = "about:blank",
     extensions: dict[str, str] | None = None,
     headers: dict[str, str] | None = None,
+    locations: dict[str, str] | None = None,
+    checks: dict[str, str] | None = None,
 ) -> JSONResponse:
     """Build a problem details response, with the fields not accepted when there are any."""
     redactor: Redactor = request.app.state.redactor
@@ -85,7 +87,15 @@ def problem(
         detail=redactor.text(detail) if detail is not None else None,
         instance=request.url.path,
         errors=(
-            [FieldError(field=f, message=redactor.text(m)) for f, m in fields.items()]
+            [
+                FieldError(
+                    field=f,
+                    message=redactor.text(m),
+                    check=(checks or {}).get(f),
+                    location=(locations or {}).get(f),
+                )
+                for f, m in fields.items()
+            ]
             if fields
             else None
         ),
@@ -116,8 +126,18 @@ async def _probeowl_error(request: Request, exc: Exception) -> JSONResponse:
     assert isinstance(exc, ProbeOwlError)  # registered for ProbeOwlError only
     status = next((s for t, s in _STATUS_BY_ERROR.items() if isinstance(exc, t)), 500)
     fields = exc.fields if isinstance(exc, RequestError) else None
+    locations = exc.locations if isinstance(exc, RequestError) else None
+    checks = exc.checks if isinstance(exc, RequestError) else None
     return problem(
-        request, status, str(exc), fields, exc.problem_type, exc.extensions(), exc.headers()
+        request,
+        status,
+        str(exc),
+        fields,
+        exc.problem_type,
+        exc.extensions(),
+        exc.headers(),
+        locations,
+        checks,
     )
 
 

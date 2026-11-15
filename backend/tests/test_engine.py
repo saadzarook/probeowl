@@ -92,7 +92,7 @@ def test_a_connector_error_is_that_locations_error_never_a_crashed_run() -> None
         raise ConnectorError("the API could not be reached: ConnectTimeout")
 
     result = run("tp_91f2b9", checkout_api=Fake(down))
-    assert result.status is RunStatus.FAILED
+    assert result.status is RunStatus.NOT_CHECKED
     assert outcomes(result)["payment"] is Outcome.ERROR
     assert outcomes(result)["ledger"] is Outcome.FOUND
     [payment_result] = [r for r in result.locations if r.location == "payment"]
@@ -311,7 +311,7 @@ def test_locations_not_read_by_the_deadline_are_errors() -> None:
     [ledger_result] = [r for r in result.locations if r.location == "ledger"]
     assert ledger_result.reason == "run time limit reached"
     assert outcomes(result)["record"] is Outcome.FOUND
-    assert result.status is RunStatus.FAILED
+    assert result.status is RunStatus.NOT_CHECKED
 
 
 # --- Missing locations ----------------------------------------------------------------------

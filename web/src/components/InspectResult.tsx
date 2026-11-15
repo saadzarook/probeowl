@@ -8,6 +8,7 @@ import { AmbiguousMatches, showValue } from "./AmbiguousMatches";
 import { CliCommand } from "./CliCommand";
 import { EvidencePanel } from "./EvidencePanel";
 import { OutcomeChip } from "./OutcomeChip";
+import { NotChecked } from "./NotChecked";
 import { RunWarnings } from "./RunWarnings";
 import { StopReason } from "./StopReason";
 
@@ -233,6 +234,7 @@ export function InspectResult({ runId, entity, onInspect, onStarted }: InspectRe
         </header>
         <RunWarnings run={run} />
         {run.status === "skipped" && run.skip_reason && <p className="summary">Skipped: {run.skip_reason}</p>}
+        <NotChecked run={run} />
         <div className="run-body inspect-body">
           <div>
             {topLevel.length === 0 && <p className="hint">{running ? "Waiting for the first location…" : "No locations."}</p>}

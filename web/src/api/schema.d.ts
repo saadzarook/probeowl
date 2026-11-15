@@ -1901,6 +1901,16 @@ export interface components {
             field: string;
             /** Message */
             message: string;
+            /**
+             * Check
+             * @description The save check that failed, when the error is one.
+             */
+            check?: string | null;
+            /**
+             * Location
+             * @description The location or identifier a failed save check is about, as it names it.
+             */
+            location?: string | null;
         };
         /**
          * FieldResult
@@ -2141,7 +2151,7 @@ export interface components {
             reason: components["schemas"]["Reason"];
             /**
              * Reference
-             * @description Jira key, support case ID or change ID, such as WALLET-482.
+             * @description Jira key, support case ID or change ID, such as PROJ-123.
              */
             reference?: string | null;
             /** Notes */
@@ -2810,11 +2820,14 @@ export interface components {
          * RunStatus
          * @description Where a run is.
          *
-         *     Skipped: a guard or circuit breaker stopped it before any lookup. Ambiguous: the
-         *     identifier matched several subjects, so nothing else ran; see the run's matches.
+         *     Failed: an expectation was evaluated and failed. Not checked: none failed, but one or more
+         *     could not be evaluated because data they need could not be read, or the run stopped before
+         *     it could check anything. Passed: every expectation that applies was evaluated and passed.
+         *     Skipped: a guard or circuit breaker stopped it before any lookup. Ambiguous: the identifier
+         *     matched several subjects, so nothing else ran; see the run's matches.
          * @enum {string}
          */
-        RunStatus: "running" | "passed" | "failed" | "skipped" | "ambiguous";
+        RunStatus: "running" | "passed" | "failed" | "not_checked" | "skipped" | "ambiguous";
         /**
          * RunSummary
          * @description One run as the Runs list shows it: no locations, expectations or evidence.
@@ -2969,7 +2982,7 @@ export interface components {
             location?: string | null;
             /**
              * Environment
-             * @description The environment a plan was read in, for plan checks.
+             * @description The environment the check is about: where a plan was read, or where a location has no binding.
              */
             environment?: string | null;
             /**

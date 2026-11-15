@@ -118,10 +118,14 @@ status. Exit codes:
 
 | Code | Meaning |
 | --- | --- |
-| 0 | Passed |
-| 1 | Failed, or skipped (a paused connector, a kill switch) |
-| 2 | Not run: refused before it started, or `owl serve` couldn't be reached or followed |
-| 3 | Ambiguous (inspect): the value matched several subjects, and nothing else ran |
+| 0 | Passed: everything evaluated held |
+| 1 | A finding, Failed: an expectation didn't hold, or the subject or a record is absent |
+| 2 | No finding, but not fully checked. **Not checked:** data couldn't be read (an Error, Stale data, a run that stopped). **Skipped:** a paused connector or a kill switch before any lookup. **Ambiguous:** the value matched several subjects, and nothing else ran. Or the run couldn't start: refused, or `owl serve` couldn't be reached or followed |
+
+A 2 always prints why, on the run's last line: `Run …: skipped (ledger_db is paused: …)`,
+`Run …: ambiguous (the value matches 2 subjects; nothing else ran)`, or
+`Run …: not_checked (could not read ledger: error, timed out)`. A script can treat 1 as "look
+at this flow" and 2 as "look at the reason, then run it again".
 
 The run header names the probe by its title, then its id:
 `Run 9305b99c-...: Top-up completed (wallet/topup_completed) on tp_91f2c7 in uat`.
