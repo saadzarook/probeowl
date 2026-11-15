@@ -20,7 +20,7 @@ from probeowl.errors import ConfigError, KeychainUnavailable
 # The operating system's keychains, by platform, in the order they are tried.
 KEYCHAINS: dict[str, tuple[tuple[str, str], ...]] = {
     "win32": (("keyring.backends.Windows", "WinVaultKeyring"),),
-    "darwin": (),
+    "darwin": (("keyring.backends.macOS", "Keyring"),),
     "linux": (
         ("keyring.backends.SecretService", "Keyring"),
         ("keyring.backends.kwallet", "DBusKeyring"),
