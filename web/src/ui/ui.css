@@ -28,6 +28,7 @@
   --ui-primary-hover: #1a4fbd;
   --ui-primary-foreground: #ffffff;
   --ui-avatar-bg: #dbe6fb;
+  --ui-selected-bg: #eef2fb;
   --ui-production: #b42318; /* fills, in both themes: Production stays red */
   --ui-production-bg: #fce9e8;
   --ui-production-text: #b42318;
@@ -64,6 +65,7 @@
   --ui-primary-hover: #86a9f1;
   --ui-primary-foreground: #0f1216;
   --ui-avatar-bg: #1d2a45;
+  --ui-selected-bg: #1b2436;
   --ui-production-bg: #3a1a18;
   --ui-production-text: #f2948b;
   --ui-sidebar: #0b0d10;
@@ -98,6 +100,7 @@
     --ui-primary-hover: #86a9f1;
     --ui-primary-foreground: #0f1216;
     --ui-avatar-bg: #1d2a45;
+    --ui-selected-bg: #1b2436;
     --ui-production-bg: #3a1a18;
     --ui-production-text: #f2948b;
     --ui-sidebar: #0b0d10;
@@ -136,6 +139,7 @@
   --color-primary-hover: var(--ui-primary-hover);
   --color-primary-foreground: var(--ui-primary-foreground);
   --color-avatar-bg: var(--ui-avatar-bg);
+  --color-selected-bg: var(--ui-selected-bg);
   --color-ring: var(--ui-primary);
   --color-production: var(--ui-production);
   --color-production-bg: var(--ui-production-bg);

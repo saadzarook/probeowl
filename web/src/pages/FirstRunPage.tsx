@@ -1,4 +1,5 @@
 // Author: @SaadZarook
+import { Button, buttonClass, Field, Input } from "../ui";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
@@ -96,14 +97,12 @@ export function FirstRunPage() {
       <section className="card wizard-form" aria-labelledby="application-step">
         <h2 id="application-step">What do you want to check?</h2>
         <p className="hint">An application is a product area: everything one team looks after, across all its environments.</p>
-        <label>
-          Name
-          <input value={name} placeholder="such as Card access" onChange={(e) => setName(e.target.value)} />
-        </label>
-        <label>
-          Owning team
-          <input value={owner} placeholder="such as access-team" onChange={(e) => setOwner(e.target.value)} />
-        </label>
+        <Field id="setup-name" label="Name">
+          <Input value={name} placeholder="such as Card access" onChange={(e) => setName(e.target.value)} />
+        </Field>
+        <Field id="setup-owner" label="Owning team">
+          <Input value={owner} placeholder="such as access-team" onChange={(e) => setOwner(e.target.value)} />
+        </Field>
         {editedId === undefined ? (
           <p className="hint">
             Id <code>{id || "…"}</code>: it names the application's folder and appears in every URL.{" "}
@@ -112,18 +111,12 @@ export function FirstRunPage() {
             </button>
           </p>
         ) : (
-          <label>
-            Id
-            <input
-              className="mono"
-              value={editedId}
-              aria-invalid={problem ? true : undefined}
-              aria-describedby="application-id-problem"
-              onChange={(e) => setEditedId(e.target.value.trim())}
-            />
-          </label>
+          // The id's problem in its own field while it is edited; below the fields otherwise (rule 3).
+          <Field id="setup-id" label="Id" error={problem}>
+            <Input className="font-mono" value={editedId} onChange={(e) => setEditedId(e.target.value.trim())} />
+          </Field>
         )}
-        {name.trim() !== "" && problem && (
+        {editedId === undefined && name.trim() !== "" && problem && (
           <p className="form-error" id="application-id-problem" role="alert">
             {problem}
           </p>
@@ -159,14 +152,13 @@ export function FirstRunPage() {
           </p>
         )}
         <div className="wizard-nav">
-          <button
-            className="btn"
-            type="button"
+          <Button
             disabled={chosen.size === 0 || !preview.data || stale || save.isPending}
+            disabledReason={chosen.size === 0 ? "Choose an environment first" : undefined}
             onClick={() => preview.data && save.mutate(preview.data.base)}
           >
             Create {body.title || id}
-          </button>
+          </Button>
         </div>
         {save.isPending && <p role="status">Working…</p>}
         {chosen.size > 0 && stale && (
@@ -199,10 +191,10 @@ export function FirstRunPage() {
         </p>
         <p className="hint">Next, connect it to a database or API in one of its environments. Passwords go to this machine's keychain, never to a file.</p>
         <div className="wizard-nav">
-          <RouterLink className="btn" to={`/connectors/new?environment=${encodeURIComponent(created.environment)}`}>
+          <RouterLink className={buttonClass()} to={`/connectors/new?environment=${encodeURIComponent(created.environment)}`}>
             Add its first connection
           </RouterLink>
-          <RouterLink className="btn btn-outline" to="/inspect">
+          <RouterLink className={buttonClass({ variant: "outline" })} to="/inspect">
             Later
           </RouterLink>
         </div>
@@ -248,19 +240,30 @@ export function FirstRunPage() {
       {content}
       {step === 0 && (
         <div className="wizard-nav">
-          <button className="btn" type="button" disabled={problem !== undefined || name.trim() === "" || owner.trim() === ""} onClick={() => setStep(1)}>
+          <Button
+            disabled={problem !== undefined || name.trim() === "" || owner.trim() === ""}
+            disabledReason={setupMissing(name, owner, problem)}
+            onClick={() => setStep(1)}
+          >
             Next: Environments
-          </button>
+          </Button>
           <GuideLink page="first-application/">Your first application</GuideLink>
         </div>
       )}
       {step === 1 && (
         <div className="wizard-nav">
-          <button className="btn btn-outline" type="button" onClick={() => setStep(0)}>
+          <Button variant="outline" onClick={() => setStep(0)}>
             Back
-          </button>
+          </Button>
         </div>
       )}
     </>
   );
+}
+
+/** Why Next can't be pressed yet (rule 8): the fields still empty, or the id's problem, said above. */
+function setupMissing(name: string, owner: string, problem: string | undefined): string | undefined {
+  const missing = [name.trim() === "" && "a name", owner.trim() === "" && "an owning team"].filter((part): part is string => typeof part === "string");
+  if (missing.length > 0) return `To continue: ${missing.join(", ")}.`;
+  return problem === undefined ? undefined : "Fix the id first.";
 }

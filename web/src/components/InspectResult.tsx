@@ -1,4 +1,5 @@
 // Author: @SaadZarook
+import { RunStatusChip } from "./RunStatusChip";
 import type { Entity, ExpectationEvaluation, LocationResult, Run } from "../api/client";
 import { useRun } from "../api/useRun";
 import { REASON_LABELS } from "../reasons";
@@ -205,9 +206,9 @@ export function InspectResult({ runId, entity, onInspect, onStarted }: InspectRe
       )}
       <section className="card run-result" aria-busy={running} aria-label="Inspect result">
         <header className="run-header">
-          <span className="status" data-status={failedCount(run) > 0 ? "failed" : run.status} data-caveat={run.caveat ? true : undefined}>
+          <RunStatusChip status={failedCount(run) > 0 ? "failed" : run.status} caveat={Boolean(run.caveat)}>
             {statusText(run)}
-          </span>
+          </RunStatusChip>
           <StopReason run={run} />
           <div>
             <h2>

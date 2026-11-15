@@ -4,8 +4,8 @@ import { cn } from "./cn";
 import { useMediaQuery } from "./useMediaQuery";
 
 export type Column<Row> = { header: string; cell: (row: Row) => ReactNode };
-export type Highlight = "missing" | "waiting";
-const SHADE: Record<Highlight, string> = { missing: "bg-missing-bg", waiting: "bg-waiting-bg" };
+export type Highlight = "missing" | "waiting" | "selected";
+const SHADE: Record<Highlight, string> = { missing: "bg-missing-bg", waiting: "bg-waiting-bg", selected: "bg-selected-bg" };
 
 type ListOrTableProps<Row> = {
   /** The table's caption, and the list's name. */
@@ -15,7 +15,7 @@ type ListOrTableProps<Row> = {
   rowKey: (row: Row) => Key;
   /** What to say when there are no rows. */
   empty: ReactNode;
-  /** A row that needs attention, shaded in its tone and marked data-highlight: "missing" for a problem, "waiting" for a difference. */
+  /** A row that needs attention, shaded in its tone and marked data-highlight: "missing" for a problem, "waiting" for a difference or a warning, "selected" for the row shown beside. */
   highlight?: (row: Row) => Highlight | undefined;
 };
 

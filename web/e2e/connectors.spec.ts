@@ -102,8 +102,8 @@ test("the environment buttons switch the bindings, and say what is showing", asy
 
 test("a binding that needs attention is marked, with its reason at the top of the detail", async ({ page }) => {
   await openPayouts(page);
-  await expect(page.getByRole("row", { name: /settlement_replica/ })).toHaveAttribute("data-attention", "true");
-  await expect(page.getByRole("row", { name: /ledger_replica/ })).toHaveAttribute("data-attention", "false");
+  await expect(page.getByRole("row", { name: /settlement_replica/ })).toHaveAttribute("data-highlight", "waiting");
+  await expect(page.getByRole("row", { name: /ledger_replica/ })).not.toHaveAttribute("data-highlight", "waiting");
   await page.getByRole("button", { name: "settlement_replica" }).click();
   const detail = page.getByRole("region", { name: "Connector settlement_replica" });
   await expect(detail.locator(".connector-reason")).toContainText("240 s behind");
@@ -137,7 +137,7 @@ test("a connector's kill switch needs a reason, then shows Stopped and a banner 
   await dialog.getByRole("button", { name: "Stop reads" }).click();
 
   await expect(page.getByRole("row", { name: /wallet_db/ })).toContainText("Stopped");
-  await expect(page.getByRole("row", { name: /wallet_db/ })).toHaveAttribute("data-attention", "true");
+  await expect(page.getByRole("row", { name: /wallet_db/ })).toHaveAttribute("data-highlight", "waiting");
   await expect(page.getByRole("checkbox", { name: "Kill switch" })).toBeChecked();
   const banner = page.getByRole("alert", { name: "Kill switches on" });
   await expect(banner).toContainText("connector wallet_db of wallet, in every environment: replica on fire · by s.khan");
@@ -272,9 +272,13 @@ test("a kill switch turned on since the screen loaded shows the refusal", async 
 test("every column fits beside the detail panel, Status included", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await openPayouts(page);
-  const scroll = page.locator(".table-scroll");
-  const overflow = await scroll.evaluate((element) => element.scrollWidth - element.clientWidth);
+  const table = page.getByRole("table", { name: "Connectors" });
+  // The table fits its own column, and Status ends before the detail panel begins.
+  const overflow = await table.evaluate((element) => element.scrollWidth - (element.parentElement?.clientWidth ?? 0));
   expect(overflow).toBeLessThanOrEqual(0);
+  const status = await table.getByRole("columnheader", { name: "Status" }).boundingBox();
+  const detail = await page.getByRole("region", { name: /^Connector / }).boundingBox();
+  expect((status?.x ?? Infinity) + (status?.width ?? 0)).toBeLessThanOrEqual(detail?.x ?? 0);
 });
 
 test("the guards show on a stopped or unreachable connector, and only no binding has none", async ({ page }) => {

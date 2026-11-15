@@ -2,7 +2,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { expectNoOverflow } from "./overflow";
-import { copyOverCode, monoHeadings, pastTheEdge, shellAt, unequalControlRows } from "./rules";
+import { copyOverCode, monoHeadings, pastTheEdge, shellAt, unequalControlRows, unevenChips } from "./rules";
 
 // Every screen against the UI foundation's rules (#105). A screen that breaks a rule today is
 // marked with the PR that moves it onto web/src/ui: the test is expected to fail until then, and
@@ -68,12 +68,8 @@ const VALIDATE: Screen = { name: "Validate", path: "/validate" };
 
 // Which rule each screen breaks today, and the PR of the phase plan that moves it (#105).
 // The numbers are the audit's items in #105.
-const SETUP = "PR 4, setup and connections";
 const EDITORS = "PR 5, the editors and the rest";
 const UNTIL: Record<string, Partial<Record<"overflow" | "heights" | "mono", string>>> = {
-  Tables: { overflow: SETUP }, // 4
-  Connectors: { overflow: SETUP }, // 4
-  "Add connection": { overflow: SETUP }, // 12: Save's reason runs past the edge at 390
   Probes: { mono: EDITORS }, // 15: the probe editor's h1
   Audit: { overflow: EDITORS }, // 4
 };
@@ -251,3 +247,16 @@ test("rule 8: the disabled reason asks for a reference only in Production", asyn
     }
   }
 });
+
+// Setup and connections moved in PR 4 (#141), with one chip everywhere: rule 9 on the screens that show chips.
+for (const name of ["Connectors", "Tables", "a Validate run", "an Inspect run", "a healthy comparison"]) {
+  test(`rule 9: on ${name}, every chip is 24 px and shows all its text, at 1440 and 390 px`, async ({ page }) => {
+    const screen = SCREENS.find((s) => s.name === name);
+    if (screen === undefined) throw new Error(`${name} is not in SCREENS`);
+    for (const width of [1440, 390]) {
+      await open(page, screen, width);
+      expect(await page.locator("main [data-outcome], main [data-health], main [data-status], main .label-chip").count(), `${name} has chips`).toBeGreaterThan(0);
+      expect(await unevenChips(page), `${name} at ${width}`).toEqual([]);
+    }
+  });
+}

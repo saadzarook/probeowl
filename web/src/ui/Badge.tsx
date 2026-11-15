@@ -17,7 +17,7 @@ const badgeClass = cva(
         ambiguous: "bg-ambiguous-bg text-ambiguous-fg",
         stale: "bg-stale-bg text-stale-fg",
         error: "border-production-text bg-card text-production-text",
-        "not-configured": "border-muted bg-card text-muted",
+        "not-configured": "border-dashed border-muted bg-card text-muted",
         neutral: "bg-blocked-bg text-blocked-fg",
         production: "bg-production text-on-production",
       },

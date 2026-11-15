@@ -19,7 +19,7 @@ test("Wallet's runs in UAT, newest first, each row as the list shows it", async 
   await expect(row(page, "tp_91f2b9")).toContainText("Draft");
   // A run the kill switch cut short is Stopped, with the reason, never a bare Failed.
   const stopped = row(page, "kill switch");
-  await expect(stopped.locator(".status")).toHaveText("Stopped");
+  await expect(stopped.locator("[data-status]")).toHaveText("Stopped");
   await expect(stopped).toContainText("stopped by the global kill switch: replica on fire");
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
 });
@@ -28,8 +28,8 @@ test("older runs come with Show older: a caveat in amber, a masked identifier st
   await openRuns(page);
   await page.getByRole("button", { name: "Show older" }).click();
   const late = row(page, "replica lag unknown");
-  await expect(late.locator(".status")).toHaveAttribute("data-caveat", "true");
-  await expect(row(page, "[masked]").locator(".status")).toHaveText("Ambiguous");
+  await expect(late.locator("[data-status]")).toHaveAttribute("data-caveat", "true");
+  await expect(row(page, "[masked]").locator("[data-status]")).toHaveText("Ambiguous");
   await expect(page.getByRole("button", { name: "Show older" })).toHaveCount(0);
 });
 
