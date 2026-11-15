@@ -6,6 +6,7 @@ import { RESULT_LABELS, formatTime, titleCase, withCaveat } from "../runFormat";
 import { useSelection } from "../selection";
 import { AmbiguousMatches, showValue } from "./AmbiguousMatches";
 import { CliCommand } from "./CliCommand";
+import { ListOrTable, type Column } from "../ui";
 import { EvidencePanel } from "./EvidencePanel";
 import { OutcomeChip } from "./OutcomeChip";
 import { NotChecked } from "./NotChecked";
@@ -63,6 +64,33 @@ function RecordsTable({ location, followUps, searched }: { location: LocationRes
   const columns = Object.keys(rows[0] ?? {});
   // Each fan-out location once, with its title: [controller, "Door controller"].
   const lookups = [...new Map(followUps.map((f) => [f.location, f.title])).entries()];
+  // Each record with its own follow-up lookups and the worst of them, read once for every column.
+  const records = rows.map((row, index) => {
+    const own = followUps.filter((f) => f.row === index);
+    const problem = own.find((f) => f.outcome !== "found");
+    const note = problem?.reason ?? (Object.values(row).some((v) => v === searched) ? "searched record" : undefined);
+    return { row, index, own, problem, note };
+  });
+  const tableColumns: Column<(typeof records)[number]>[] = [
+    ...columns.map((c) => ({ header: titleCase(c), cell: ({ row }: (typeof records)[number]) => showValue(row[c]) })),
+    ...lookups.map(([l, title]) => ({
+      header: title,
+      cell: ({ own }: (typeof records)[number]) => {
+        const lookup = own.find((f) => f.location === l);
+        const result: Row | undefined = lookup?.evidence?.rows?.[0];
+        return result ? Object.values(result).map(showValue).join(" · ") : lookup ? titleCase(lookup.outcome) : "—";
+      },
+    })),
+    {
+      header: "Outcome",
+      cell: ({ problem, note }: (typeof records)[number]) => (
+        <>
+          <OutcomeChip outcome={problem?.outcome ?? "found"} caveat={problem?.caveat} />
+          {note && <p className="m-0 mt-1 text-sm text-muted">{note}</p>}
+        </>
+      ),
+    },
+  ];
 
   return (
     <div className="location-block">
@@ -75,46 +103,14 @@ function RecordsTable({ location, followUps, searched }: { location: LocationRes
           <OutcomeChip outcome={location.outcome} caveat={location.caveat} /> {location.reason ?? "No records."}
         </p>
       ) : (
-        <table className="records">
-          <thead>
-            <tr>
-              {columns.map((c) => (
-                <th key={c} scope="col">
-                  {titleCase(c)}
-                </th>
-              ))}
-              {lookups.map(([l, title]) => (
-                <th key={l} scope="col">
-                  {title}
-                </th>
-              ))}
-              <th scope="col">Outcome</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, index) => {
-              const own = followUps.filter((f) => f.row === index);
-              const worst = own.find((f) => f.outcome !== "found");
-              const note = worst?.reason ?? (Object.values(row).some((v) => v === searched) ? "searched record" : undefined);
-              return (
-                <tr key={index} data-problem={worst !== undefined}>
-                  {columns.map((c) => (
-                    <td key={c}>{showValue(row[c])}</td>
-                  ))}
-                  {lookups.map(([l]) => {
-                    const lookup = own.find((f) => f.location === l);
-                    const result: Row | undefined = lookup?.evidence?.rows?.[0];
-                    return <td key={l}>{result ? Object.values(result).map(showValue).join(" · ") : lookup ? titleCase(lookup.outcome) : "—"}</td>;
-                  })}
-                  <td>
-                    <OutcomeChip outcome={worst?.outcome ?? "found"} caveat={worst?.caveat} />
-                    {note && <p className="hint">{note}</p>}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <ListOrTable
+          label={`${location.title} records`}
+          rows={records}
+          rowKey={(record) => record.index}
+          columns={tableColumns}
+          highlight={(record) => (record.problem !== undefined ? "missing" : undefined)}
+          empty={location.reason ?? "No records."}
+        />
       )}
     </div>
   );
@@ -215,7 +211,7 @@ export function InspectResult({ runId, entity, onInspect, onStarted }: InspectRe
           <StopReason run={run} />
           <div>
             <h2>
-              {run.probe_title} on {run.subject ?? run.identifier_value}
+              {run.probe_title} on <code className="font-mono">{run.subject ?? run.identifier_value}</code>
             </h2>
             <CliCommand run={run} />
             <p className="hint">

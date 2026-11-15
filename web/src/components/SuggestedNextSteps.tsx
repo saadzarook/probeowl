@@ -1,5 +1,6 @@
 // Author: @SaadZarook
 import { useQuery } from "@tanstack/react-query";
+import { buttonClass } from "../ui";
 import { Link } from "react-router-dom";
 import { fetchSuggestedRunbooks, type RunbookView } from "../api/client";
 import { useRun } from "../api/useRun";
@@ -52,7 +53,7 @@ function Suggestions({ runId }: { runId: string }) {
               {runbook.review_due ? " · review due" : ""}
             </p>
           </div>
-          <Link className={index === 0 ? "btn" : "btn btn-outline"} to={`/knowledge-base?runbook=${encodeURIComponent(runbook.runbook)}&run=${encodeURIComponent(runId)}`}>
+          <Link className={buttonClass({ variant: index === 0 ? "primary" : "outline" })} to={`/knowledge-base?runbook=${encodeURIComponent(runbook.runbook)}&run=${encodeURIComponent(runId)}`}>
             Open with values
           </Link>
         </li>

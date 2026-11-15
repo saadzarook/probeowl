@@ -11,7 +11,7 @@ test("the dropdowns show titles, with the probe's id beside its select", async (
   await openValidate(page);
   await expect(page.getByLabel("Probe").locator("option:checked")).toHaveText("Top-up completed");
   await expect(page.getByLabel("Entity").locator("option:checked")).toHaveText("Top-up");
-  await expect(page.locator(".field-id")).toHaveText("topup_completed");
+  await expect(page.getByRole("main").getByText("topup_completed", { exact: true })).toBeVisible();
 });
 
 test("Validate stays disabled until the Production record is complete", async ({ page }) => {
@@ -45,7 +45,7 @@ test("a time typed with an offset is refused at the field before any run starts"
   );
   await expect(page.getByText("topups.created_at is datetime2: this column stores time without an offset")).toBeVisible();
   await expect(page.getByRole("region", { name: "Run result" })).toHaveCount(0);
-  const axe = await new AxeBuilder({ page }).include(".validate-form").analyze();
+  const axe = await new AxeBuilder({ page }).include("main form").analyze();
   expect(axe.violations).toEqual([]);
 });
 
@@ -205,9 +205,11 @@ test("a field expected to vary is shown, but not as a likely cause", async ({ pa
   await section.getByRole("button", { name: "Newest passing" }).click();
   const amount = section.getByRole("row", { name: /^Amount/ });
   await expect(amount).toContainText("Expected to vary");
-  await expect(amount).toHaveAttribute("data-result", "expected_to_vary");
-  const rows = await section.locator("tbody tr").evaluateAll((all) => all.map((row) => row.getAttribute("data-result")));
-  expect(rows.lastIndexOf("different")).toBeLessThan(rows.indexOf("expected_to_vary"));
+  // Not a likely cause: never shaded as a difference is.
+  await expect(amount).not.toHaveAttribute("data-highlight");
+  const results = await section.locator("tbody tr td:last-child").allInnerTexts();
+  expect(results.lastIndexOf("Different")).toBeLessThan(results.indexOf("Expected to vary"));
+  expect(results.indexOf("Expected to vary")).toBeGreaterThan(0);
   await expect(section.getByText(/\d+ differences/)).toContainText("5 differences");
 });
 

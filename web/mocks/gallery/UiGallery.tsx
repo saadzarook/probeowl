@@ -138,7 +138,7 @@ export function UiGallery() {
         <h2 id="bindings-title" className="m-0 mb-4 text-lg font-semibold">
           Bindings
         </h2>
-        <ListOrTable label="Bindings" rows={BINDINGS} columns={COLUMNS} rowKey={(row) => row.connector} empty="No bindings yet." />
+        <ListOrTable label="Bindings" rows={BINDINGS} columns={COLUMNS} rowKey={(row) => row.connector} empty="No bindings yet." highlight={(row) => (row.outcome === "missing" ? "missing" : undefined)} />
         <ListOrTable label="No bindings" rows={[]} columns={COLUMNS} rowKey={(row) => row.connector} empty="No bindings yet." />
       </Card>
 

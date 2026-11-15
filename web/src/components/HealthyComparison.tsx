@@ -5,26 +5,26 @@ import { useHealthyComparison, useStartHealthyComparison } from "../api/useHealt
 import { useRun } from "../api/useRun";
 import { nothingHighlighted, partDifferences, RESULT_TITLES, shownValue, subtitle } from "../healthyComparison";
 import { titleCase } from "../runFormat";
+import { Badge, Button, Field, Input, ListOrTable, type BadgeTone, type Column } from "../ui";
 
-/** One compared field, or a whole location, shown by its title from the run. */
-function FieldRow({ row, title }: { row: ComparedField; title: string | undefined }) {
-  return (
-    <tr data-result={row.result}>
-      <td>
-        {row.field ? titleCase(row.field) : (title ?? row.location)}
-        <span className="hint compare-source">
-          {row.field ? `${row.location} · ${row.connector}` : row.connector}
-        </span>
-      </td>
-      <td>{shownValue(row, row.failing)}</td>
-      <td>{shownValue(row, row.healthy)}</td>
-      <td>
-        <span className="compare-result" data-result={row.result}>
-          {RESULT_TITLES[row.result]}
-        </span>
-      </td>
-    </tr>
-  );
+const RESULT_TONE: Record<ComparedField["result"], BadgeTone> = { different: "missing", same: "found", expected_to_vary: "neutral", not_compared: "blocked" };
+
+/** The compared fields' columns: a field, or a whole location, shown by its title from the run. */
+function fieldColumns(titles: Map<string, string>, failing: string, healthy: string): Column<ComparedField>[] {
+  return [
+    {
+      header: "Location or field",
+      cell: (row) => (
+        <>
+          {row.field ? titleCase(row.field) : (titles.get(row.location) ?? row.location)}
+          <span className="block text-xs text-muted">{row.field ? `${row.location} · ${row.connector}` : row.connector}</span>
+        </>
+      ),
+    },
+    { header: failing, cell: (row) => <span className="wrap-anywhere">{shownValue(row, row.failing)}</span> },
+    { header: healthy, cell: (row) => <span className="wrap-anywhere">{shownValue(row, row.healthy)}</span> },
+    { header: "Difference", cell: (row) => <Badge tone={RESULT_TONE[row.result]}>{RESULT_TITLES[row.result]}</Badge> },
+  ];
 }
 
 /** Why there is nothing to compare, or that the search is still on. */
@@ -118,13 +118,16 @@ function Comparison({ runId, production }: { runId: string; production: boolean 
       )}
 
       {pasting && (
-        <form className="compare-paste" onSubmit={paste}>
-          <label>
-            Known-good ID <input value={pasted} onChange={(e) => setPasted(e.target.value)} />
-          </label>
-          <button className="btn" type="submit" disabled={running || pasted.trim() === ""}>
+        <form className="mt-3 flex flex-wrap items-start gap-3" onSubmit={paste}>
+          <div className="w-full max-w-80">
+            <Field id="compare-known-good" label="Known-good ID">
+              <Input value={pasted} onChange={(e) => setPasted(e.target.value)} />
+            </Field>
+          </div>
+          {/* Level with the input: below its label's row. */}
+          <Button className="sm:mt-6" type="submit" disabled={running || pasted.trim() === ""} disabledReason={running ? undefined : "Paste an ID first"}>
             Compare
-          </button>
+          </Button>
         </form>
       )}
 
@@ -149,30 +152,24 @@ function Comparison({ runId, production }: { runId: string; production: boolean 
       {compared && (
         <>
           {!tableShown && <p className="summary" role="status">{nothingHighlighted(matching, notCompared)}</p>}
-          {tableShown && <div className="table-scroll">
-            <table className="compare-fields">
-              <thead>
-                <tr>
-                  <th scope="col">Location or field</th>
-                  <th scope="col">Failing {found.failing_subject}</th>
-                  <th scope="col">{found.warning ? "Did not pass" : "Healthy"} {found.healthy_subject}</th>
-                  <th scope="col">Difference</th>
-                </tr>
-              </thead>
-              <tbody>
-                {highlighted.map((row) => <FieldRow key={`${row.location}/${row.field ?? ""}`} row={row} title={titles.get(row.location)} />)}
-                {showAll && hidden.map((row) => <FieldRow key={`${row.location}/${row.field ?? ""}`} row={row} title={titles.get(row.location)} />)}
-              </tbody>
-            </table>
-          </div>}
+          {tableShown && (
+            <ListOrTable
+              label="Compared fields"
+              rows={showAll ? [...highlighted, ...hidden] : highlighted}
+              columns={fieldColumns(titles, `Failing ${found.failing_subject}`, `${found.warning ? "Did not pass" : "Healthy"} ${found.healthy_subject}`)}
+              rowKey={(row) => `${row.location}/${row.field ?? ""}`}
+              highlight={(row) => (row.result === "different" ? "waiting" : undefined)}
+              empty="No fields to compare."
+            />
+          )}
           <footer className="compare-footer">
             <p className="hint">
               {differing} {differing === 1 ? "difference" : "differences"} · {matching} matching · {notCompared} not compared · fields come from the table catalog's marked columns and each REST location's compare list
             </p>
             {hidden.length > 0 && (
-              <button type="button" className="btn btn-outline" onClick={() => setShowAll((all) => !all)}>
+              <Button variant="outline" onClick={() => setShowAll((all) => !all)}>
                 {showAll ? "Hide fields" : "Show all fields"}
-              </button>
+              </Button>
             )}
           </footer>
         </>

@@ -14,7 +14,7 @@ export function CodeBlock({ code, copyLabel = "Copy" }: CodeBlockProps) {
   const [copied, setCopied] = useState<boolean>();
   return (
     <div className="flex min-w-0 flex-col items-start gap-2 sm:flex-row">
-      <pre className="m-0 w-full min-w-0 flex-1 whitespace-pre-wrap rounded-md bg-code-bg p-3 font-mono text-xs text-code-fg [overflow-wrap:anywhere]">
+      <pre className="m-0 w-full min-w-0 flex-1 whitespace-pre-wrap rounded-md bg-code-bg p-3 font-mono text-xs text-code-fg wrap-anywhere">
         <code>{code}</code>
       </pre>
       <div className="flex shrink-0 flex-col gap-1">

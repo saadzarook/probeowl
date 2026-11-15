@@ -2,7 +2,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { expectNoOverflow } from "./overflow";
-import { monoHeadings, pastTheEdge, shellAt, unequalControlRows } from "./rules";
+import { copyOverCode, monoHeadings, pastTheEdge, shellAt, unequalControlRows } from "./rules";
 
 // Every screen against the UI foundation's rules (#105). A screen that breaks a rule today is
 // marked with the PR that moves it onto web/src/ui: the test is expected to fail until then, and
@@ -26,6 +26,32 @@ const SCREENS: Screen[] = [
       await page.getByRole("region", { name: "Run result" }).getByRole("button", { name: "Copy command" }).waitFor();
     },
   },
+  {
+    name: "a healthy comparison",
+    path: "/validate",
+    ready: async (page) => {
+      await page.getByLabel("Any ID").fill("tp_91f2c7");
+      await page.getByLabel("Reason").selectOption("incident");
+      await page.getByLabel(/^Reference/).fill("WALLET-482");
+      await page.getByRole("button", { name: "Validate" }).click();
+      const section = page.getByRole("region", { name: "Compare with a healthy record" });
+      await section.getByRole("button", { name: "Newest passing" }).click();
+      await section.getByText(/\d+ differences/).waitFor();
+    },
+  },
+  {
+    name: "an Inspect run",
+    path: "/inspect",
+    ready: async (page) => {
+      await page.getByRole("button", { name: "Application" }).click();
+      await page.getByRole("button", { name: /Card access/ }).last().click();
+      await page.getByLabel("Identifier").fill("C204518");
+      await page.getByLabel("Reason").selectOption("customer_complaint");
+      await page.getByLabel(/^Reference/).fill("SUP-20931");
+      await page.getByRole("button", { name: "Inspect", exact: true }).click();
+      await page.getByRole("region", { name: "Inspect result" }).getByText("3 issues").waitFor();
+    },
+  },
   { name: "Health", path: "/health" },
   { name: "Probes", path: "/probes" },
   { name: "Knowledge base", path: "/knowledge-base" },
@@ -42,13 +68,9 @@ const VALIDATE: Screen = { name: "Validate", path: "/validate" };
 
 // Which rule each screen breaks today, and the PR of the phase plan that moves it (#105).
 // The numbers are the audit's items in #105.
-const RUN_SCREENS = "PR 3, the run screens";
 const SETUP = "PR 4, setup and connections";
 const EDITORS = "PR 5, the editors and the rest";
 const UNTIL: Record<string, Partial<Record<"overflow" | "heights" | "mono", string>>> = {
-  Inspect: { heights: RUN_SCREENS }, // 10
-  Validate: { heights: RUN_SCREENS }, // 8
-  "a Validate run": { heights: RUN_SCREENS, mono: RUN_SCREENS }, // 8, 15
   Tables: { overflow: SETUP }, // 4
   Connectors: { overflow: SETUP }, // 4
   "Add connection": { overflow: SETUP }, // 12: Save's reason runs past the edge at 390
@@ -159,4 +181,36 @@ test("in Production the folded top bar still shows it in red, at 390 and 320 px"
     expect(look, `at ${width}`).toEqual({ color: "rgb(180, 35, 24)", border: "rgb(180, 35, 24)", weight: "600" });
     await expect(environment.locator("option:checked")).toHaveText("Production");
   }
+});
+
+// The run screens moved in PR 3 (#138): rules 7 and 8 on them too.
+for (const name of ["a Validate run", "an Inspect run"]) {
+  test(`rule 7: on ${name}, Copy stays clear of the command at 390 and 1024 px`, async ({ page }) => {
+    const screen = SCREENS.find((s) => s.name === name);
+    if (screen === undefined) throw new Error(`${name} is not in SCREENS`);
+    for (const width of [390, 1024]) {
+      await open(page, screen, width);
+      const copy = page.getByRole("button", { name: "Copy command" });
+      await expect(copy).toBeVisible();
+      expect(await copyOverCode(page), `${name} at ${width}`).toEqual([]);
+    }
+  });
+}
+
+test("rule 8: Validate and Inspect say what they still need while disabled", async ({ page }) => {
+  await open(page, VALIDATE, 1440);
+  const validate = page.getByRole("button", { name: "Validate", exact: true });
+  await expect(validate).toBeDisabled();
+  await expect(validate).toHaveAccessibleDescription("To validate: an ID, a reason, a reference.");
+  await page.getByLabel("Any ID").fill("tp_91f2c7");
+  await page.getByLabel("Reason").selectOption("incident");
+  await expect(validate).toHaveAccessibleDescription("To validate: a reference.");
+  await page.getByLabel(/^Reference/).fill("WALLET-482");
+  await expect(validate).toBeEnabled();
+  await expect(page.getByText(/^To validate:/)).toHaveCount(0);
+
+  await open(page, { name: "Inspect", path: "/inspect" }, 1440);
+  const inspect = page.getByRole("button", { name: "Inspect", exact: true });
+  await expect(inspect).toBeDisabled();
+  await expect(page.getByText(/^To inspect: an identifier, a reason/)).toBeVisible();
 });
