@@ -213,7 +213,7 @@ class InvestigationRecord(ProbeOwlModel):
         default=None,
         pattern=r"^\S+$",
         max_length=64,
-        description="Jira key, support case ID or change ID, such as WALLET-482.",
+        description="Jira key, support case ID or change ID, such as PROJ-123.",
     )
     notes: str | None = None
     customer_reference: str | None = Field(default=None, description="Stored masked.")
