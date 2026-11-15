@@ -101,6 +101,19 @@ export function stoppedValidateRun(id: string): Run {
   };
 }
 
+/** topup_completed on tp_noweb: the ledger check fails, and the webhooks could not be read (#82). */
+export function partialValidateRun(id: string): Run {
+  const failed = failedValidateRun(id);
+  const reason = "the API did not answer";
+  return {
+    ...failed,
+    locations: (failed.locations ?? []).map((l) => (l.location === "webhook" ? { ...l, outcome: "error", reason } : l)),
+    expectations: (failed.expectations ?? []).map((e) =>
+      e.expectation === "count(webhook) >= 1" ? { ...e, result: "skip", detail: `needs webhook, which is Error (${reason})` } : e,
+    ),
+  };
+}
+
 /** topup_completed on tp_paused: the circuit breaker for ledger_db is open, so the run is skipped. */
 export function skippedValidateRun(id: string): Run {
   return {

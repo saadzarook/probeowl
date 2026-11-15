@@ -69,7 +69,9 @@ test("polls the run, filling in locations, and shows Ledger Missing with its evi
   await expect(ledger).toContainText("61 ms");
   await expect(result.getByText("Failed", { exact: true })).toBeVisible();
   await expect(result.getByText(/· WALLET-482 ·/)).toBeVisible();
-  await expect(result.getByText(/First failure in dependency order: Ledger entries missing/)).toBeVisible();
+  // The expectation that failed leads (#82), not the first location that wasn't Found.
+  await expect(result.getByText("First failed expectation: count(ledger) == 2: got 0")).toBeVisible();
+  await expect(result.getByText(/First failure in dependency order/)).toHaveCount(0);
   await expect(result.getByText("Fail", { exact: true })).toBeVisible();
   await expect(result.getByText("Skip", { exact: true })).toBeVisible();
 
@@ -134,7 +136,7 @@ test("a Missing on a replica whose lag is unknown never looks clean", async ({ p
   await expect(result.getByText("Failed - replica lag unknown: 1 Missing result may not have arrived yet")).toBeVisible();
   await expect(result.locator(".locations").getByText("Missing - replica lag unknown, the record may not have arrived yet")).toBeVisible();
   await expect(result.getByText("Fail - reads a Missing record that may not have arrived yet: replica lag unknown")).toBeVisible();
-  await expect(result.getByText(/First failure in dependency order: Ledger entries missing - replica lag unknown/)).toBeVisible();
+  await expect(result.getByText("First failed expectation: count(ledger) == 2: got 0 - reads a Missing record that may not have arrived yet: replica lag unknown")).toBeVisible();
   // The clean Missing chip is not shown for it.
   await expect(result.locator('.locations .chip[data-outcome="missing"]:not([data-caveat])')).toHaveCount(0);
   const axe = await new AxeBuilder({ page }).include(".run-result").analyze();
@@ -361,4 +363,19 @@ test("nothing is suggested until the run has finished", async ({ page }) => {
   await page.getByRole("button", { name: "Validate" }).click();
   await expect(page.getByRole("region", { name: "Run result" }).getByText("Locations are filling in")).toBeVisible();
   await expect(page.getByRole("region", { name: "Suggested next steps" })).toHaveCount(0);
+});
+
+test("the failed expectation leads, and what could not be read is listed apart (#82)", async ({ page }) => {
+  await page.goto("/validate");
+  await page.getByLabel("Any ID").fill("tp_noweb");
+  await page.getByLabel("Reason").selectOption("incident");
+  await page.getByLabel(/^Reference/).fill("WALLET-482");
+  await page.getByRole("button", { name: "Validate" }).click();
+  const result = page.getByRole("region", { name: "Run result" });
+  await expect(result.getByText("First failed expectation: count(ledger) == 2: got 0")).toBeVisible();
+  const unread = result.getByRole("note");
+  await expect(unread).toContainText("Not read, so not part of that failure:");
+  await expect(unread).toContainText("Webhook deliveries: error, the API did not answer");
+  await expect(result.getByText(/First failure in dependency order/)).toHaveCount(0);
+  expect((await new AxeBuilder({ page }).include(".run-result").analyze()).violations).toEqual([]);
 });
