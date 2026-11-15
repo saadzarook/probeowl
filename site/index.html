@@ -686,22 +686,22 @@ footer { margin-top: 96px; border-top: 1px solid var(--rule); }
     <div class="s-head">
       <p class="eyebrow">Testing</p>
       <h2 id="tested-h">Tested like it reads production.</h2>
-      <p class="lede">ProbeOwl reads systems people depend on, so each guard is tested the way it would fail. The numbers are v0.2.0’s, from its release checks on 14 Nov 2026.</p>
+      <p class="lede">ProbeOwl reads systems people depend on, so each guard is tested the way it would fail. The numbers are v0.2.1’s, from its release checks on 15 Nov 2026.</p>
     </div>
     <div class="stats">
-      <div><span class="num">2,317</span><span class="what">backend tests</span></div>
-      <div><span class="num">231</span><span class="what">browser tests on mocks, and 36 live against real databases</span></div>
+      <div><span class="num">2,407</span><span class="what">backend tests</span></div>
+      <div><span class="num">268</span><span class="what">browser tests on mocks, and 36 live against real databases</span></div>
       <div><span class="num">154</span><span class="what">database tests, run on installed SQL Server, Oracle, MariaDB and PostgreSQL</span></div>
       <div><span class="num">4</span><span class="what">end-to-end exit checks</span></div>
     </div>
     <div class="safety-wrap" style="margin-top:24px">
       <table class="safety">
         <tbody>
-          <tr><th scope="row">Every pull request</th><td>The backend and browser tests; the database tests against SQL Server, Oracle, MariaDB and PostgreSQL in containers, with SQLite as the default store; live browser tests against <code>owl serve</code> and the example databases; and the four end-to-end exit checks, one per milestone.</td></tr>
+          <tr><th scope="row">Every pull request</th><td>The backend and browser tests; the database tests against SQL Server, Oracle, MariaDB and PostgreSQL in containers, with SQLite as the default store; live browser tests against <code>owl serve</code> and the example databases; the four end-to-end exit checks, one per milestone; and on macOS, the keychain tests against a real Keychain.</td></tr>
           <tr><th scope="row">Before every release</th><td>The same tests and exit checks again on real servers installed on a machine, not containers: SQL Server 2025, Oracle AI Database 26ai Free, MariaDB 11.8 and PostgreSQL 16.</td></tr>
           <tr><th scope="row">Guards tested by attack</th><td>Writes (inside a CTE too), locks and lock hints, temporary tables, links to other databases, query hints, and comments a database would execute are each refused. Hostile identifiers (quotes, <code>OR '1'='1'</code>, <code>DROP TABLE</code>, <code>xp_cmdshell</code>, 10,000 characters) must reach the driver as one bound value, never as SQL. On a real SQL Server, a test checks that the parallelism cap sits before a trailing comment, so the comment can’t swallow it.</td></tr>
           <tr><th scope="row">Leak scans</th><td>Tests send a known email or secret through and check it never appears in API responses, the logs or the audit, and that a file comparison masks it. Before a release, a secrets scan covers every commit on every branch.</td></tr>
-          <tr><th scope="row">As users get it</th><td>The release wheel is installed with <code>uv tool install</code> and a fresh dependency resolution, then <code>owl init</code>, <code>owl check</code> and <code>owl serve</code> run on it, and the guide it bundles is opened in a browser with no request leaving the machine. A scripted newcomer run on that wheel goes from install to a first Validate through first-run setup in the browser. Built twice from the release commit, the v0.2.0 wheel is byte-for-byte the same file.</td></tr>
+          <tr><th scope="row">As users get it</th><td>The release wheel is installed with <code>uv tool install</code> and a fresh dependency resolution, then <code>owl init</code>, <code>owl check</code> and <code>owl serve</code> run on it, and the guide it bundles is opened in a browser with no request leaving the machine. A scripted newcomer run on that wheel goes from install to a first Validate through first-run setup in the browser. Built twice from the release commit, the v0.2.1 wheel is byte-for-byte the same file.</td></tr>
         </tbody>
       </table>
     </div>
