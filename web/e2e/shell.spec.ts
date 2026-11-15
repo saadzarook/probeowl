@@ -93,6 +93,7 @@ test("the application and environment survive a reload (#94)", async ({ page }) 
   await page.reload();
   await expect(page.getByRole("button", { name: "Application" })).toContainText("Card access");
   await expect(page.getByLabel("Environment").first()).toHaveValue("uat");
+  await expect(page.locator(".switch-notice")).toHaveCount(0); // UAT is restored silently
   // A new tab in the same browser opens where the person left off, too.
   const other = await page.context().newPage();
   await other.goto("/tables");
@@ -116,7 +117,8 @@ test("a kept environment the application doesn't have falls back to its first", 
   );
   await page.goto("/inspect");
   await expect(page.getByRole("button", { name: "Application" })).toContainText("Card access");
-  await expect(page.getByLabel("Environment").first()).toHaveValue("prod");
+  // Its first environment is Production, which a reload never opens.
+  await expect(page.getByLabel("Environment").first()).toHaveValue("uat");
 });
 
 test("with the selection unreadable or blocked, the app starts as on a first visit", async ({ page }) => {
@@ -144,4 +146,46 @@ test("a kept value that isn't ProbeOwl's is ignored", async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("probeowl.selection", "{not json"));
   await page.goto("/inspect");
   await expect(page.getByRole("button", { name: "Application" })).toContainText("Wallet");
+});
+
+test("a reload never reopens Production: it opens UAT and says so (#106)", async ({ page }) => {
+  await page.goto("/inspect");
+  await page.getByRole("button", { name: "Application" }).click();
+  await page.getByRole("button", { name: /Card access/ }).last().click();
+  await page.getByLabel("Environment").first().selectOption("Production");
+  await expect(page.locator(".prod-banner")).toBeVisible();
+  await page.reload();
+  await expect(page.getByLabel("Environment").first()).toHaveValue("uat");
+  await expect(page.locator(".prod-banner")).toHaveCount(0);
+  const notice = page.locator(".switch-notice");
+  await expect(notice).toHaveText(/Opened in UAT; choose Production in the top bar if you meant it\./);
+  await expect(notice).toHaveAttribute("role", "status");
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  // Dismissing keeps UAT, and the next reload opens it silently.
+  await notice.getByRole("button", { name: "Dismiss" }).click();
+  await expect(page.locator(".switch-notice")).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByLabel("Environment").first()).toHaveValue("uat");
+  await expect(page.locator(".switch-notice")).toHaveCount(0);
+  // Choosing Production again in the page is the person's choice: it holds until the next reload.
+  await page.getByLabel("Environment").first().selectOption("Production");
+  await expect(page.locator(".prod-banner")).toBeVisible();
+  await expect(page.locator(".switch-notice")).toHaveCount(0);
+});
+
+test("an application with only Production reopens there, and says so", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("mock-prod-only-app", "1");
+    localStorage.setItem("probeowl.selection", JSON.stringify({ application: "settlements", environment: "prod" }));
+  });
+  await page.goto("/inspect");
+  await expect(page.getByRole("button", { name: "Application" })).toContainText("Settlements");
+  await expect(page.getByLabel("Environment").first()).toHaveValue("prod");
+  await expect(page.locator(".switch-notice")).toContainText("Opened in Production, Settlements's only environment, which is Production.");
+});
+
+test("a first visit with nothing kept is unchanged: no notice", async ({ page }) => {
+  await page.goto("/inspect");
+  await expect(page.getByRole("button", { name: "Application" })).toContainText("Wallet");
+  await expect(page.locator(".switch-notice")).toHaveCount(0);
 });

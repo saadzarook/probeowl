@@ -15,6 +15,9 @@ interface Selection {
   /** Choose an application; an environment too when something says which, such as a run. */
   selectApplication: (name: string | undefined, environmentName?: string) => void;
   selectEnvironment: (name: string) => void;
+  /** Said when a reload did not reopen Production; undefined otherwise. */
+  restoreNotice: string | undefined;
+  dismissRestoreNotice: () => void;
 }
 
 const SelectionContext = createContext<Selection | undefined>(undefined);
@@ -23,6 +26,8 @@ interface Chosen {
   /** Undefined is an explicit choice of "All applications". */
   application: string | undefined;
   environment: string | undefined;
+  /** Read back from storage on load, not chosen in this page: never opens Production. */
+  restored?: boolean;
 }
 
 // The choice survives a reload, per browser. Only names are kept, never anything from a run.
@@ -44,6 +49,7 @@ function storedChoice(): Chosen | undefined {
     return {
       application: typeof application === "string" ? application : undefined,
       environment: typeof environment === "string" ? environment : undefined,
+      restored: true,
     };
   } catch {
     return undefined; // not ours, or written by an older release: ignore it
@@ -52,7 +58,7 @@ function storedChoice(): Chosen | undefined {
 
 function keepChoice(choice: Chosen): void {
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(choice));
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ application: choice.application, environment: choice.environment }));
   } catch {
     // Storage blocked: the choice still holds until the page is reloaded.
   }
@@ -76,8 +82,17 @@ export function SelectionProvider({ children }: { children: ReactNode }) {
       : chosen.application === undefined
         ? undefined
         : (applications.find((a) => a.name === chosen.application) ?? applications[0]);
-    const environment =
-      application?.environments.find((e) => e.name === chosen?.environment) ?? application?.environments[0];
+    const kept = application?.environments.find((e) => e.name === chosen?.environment) ?? application?.environments[0];
+    // A reload never reopens Production: as search does, it opens the first environment that isn't,
+    // and says so. Only an application with nothing but Production opens there.
+    const safe = application?.environments.find((e) => !e.production);
+    const environment = chosen?.restored && kept?.production && safe ? safe : kept;
+    const restoreNotice =
+      chosen?.restored && kept?.production && environment
+        ? safe
+          ? `Opened in ${environment.title}; choose ${kept.title} in the top bar if you meant it.`
+          : `Opened in ${environment.title}, ${application?.title ?? "this application"}'s only environment, which is Production.`
+        : undefined;
     return {
       applications,
       loading: query.isPending,
@@ -87,6 +102,8 @@ export function SelectionProvider({ children }: { children: ReactNode }) {
       environment,
       selectApplication: (name, environmentName) => setChosen({ application: name, environment: environmentName ?? environment?.name }),
       selectEnvironment: (name) => setChosen({ application: application?.name, environment: name }),
+      restoreNotice,
+      dismissRestoreNotice: () => setChosen({ application: application?.name, environment: environment?.name }),
     };
   }, [applications, chosen, query, setChosen]);
 
