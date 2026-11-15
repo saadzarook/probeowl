@@ -136,7 +136,8 @@ export function NewEntityPage() {
         <p>
           Written to <code>{save.data.path}</code>. Now write its first probe.
         </p>
-        <RouterLink className="btn" to={`/probes?new=inspect&entity=${encodeURIComponent(current.entity)}`}>
+        {/* Validate, as the guide's first application goes on to (#101); the kind can be changed there. */}
+        <RouterLink className="btn" to={`/probes?new=validate&entity=${encodeURIComponent(current.entity)}`}>
           Write a probe for {current.entity}
         </RouterLink>
       </section>
@@ -295,7 +296,16 @@ export function NewEntityPage() {
             Back
           </button>
           {step < STEPS.length - 1 && (
-            <button className="btn" type="button" disabled={(step === 0 && taken) || (step === 1 && current.locations.length === 0)} onClick={() => setStep(step + 1)}>
+            <button
+              className="btn"
+              type="button"
+              disabled={(step === 0 && taken) || (step === 1 && current.locations.length === 0)}
+              onClick={() => {
+                // Reaching Preview runs its save checks at once: nothing waits for Check (#99).
+                if (step + 1 === STEPS.length - 1 && preview === undefined && !save.isPending) save.mutate(undefined);
+                setStep(step + 1);
+              }}
+            >
               Next: {STEPS[step + 1]}
             </button>
           )}
