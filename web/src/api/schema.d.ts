@@ -504,6 +504,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Audit
+         * @description The audit, newest first, 50 at a time; read-only, and not itself audited (#79).
+         *
+         *     Each filter given narrows the list, by exact name. actor: who acted, or the person an agent
+         *     acted for, so s.khan finds "s.khan via MCP" too. Details are shown masked by today's PII
+         *     rules, and with every loaded binding's host, login and secret redacted. before: the next
+         *     value of the previous page.
+         */
+        get: operations["list_audit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runs/{run_id}": {
         parameters: {
             query?: never;
@@ -1037,6 +1062,51 @@ export interface components {
          * @enum {string}
          */
         ArrayMatch: "by_position" | "any_order" | "by_key";
+        /**
+         * AuditEvent
+         * @description One audit record. Never changed or removed once written.
+         */
+        AuditEvent: {
+            /** Id */
+            id?: string;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at?: string;
+            /**
+             * Action
+             * @description What happened, such as run_started or write_query_copied.
+             */
+            action: string;
+            actor: components["schemas"]["Actor"];
+            /** Application */
+            application?: string | null;
+            /** Environment */
+            environment?: string | null;
+            /** Run Id */
+            run_id?: string | null;
+            /**
+             * Details
+             * @description Masked values only.
+             */
+            details?: {
+                [key: string]: components["schemas"]["JsonValue"];
+            };
+        };
+        /**
+         * AuditPage
+         * @description A page of audit events, newest first.
+         */
+        AuditPage: {
+            /** Events */
+            events: components["schemas"]["AuditEvent"][];
+            /**
+             * Next
+             * @description Pass as before for the next, older page; null when none.
+             */
+            next?: string | null;
+        };
         /**
          * BindingHealth
          * @description How a binding is doing right now.
@@ -1831,6 +1901,16 @@ export interface components {
             field: string;
             /** Message */
             message: string;
+            /**
+             * Check
+             * @description The save check that failed, when the error is one.
+             */
+            check?: string | null;
+            /**
+             * Location
+             * @description The location or identifier a failed save check is about, as it names it.
+             */
+            location?: string | null;
         };
         /**
          * FieldResult
@@ -2071,7 +2151,7 @@ export interface components {
             reason: components["schemas"]["Reason"];
             /**
              * Reference
-             * @description Jira key, support case ID or change ID, such as WALLET-482.
+             * @description Jira key, support case ID or change ID, such as PROJ-123.
              */
             reference?: string | null;
             /** Notes */
@@ -2740,11 +2820,14 @@ export interface components {
          * RunStatus
          * @description Where a run is.
          *
-         *     Skipped: a guard or circuit breaker stopped it before any lookup. Ambiguous: the
-         *     identifier matched several subjects, so nothing else ran; see the run's matches.
+         *     Failed: an expectation was evaluated and failed. Not checked: none failed, but one or more
+         *     could not be evaluated because data they need could not be read, or the run stopped before
+         *     it could check anything. Passed: every expectation that applies was evaluated and passed.
+         *     Skipped: a guard or circuit breaker stopped it before any lookup. Ambiguous: the identifier
+         *     matched several subjects, so nothing else ran; see the run's matches.
          * @enum {string}
          */
-        RunStatus: "running" | "passed" | "failed" | "skipped" | "ambiguous";
+        RunStatus: "running" | "passed" | "failed" | "not_checked" | "skipped" | "ambiguous";
         /**
          * RunSummary
          * @description One run as the Runs list shows it: no locations, expectations or evidence.
@@ -2899,7 +2982,7 @@ export interface components {
             location?: string | null;
             /**
              * Environment
-             * @description The environment a plan was read in, for plan checks.
+             * @description The environment the check is about: where a plan was read, or where a location has no binding.
              */
             environment?: string | null;
             /**
@@ -5210,6 +5293,68 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    list_audit: {
+        parameters: {
+            query?: {
+                before?: string | null;
+                actor?: string | null;
+                action?: string | null;
+                application?: string | null;
+                environment?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditPage"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

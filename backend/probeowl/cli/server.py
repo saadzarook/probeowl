@@ -39,9 +39,13 @@ NoConfig = Annotated[
 """A hidden --config on each command that runs through owl serve: it stops with where it goes."""
 POLL_S = 0.5
 
-# Exit codes: the run passed, the run failed, the run could not be started or followed, or
-# the value matched several subjects so nothing ran (owl inspect).
-PASSED, FAILED, NOT_RUN, AMBIGUOUS = 0, 1, 2, 3
+# Exit codes: 0 passed; 1 a finding (Failed); 2 no finding, but not fully checked: Not checked,
+# Skipped or Ambiguous, or the run could not be started or followed. A 2 always says why.
+PASSED, FAILED, NOT_RUN = 0, 1, 2
+# The run statuses that end in 2: nothing was found wrong, and not everything was checked.
+NOT_FULLY_CHECKED = {RunStatus.NOT_CHECKED, RunStatus.SKIPPED, RunStatus.AMBIGUOUS}
+# Locations whose data a Not checked run could not use.
+_UNREAD = {"error", "stale", "blocked", "not_configured", "waiting"}
 
 
 def client(server: str) -> httpx.Client:
@@ -142,11 +146,29 @@ def finish(run: Run) -> None:
     """Print the run's warnings and status, and exit with its code."""
     for warning in run.warnings:
         typer.echo(f"warning: {warning}")
-    why = run.stop_reason or run.skip_reason
+    why = run.stop_reason or run.skip_reason or _why_not_fully_checked(run)
     caveat = f" - {run.caveat}" if run.caveat else ""
     typer.echo(f"Run {run.id}: {run.status.value}{caveat}" + (f" ({why})" if why else ""))
-    codes = {RunStatus.PASSED: PASSED, RunStatus.AMBIGUOUS: AMBIGUOUS}
-    raise typer.Exit(codes.get(run.status, FAILED))
+    if run.status is RunStatus.PASSED:
+        raise typer.Exit(PASSED)
+    raise typer.Exit(NOT_RUN if run.status in NOT_FULLY_CHECKED else FAILED)
+
+
+def _why_not_fully_checked(run: Run) -> str | None:
+    """The reason a 2 always prints when the run carries none of its own."""
+    if run.status is RunStatus.AMBIGUOUS:
+        return f"the value matches {len(run.matches)} subjects; nothing else ran"
+    if run.status is RunStatus.SKIPPED:
+        return "skipped before any lookup"
+    if run.status is RunStatus.NOT_CHECKED:
+        unread = [
+            f"{loc.location}: {loc.outcome.value.replace('_', ' ')}"
+            + (f", {loc.reason}" if loc.reason else "")
+            for loc in run.locations
+            if loc.outcome.value in _UNREAD
+        ]
+        return "could not read " + "; ".join(unread) if unread else "data could not be read"
+    return None
 
 
 def get(api: httpx.Client, path: str, params: dict[str, str] | None = None) -> Any:

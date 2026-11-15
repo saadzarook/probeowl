@@ -3,7 +3,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 
-const routes = ["Inspect", "Validate", "Health", "Probes", "Knowledge base", "Tables", "Connectors", "Runs"];
+const routes = ["Inspect", "Validate", "Health", "Probes", "Knowledge base", "Tables", "Connectors", "Runs", "Audit"];
 
 test("shell shows sidebar, top bar, Production banner and empty state", async ({ page }) => {
   await page.goto("/");

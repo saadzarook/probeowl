@@ -8,6 +8,7 @@ import { RESULT_LABELS, formatTime, keyLine, titleCase, withCaveat } from "../ru
 import { useSelection } from "../selection";
 import { CliCommand } from "./CliCommand";
 import { EvidencePanel } from "./EvidencePanel";
+import { NotChecked } from "./NotChecked";
 import { OutcomeChip } from "./OutcomeChip";
 import { RunWarnings } from "./RunWarnings";
 import { StopReason } from "./StopReason";
@@ -95,6 +96,7 @@ export function RunResult({ runId }: { runId: string }) {
       <RunWarnings run={run} />
       {run.status === "skipped" && run.skip_reason && <p className="summary">Skipped: {run.skip_reason}</p>}
       {failure && <p className="summary failure">First failure in dependency order: {failure}</p>}
+      <NotChecked run={run} />
 
       <div className="run-body">
         <div>

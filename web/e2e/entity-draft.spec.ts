@@ -169,14 +169,15 @@ test("a location keyed by the root key brings its unique, non-PII columns as ide
 test("a refused save's failures go to the location they name; the time filter's fix marks the followed link", () => {
   const { byLocation, general } = failuresByLocation(
     [
-      { field: "Time filter: topups", message: "topups is a Transaction table" },
+      // As the backend sends them: each failed check names its check and location (#108).
+      { field: "Time filter: topups", check: "Time filter", location: "topups", message: "topups is a Transaction table" },
       { field: "entity", message: "choose a new name" },
-      { field: "Read-only SQL: nowhere", message: "not a location of this draft" },
+      { field: "Read-only SQL: nowhere", check: "Read-only SQL", location: "nowhere", message: "not a location of this draft" },
     ],
     ["wallets", "topups"],
   );
   expect(byLocation.get("topups")).toEqual([{ check: "Time filter", message: "topups is a Transaction table" }]);
-  expect(general.map((f) => f.check)).toEqual(["entity", "Read-only SQL: nowhere"]);
+  expect(general.map((f) => f.check)).toEqual(["entity", "Read-only SQL"]);
 
   const tables = wallet;
   const wallets = rootLocation(table(tables, "wallets"), tables, walletCatalog.tables, "wallet_id");

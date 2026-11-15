@@ -305,12 +305,20 @@ def locations_used(node: Node) -> set[str]:
 
 
 class Unavailable(Exception):
-    """An expression needs a location whose data could not be read."""
+    """An expression needs a location whose data it cannot use.
 
-    def __init__(self, location: str, outcome: str, message: str | None = None):
+    absent: the data was read and is not there (Missing, an empty link), which is a finding;
+    otherwise it could not be read (Error, Stale, a row not looked up). The run status rule
+    tells the two apart (#81).
+    """
+
+    def __init__(
+        self, location: str, outcome: str, message: str | None = None, *, absent: bool = False
+    ):
         super().__init__(message or f"needs {location}, which is {outcome}")
         self.location = location
         self.outcome = outcome
+        self.absent = absent
 
 
 class Data(Protocol):

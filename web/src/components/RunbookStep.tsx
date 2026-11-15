@@ -75,7 +75,7 @@ function RunRead({ run, runbook, step, result }: { run: Run; runbook: string; st
   const [subject, setSubject] = useState("");
   const running = useRunStep(run.id, runbook, step, masked ? subject : undefined);
   const [acknowledged, setAcknowledged] = useState(false);
-  const asks = running.isError && needsPlanAcknowledgement(running.error.message);
+  const asks = running.isError && needsPlanAcknowledgement(running.error);
   const found: Pick<LocationResult, "evidence" | "reason"> | undefined = result ? { reason: result.reason, evidence: result.evidence } : undefined;
   return (
     <div className="runbook-run">
