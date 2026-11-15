@@ -50,11 +50,11 @@ expect "^warning: Replica lag unknown for access_db \(missing (REPLICA|SLAVE) MO
 
 echo "== the email VP00012931 and VP00008807 share: Ambiguous, nothing else runs"
 # shellcheck disable=SC2086
-inspect 3 contractor.one@example.com $prod
+inspect 2 contractor.one@example.com $prod  # no finding, not fully checked
 expect '^email \[masked\] matches 2 subjects via profile\.email; nothing else ran:$'
 expect '^  VP00012931  '
 expect '^  VP00008807  '
-expect ': ambiguous$'
+expect ': ambiguous \(the value matches 2 subjects; nothing else ran\)$'
 reject 'contractor.one@example.com'
 reject 'controller['
 
