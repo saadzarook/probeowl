@@ -12,6 +12,16 @@ v0.2 phase (a) first-run setup and Add connection, v0.3 phase (b) the entity gra
 v0.4 phase (c) blocks and probe by example, v0.5 phase (d) templates and New runbook.
 See docs/implementation-plan.md, Releases. -->
 
+### Changed
+
+- A connection test the audit records as not reached now gives its fixed reason, such as
+  `authentication failed`, `connection refused`, `timed out` or `server error`. That tells a
+  wrong password from a server that's down. It's in `connection_tested` events, for saved bindings
+  and drafts, and never includes the password, host or login.
+- A REST API that doesn't answer says "the API did not answer", or "the API did not answer within
+  5 s" on a timeout, instead of an exception's class name such as `ConnectError`. The class goes
+  to the `owl serve` log only.
+
 ## [0.2.0] - 2026-11-14
 
 Phase (a) of No YAML required: set up in the browser. The newcomer path, from install to a first

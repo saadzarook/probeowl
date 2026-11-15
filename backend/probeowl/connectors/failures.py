@@ -9,6 +9,7 @@ a parameter's value, unless owl serve was started with --debug-driver-errors.
 import re
 from collections.abc import Iterable
 from enum import StrEnum
+from typing import NamedTuple
 
 MASKED = "[masked]"
 # To the end of the text when a quote is never closed: masking too much beats too little.
@@ -17,7 +18,7 @@ _raw_driver_errors = False
 
 
 class Failure(StrEnum):
-    """Why a SQL connector failed."""
+    """Why a connector failed: a fixed category, which the audit records as it is."""
 
     AUTHENTICATION = "authentication failed"
     CONNECTION = "connection refused"
@@ -27,6 +28,18 @@ class Failure(StrEnum):
     LOCK_NOT_GRANTED = "lock not granted"
     REFUSED = "refused by the database"
     UNKNOWN = "failed"
+    # REST: the API answered, but with a server error.
+    SERVER_ERROR = "server error"
+    # Not the system's answer: the secret could not be read, or the breaker paused it.
+    NO_SECRET = "secret not available"
+    PAUSED = "paused"
+
+
+class Unreachable(NamedTuple):
+    """Why a connector cannot be reached: its category, and the fixed message a person reads."""
+
+    failure: Failure
+    message: str
 
 
 _MESSAGES = {

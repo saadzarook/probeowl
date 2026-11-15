@@ -15,6 +15,7 @@ from probeowl.api.app import create_app
 from probeowl.cli import main as cli
 from probeowl.cli import server
 from probeowl.connector_status import ConnectorStatuses
+from probeowl.connectors.failures import Failure, Unreachable
 from probeowl.connectors.lookup import LookupResult
 from probeowl.errors import KillSwitchEngaged, KillSwitchUnknown
 from probeowl.guards.breaker import CircuitBreaker
@@ -485,8 +486,8 @@ class Reachable:
     def __init__(self, reason: str | None = None) -> None:
         self.reason = reason
 
-    def unreachable(self) -> str | None:
-        return self.reason
+    def unreachable(self) -> Unreachable | None:
+        return None if self.reason is None else Unreachable(Failure.CONNECTION, self.reason)
 
     def close(self) -> None:
         return None

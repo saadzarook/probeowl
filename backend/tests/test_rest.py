@@ -9,6 +9,7 @@ import httpx
 import pytest
 from pydantic import ValidationError
 
+from probeowl.connectors.failures import Failure, Unreachable
 from probeowl.connectors.rest import RateBudget, RestAdapter, RestLimits, build_request
 from probeowl.errors import ConnectorError, GuardViolation
 from probeowl.model import RestBinding
@@ -196,13 +197,13 @@ def test_a_long_retry_after_is_an_error_not_a_long_wait() -> None:
 
 def test_network_errors_are_retried_then_an_error() -> None:
     api = Api(httpx.ConnectError("refused"))
-    sleeps = lookup_fails(api, "could not be reached: ConnectError")
+    sleeps = lookup_fails(api, "the API did not answer")
     assert len(api.requests) == 3
     assert sleeps == [0.5, 1.0]
 
 
 def test_a_timeout_is_an_error() -> None:
-    lookup_fails(Api(httpx.ReadTimeout("slow")), "could not be reached: ReadTimeout", retries=0)
+    lookup_fails(Api(httpx.ReadTimeout("slow")), "the API did not answer within 5 s", retries=0)
 
 
 def test_an_answer_that_is_not_json_is_an_error() -> None:
@@ -325,18 +326,41 @@ def test_any_answer_means_the_api_was_reached(status: int) -> None:
 @pytest.mark.parametrize("status", [401, 403])
 def test_refused_credentials_are_not_a_working_connection(status: int) -> None:
     found = adapter(Api(httpx.Response(status, json={}))).unreachable()
-    assert found == f"the API refused the credentials (HTTP {status}); check the binding's secret"
+    message = f"the API refused the credentials (HTTP {status}); check the binding's secret"
+    assert found == Unreachable(Failure.AUTHENTICATION, message)
 
 
 def test_a_server_error_is_not_retried_for_a_connection_test() -> None:
     api = Api(httpx.Response(503, json={}))
-    assert adapter(api).unreachable() == "the API answered HTTP 503"
+    assert adapter(api).unreachable() == Unreachable(
+        Failure.SERVER_ERROR, "the API answered HTTP 503"
+    )
     assert len(api.requests) == 1
 
 
-def test_a_network_failure_says_only_its_kind() -> None:
-    failure = httpx.ConnectError("https://secret-host.example token=abc")
-    assert adapter(Api(failure)).unreachable() == "the API could not be reached: ConnectError"
+@pytest.mark.parametrize(
+    ("error", "found"),
+    [
+        (
+            httpx.ConnectError("https://secret-host.example token=abc"),
+            Unreachable(Failure.CONNECTION, "the API did not answer"),
+        ),
+        (
+            httpx.ReadError("connection reset by secret-host.example"),
+            Unreachable(Failure.CONNECTION, "the API did not answer"),
+        ),
+        (
+            httpx.ConnectTimeout("timed out reaching secret-host.example"),
+            Unreachable(Failure.TIMED_OUT, "the API did not answer within 5 s"),
+        ),
+    ],
+)
+def test_a_network_failure_is_a_fixed_reason_never_its_class_or_text(
+    error: httpx.TransportError, found: Unreachable
+) -> None:
+    # #83: no exception class name and nothing of the error's own text reaches a person.
+    assert adapter(Api(error)).unreachable() == found
+    assert type(error).__name__ not in found.message and "secret-host" not in found.message
 
 
 def test_a_redirect_is_not_followed_by_a_connection_test() -> None:

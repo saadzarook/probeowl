@@ -14,6 +14,7 @@ import probeowl.setup_writes
 from probeowl.api.app import create_app
 from probeowl.config_folder import ConfigFolder
 from probeowl.connector_status import ConnectorStatuses
+from probeowl.connectors.failures import Failure, Unreachable
 from probeowl.errors import ConfigError
 from probeowl.guards.breaker import CircuitBreaker
 from probeowl.model.check import load_applications
@@ -52,11 +53,12 @@ SQL_BINDING = {
 class Source:
     """A connection that answers as it is told."""
 
-    def __init__(self, reason: str | None) -> None:
+    def __init__(self, reason: str | None, failure: Failure = Failure.CONNECTION) -> None:
         self.reason = reason
+        self.failure = failure
 
-    def unreachable(self) -> str | None:
-        return self.reason
+    def unreachable(self) -> Unreachable | None:
+        return None if self.reason is None else Unreachable(self.failure, self.reason)
 
     def close(self) -> None:
         pass
@@ -74,6 +76,7 @@ class Setup:
         self.runs = RunService(self.applications, self.store, actor_name="s.khan")
         self.secrets_seen: list[str] = []
         self.reason: str | None = None
+        self.failure = Failure.CONNECTION
 
         def draft_opener(
             connector: SqlConnector | RestConnector, env: str, secrets: Callable[[str], str]
@@ -81,7 +84,7 @@ class Setup:
             reference = connector.environments[env].secret
             if reference is not None:
                 self.secrets_seen.append(secrets(reference))
-            return Source(self.reason)
+            return Source(self.reason, self.failure)
 
         statuses = ConnectorStatuses(
             self.applications, CircuitBreaker(), self.runs.kill.reason, draft_opener=draft_opener
@@ -422,6 +425,38 @@ def test_an_unknown_application_or_environment_is_a_404(setup: Setup) -> None:
 # --- Change password: a saved binding, tested with a new password before it is saved ----------
 
 DRAFT_URL = "/api/applications/card_access/connectors/test-draft"
+
+
+@pytest.mark.parametrize(
+    ("failure", "message"),
+    [
+        (Failure.AUTHENTICATION, "authentication failed; check the binding's login and secret"),
+        (
+            Failure.CONNECTION,
+            "the connection was refused or could not be made; check the database is up and the "
+            "binding is right",
+        ),
+    ],
+)
+def test_a_draft_not_reached_is_audited_with_its_fixed_reason(
+    setup: Setup, failure: Failure, message: str
+) -> None:
+    # The audit tells a wrong password from a server that is down (#91), never with the password.
+    setup.reason, setup.failure = message, failure
+    response = setup.api.post("/api/applications/card_access/connectors/test-draft", json=draft())
+    assert response.status_code == 200, response.text
+    assert (response.json()["reachable"], response.json()["reason"]) == (False, message)
+    assert "failure" not in response.json()  # the category is for the audit, not the API
+    [event] = setup.events("connection_tested")
+    assert event.details == {
+        "application": "card_access",
+        "connector": "access_reports",
+        "environment": "uat",
+        "reachable": False,
+        "reason": failure.value,
+        "draft": True,
+    }
+    assert TEST_PASSWORD not in str(event.details)
 
 
 def new_password(**change: Any) -> dict[str, Any]:
