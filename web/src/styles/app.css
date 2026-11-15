@@ -9,32 +9,7 @@ body {
 button, input, select { font: inherit; }
 :focus-visible { outline: 2px solid var(--color-action-blue); outline-offset: 2px; }
 
-.shell { display: grid; grid-template-columns: var(--sidebar-width) 1fr; min-height: 100vh; }
-.sidebar {
-  background: var(--color-ink);
-  color: #fff;
-  padding: 1.5rem 1rem;
-  display: flex;
-  flex-direction: column;
-}
-.brand { display: flex; align-items: center; gap: 0.6rem; padding: 0 0.5rem 1.5rem; font-size: 1.25rem; color: #c9ced8; text-decoration: none; }
-.brand img { width: 2rem; height: 2rem; }
-.brand strong { color: #fff; font-weight: 600; }
-.nav { display: flex; flex-direction: column; gap: 0.25rem; }
-.nav a { color: #e6e9ef; text-decoration: none; padding: 0.6rem 0.75rem; border-radius: 0.5rem; }
-.nav a:hover { background: var(--color-night); }
-.nav a[aria-current="page"] { background: var(--color-night); font-weight: 500; }
-.nav-heading { margin: 1.5rem 0 0.25rem; padding: 0 0.75rem; font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: #9aa2b1; }
-.sidebar-footer { margin-top: auto; padding: 0 0.75rem; font-size: 0.875rem; color: #9aa2b1; }
-
-.main { padding: 0 2rem 2rem; min-width: 0; }
-.topbar { display: flex; align-items: center; gap: 1rem; padding: 1rem 0; border-bottom: 1px solid var(--color-border); }
-.topbar label, .topbar .field-label { font-weight: 500; font-size: 0.9rem; color: var(--color-text-muted); }
-.topbar-spacer { flex: 1; }
-.user { display: flex; align-items: center; gap: 0.6rem; }
-.avatar { display: grid; place-items: center; width: 2.25rem; height: 2.25rem; border-radius: 50%; background: #dbe6fb; color: var(--color-action-blue); font-size: 0.8rem; font-weight: 600; }
-
-.env-select, .app-trigger {
+.env-select {
   background: var(--color-card);
   border: 1px solid var(--color-border);
   border-radius: 0.6rem;
@@ -42,8 +17,6 @@ button, input, select { font: inherit; }
   color: var(--color-text);
 }
 .env-select[data-production="true"] { border-color: var(--color-production); color: var(--color-production); font-weight: 500; }
-.app-trigger { display: flex; align-items: center; gap: 0.75rem; min-width: 18rem; cursor: pointer; text-align: left; }
-.app-trigger .grow { flex: 1; font-weight: 500; }
 .app-team { color: var(--color-text-muted); font-size: 0.875rem; font-weight: 400; }
 
 .app-popover { background: var(--color-card); border: 1px solid var(--color-border); border-radius: 0.75rem; box-shadow: 0 8px 24px rgb(20 23 28 / 14%); width: 26rem; padding: 0.5rem; z-index: 10; }
@@ -392,8 +365,6 @@ button, input, select { font: inherit; }
 /* --- Widths below the 1440 px design canvas ------------------------------------------------- */
 /* Every screen stays usable down to 768 px: rows wrap, two-column bodies stack below 1100 px,
    and wide tables scroll inside their card instead of pushing the page sideways. */
-.topbar { flex-wrap: wrap; row-gap: 0.5rem; }
-.app-trigger { min-width: min(18rem, 100%); }
 .form-row { grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); }
 .inspect-row { grid-template-columns: minmax(7rem, 0.9fr) minmax(11rem, 2fr) repeat(3, minmax(9rem, 1.3fr)) auto; }
 /* The button lines up with the inputs, not with the identifier's hint below its input. */
@@ -418,19 +389,9 @@ button, input, select { font: inherit; }
   .editor-grid > :last-child { grid-column: 1 / -1; }
   .inspect-row { grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); }
   .inspect-row .btn { justify-self: start; }
-  .app-trigger { min-width: min(14rem, 100%); }
-  .topbar { gap: 0.75rem; }
 }
 
-/* Below 900 px the sidebar becomes a bar across the top. */
 @media (max-width: 900px) {
-  .shell { grid-template-columns: minmax(0, 1fr); }
-  .sidebar { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 0.25rem 1rem; padding: 0.75rem 1rem; }
-  .brand { padding: 0; font-size: 1.1rem; }
-  .nav { flex-direction: row; flex-wrap: wrap; gap: 0.25rem; }
-  .nav a { padding: 0.4rem 0.6rem; }
-  .nav-heading, .sidebar-footer { display: none; }
-  .main { padding: 0 1rem 1.5rem; }
   .editor-grid { grid-template-columns: minmax(0, 1fr); }
 }
 
@@ -559,12 +520,6 @@ input.mono { font-family: var(--font-mono); }
 }
 .palette-option .chip {
   margin-left: 6px;
-}
-.topbar-search kbd {
-  margin-left: 6px;
-  font-family: var(--font-mono, monospace);
-  font-size: 0.75rem;
-  color: var(--color-text-muted);
 }
 .switch-notice {
   display: flex;

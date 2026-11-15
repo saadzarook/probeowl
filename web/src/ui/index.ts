@@ -5,7 +5,7 @@ export { Badge, type BadgeTone } from "./Badge";
 export { Button, buttonClass } from "./Button";
 export { Card } from "./Card";
 export { copyText } from "./clipboard";
-export { cn } from "./cn";
+export { cn, CONTROL as controlClass } from "./cn";
 export { CodeBlock } from "./CodeBlock";
 export { Field, FormGrid } from "./Field";
 export { Input } from "./Input";

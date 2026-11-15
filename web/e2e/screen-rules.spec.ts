@@ -1,4 +1,5 @@
 // Author: @SaadZarook
+import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { expectNoOverflow } from "./overflow";
 import { monoHeadings, pastTheEdge, shellAt, unequalControlRows } from "./rules";
@@ -54,7 +55,6 @@ const UNTIL: Record<string, Partial<Record<"overflow" | "heights" | "mono", stri
   Probes: { mono: EDITORS }, // 15: the probe editor's h1
   Audit: { overflow: EDITORS }, // 4
 };
-const SHELL = "PR 2, the shell"; // 1, 2, 3
 
 async function open(page: Page, screen: Screen, width: number): Promise<void> {
   await page.setViewportSize({ width, height: 900 });
@@ -97,8 +97,7 @@ for (const screen of SCREENS) {
 }
 
 test("rule 5: from 1024 px, the sidebar and no Menu button, and a top bar of at most two rows", async ({ page }) => {
-  test.fail(true, `until ${SHELL}`);
-  for (const width of [1024, 1440]) {
+  for (const width of [1024, 1280, 1440]) {
     await open(page, VALIDATE, width);
     expect(await shellAt(page), `at ${width}`).toEqual({ sidebar: true, menu: false, topBarRows: expect.any(Number) });
     expect((await shellAt(page)).topBarRows, `at ${width}`).toBeLessThanOrEqual(2);
@@ -106,11 +105,41 @@ test("rule 5: from 1024 px, the sidebar and no Menu button, and a top bar of at 
 });
 
 test("rule 5: below 1024 px, a Menu button instead of the sidebar, and a top bar of at most two rows", async ({ page }) => {
-  test.fail(true, `until ${SHELL}`);
-  for (const width of [1023, 390]) {
+  for (const width of [1023, 768, 640, 639, 390, 320]) {
     await open(page, VALIDATE, width);
     const shell = await shellAt(page);
     expect(shell, `at ${width}`).toEqual({ sidebar: false, menu: true, topBarRows: expect.any(Number) });
     expect(shell.topBarRows, `at ${width}`).toBeLessThanOrEqual(2);
   }
+});
+
+test("rule 5: below 640 px the selects take the second row, and Search and the user stay together", async ({ page }) => {
+  for (const width of [639, 390, 320]) {
+    await open(page, VALIDATE, width);
+    const bar = page.getByRole("banner");
+    const top = async (name: string) => (await bar.getByRole(name === "Environment" ? "combobox" : "button", { name }).boundingBox())?.y ?? -1;
+    const [menu = -1, search = -2, application = -3, environment = -4] = await Promise.all(["Menu", "Search", "Application", "Environment"].map(top));
+    expect(search, `at ${width}`).toBe(menu);
+    expect(application, `at ${width}`).toBeGreaterThan(menu);
+    expect(environment, `at ${width}`).toBe(application);
+    const user = await bar.getByLabel(/^Signed in as/).boundingBox();
+    expect(Math.abs((user?.y ?? 0) + (user?.height ?? 0) / 2 - (menu + 20)), `the user beside Search at ${width}`).toBeLessThanOrEqual(4);
+  }
+});
+
+test("the menu opens the navigation, goes where it is told and closes, and passes axe", async ({ page }) => {
+  await open(page, VALIDATE, 390);
+  const menu = page.getByRole("button", { name: "Menu", exact: true });
+  await menu.click();
+  const sheet = page.getByRole("dialog", { name: "ProbeOwl" });
+  await expect(sheet.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Validate" })).toHaveAttribute("aria-current", "page");
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await sheet.getByRole("link", { name: "Connectors" }).click();
+  await expect(sheet).toHaveCount(0);
+  await expect(page).toHaveURL(/\/connectors$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Connectors" })).toBeVisible();
+  await menu.click();
+  await page.keyboard.press("Escape");
+  await expect(sheet).toHaveCount(0);
+  await expect(menu).toBeFocused();
 });

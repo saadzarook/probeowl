@@ -8,7 +8,8 @@ type SheetProps = {
   trigger: ReactElement;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  title: string;
+  /** Its name: text, or a heading's content such as the brand. */
+  title: ReactNode;
   description: string;
   children: ReactNode;
 };
