@@ -66,6 +66,8 @@ test("an empty owl serve opens setup, and Create writes application.yaml and loa
   await page.getByRole("button", { name: "Preview" }).click();
   await expect(page.getByLabel(`Diff of card_access/connectors/${connector}.yaml`)).toContainText(`keyring:probeowl/${connector}.uat`);
   await page.getByRole("button", { name: `Save ${connector}` }).click();
+  // Save shows the preview in a confirm dialog; Write is what writes (#98).
+  await page.getByRole("dialog").getByRole("button", { name: `Write ${connector}` }).click();
   await expect(page.getByRole("status").filter({ hasText: "keychain" })).toContainText("The password is in this machine's keychain", { timeout: 30_000 });
   // Test connection with the saved password: read back from the keychain by owl serve, never by the page.
   await expect(page.getByRole("status").filter({ hasText: "Connected" })).toBeVisible({ timeout: 30_000 });
