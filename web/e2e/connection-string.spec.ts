@@ -1,6 +1,6 @@
 // Author: @SaadZarook
 import { expect, test } from "@playwright/test";
-import { parseConnectionString } from "../src/connectionString";
+import { parseConnectionString, withoutPassword } from "../src/connectionString";
 
 // Pure parsing, no page: the pasted string is read in the browser and never sent.
 const cases: [string, ReturnType<typeof parseConnectionString>][] = [
@@ -33,3 +33,14 @@ for (const [text, expected] of cases) {
 test("anything else is not a connection string", () => {
   for (const text of ["", "hello", "postgres://x/y", "ftp://host/"]) expect(parseConnectionString(text)).toBeUndefined();
 });
+
+// What stays on screen once a string fills the form: the same string, its password taken out (#92).
+for (const [text, expected] of cases) {
+  test(`shows ${text.slice(0, 40)} without its password`, () => {
+    const shown = withoutPassword(text);
+    if (expected?.password && expected.password.length > 2) expect(shown).not.toContain(expected.password);
+    // Still the same connection: it reads the same, apart from the password.
+    const { password: _gone, ...rest } = expected ?? {};
+    expect(parseConnectionString(shown)).toEqual(rest);
+  });
+}
