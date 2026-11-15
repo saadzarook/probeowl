@@ -1,0 +1,14 @@
+# Author: @SaadZarook
+name: diag
+on: pull_request
+jobs:
+  diag:
+    runs-on: macos-latest
+    timeout-minutes: 5
+    defaults: {run: {working-directory: backend}}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+      - run: uv sync --locked
+      - run: uv run python diag_keychain.py
+      - run: sed -n '/^def find_generic_password/,/^def delete/p' .venv/lib/python3.12/site-packages/keyring/backends/macOS/api.py
