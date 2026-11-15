@@ -448,7 +448,7 @@ def test_owl_validate_says_why_a_run_was_skipped(setup: Setup, owl: Any) -> None
         cli.app,
         ["validate", "topup", "tp_91f2b9", "--env", "uat", "--reason", "incident"],
     )
-    assert result.exit_code == 1
+    assert result.exit_code == 2  # no finding, not fully checked: skipped
     assert ": skipped (stopped by the kill switch on connector wallet_db" in result.output
 
 
