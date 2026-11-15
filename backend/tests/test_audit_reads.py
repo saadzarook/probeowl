@@ -7,6 +7,7 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import JsonValue
 from typer.testing import CliRunner
 
 from probeowl.audit_reads import masked_details
@@ -121,7 +122,12 @@ def test_an_identifier_that_is_not_pii_is_shown() -> None:
 
 
 def test_with_its_entity_gone_every_identifier_subject_and_match_is_masked() -> None:
-    details = {"identifiers": {"x": "1"}, "subject": "VP1", "matches": ["a", "b"], "reason": "r"}
+    details: dict[str, JsonValue] = {
+        "identifiers": {"x": "1"},
+        "subject": "VP1",
+        "matches": ["a", "b"],
+        "reason": "r",
+    }
     assert masked_details(details, None) == {
         "identifiers": {"x": MASKED},
         "subject": MASKED,
