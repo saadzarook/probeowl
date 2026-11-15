@@ -21,7 +21,7 @@ from sqlalchemy import Engine
 from probeowl.checks.plans import PlanOpener
 from probeowl.drafting import tools
 from probeowl.drafting.content import DraftKind
-from probeowl.errors import ProbeOwlError
+from probeowl.errors import NotFoundError, ProbeOwlError
 from probeowl.model.check import LoadedApplication
 from probeowl.model.run import Actor, ActorKind
 from probeowl.store.audit import AuditEvent, append_event
@@ -55,27 +55,37 @@ def create_server(
     actor = Actor(kind=ActorKind.AGENT, name=f"{person} via MCP", on_behalf_of=person)
 
     def audited(
-        tool: str, kind: DraftKind | None, application: str | None, call: Callable[[], T]
+        tool: str,
+        kind: DraftKind | None,
+        application: str | None,
+        call: Callable[[], T],
+        environment: str | None = None,
     ) -> T:
+        # Names only: the environment asked for, never the draft or a value from it (#80).
         details: dict[str, JsonValue] = {
             "tool": tool,
             "kind": kind.value if kind else None,
             "application": application,
+            "environment": environment,
         }
         try:
             result = call()
         except ProbeOwlError as err:
             # A refusal with its fixed reason, as the client's tool error; never a traceback.
-            _audit(store, actor, details | {"ok": False}, application)
-            log.info("mcp %s %s: refused", tool, details["kind"] or "")
+            reason = refusal_reason(err)
+            _audit(store, actor, details | {"ok": False, "reason": reason}, application)
+            log.info("mcp %s %s: refused (%s)", tool, details["kind"] or "", reason)
             raise ToolError(str(err)) from err
         except Exception:
-            _audit(store, actor, details | {"ok": False}, application)
+            _audit(store, actor, details | {"ok": False, "reason": FAILED}, application)
             log.info("mcp %s %s: failed", tool, details["kind"] or "")
             raise
-        ok = getattr(result, "ok", True)
-        _audit(store, actor, details | {"ok": bool(ok)}, application)
-        log.info("mcp %s %s: %s", tool, details["kind"] or "", "ok" if ok else "not ok")
+        ok = bool(getattr(result, "ok", True))
+        outcome: dict[str, JsonValue] = {"ok": ok} | (
+            {} if ok else {"reason": result_reason(result)}
+        )
+        _audit(store, actor, details | outcome, application)
+        log.info("mcp %s %s: %s", tool, details["kind"] or "", "ok" if ok else outcome["reason"])
         return result
 
     @server.tool(annotations=READ_ONLY, structured_output=True)
@@ -113,6 +123,7 @@ def create_server(
             lambda: tools.check_draft(
                 applications, folder, kind, text, application, name, plans, environment
             ),
+            environment,
         )
 
     @server.tool(annotations=READ_ONLY, structured_output=True)
@@ -132,9 +143,39 @@ def create_server(
             None,
             application,
             lambda: tools.schema(applications, store, application, connector, environment),
+            environment,
         )
 
     return server
+
+
+# The fixed reasons an audit event gives for a call that did not succeed (#80). Chosen from the
+# kind of refusal or result, never from a message, and never naming the draft or its values.
+PRODUCTION_REFUSED = "production_refused"
+NOT_FOUND = "not_found"
+INVALID = "invalid"
+CREDENTIAL_FOUND = "credential_found"
+TOO_LARGE = "too_large"
+SAVE_CHECKS_FAILED = "save_checks_failed"
+FAILED = "failed"
+
+
+def refusal_reason(err: ProbeOwlError) -> str:
+    """The fixed reason for a refused call."""
+    if isinstance(err, tools.ProductionRefused):
+        return PRODUCTION_REFUSED
+    if isinstance(err, NotFoundError):
+        return NOT_FOUND
+    return INVALID
+
+
+def result_reason(result: object) -> str:
+    """The fixed reason for a result that is not ok: a credential, the size, or the checks."""
+    if getattr(result, "credentials", None):
+        return CREDENTIAL_FOUND
+    if any(getattr(f, "check", None) == tools.SIZE_CHECK for f in getattr(result, "findings", [])):
+        return TOO_LARGE
+    return SAVE_CHECKS_FAILED
 
 
 def _audit(

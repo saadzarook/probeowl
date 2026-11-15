@@ -12,6 +12,13 @@ v0.2 phase (a) first-run setup and Add connection, v0.3 phase (b) the entity gra
 v0.4 phase (c) blocks and probe by example, v0.5 phase (d) templates and New runbook.
 See docs/implementation-plan.md, Releases. -->
 
+### Changed
+
+- An `owl mcp` call's audit event records the environment asked for. A call that didn't succeed
+  has a fixed reason: `production_refused`, `not_found`, `invalid`, `credential_found`,
+  `too_large`, `save_checks_failed` or `failed`. It still never records the draft or a value from
+  it.
+
 ## [0.2.0] - 2026-11-14
 
 Phase (a) of No YAML required: set up in the browser. The newcomer path, from install to a first
