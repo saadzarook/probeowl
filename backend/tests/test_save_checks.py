@@ -398,8 +398,11 @@ def test_an_unbound_environment_fails_with_that_environment_named(setup: Setup) 
     probe = PROBE.replace("environments: [prod, uat]\n", "")
     report = check_draft(unbound, probe)
     environments = [c for c in report.checks if c.check == "Environments"]
-    assert [(c.status, c.environment) for c in environments] == [(CheckStatus.FAIL, "uat")]
+    # One per unbound location, each with its location and environment: the fields an editor reads.
+    assert [(c.status, c.location, c.environment) for c in environments] == [
+        (CheckStatus.FAIL, "ledger", "uat")
+    ]
     assert environments[0].message == (
         "enabled in uat, where ledger (ledger_db) has no binding; "
-        "bind it or leave uat out of the probe's environments"
+        "bind ledger_db in uat or leave uat out of the probe's environments"
     )

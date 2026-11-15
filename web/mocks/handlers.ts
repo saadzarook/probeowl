@@ -246,7 +246,8 @@ function checksOf(body: DraftBody, application = "") {
   } catch (e) {
     return unreadableReport(e instanceof Error ? e.message.split("\n")[0] ?? "" : "");
   }
-  if (prodUnbound(application)) return unboundReport(name, (environments ?? ["prod", "uat"]).filter((e) => e === "prod"));
+  // Enabled in Production (named, or by having no list): the backend's answer; otherwise it passes.
+  if (prodUnbound(application) && (environments ?? ["prod"]).includes("prod")) return unboundReport(name);
   const entity = body.entity ?? "";
   if (/FROM topups WHERE status = :status/.test(entity)) return timeFilterReport(name);
   if (/SELECT customer_email/.test(entity)) return piiReport(name);
