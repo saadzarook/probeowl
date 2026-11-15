@@ -90,14 +90,45 @@ export function lateValidateRun(id: string): Run {
   };
 }
 
-/** topup_completed on tp_halted: a kill switch stopped it after its first location. */
+/** topup_completed on tp_halted: a kill switch stopped it after its first location, so nothing was checked. */
 export function stoppedValidateRun(id: string): Run {
   const failed = failedValidateRun(id);
   return {
     ...failed,
+    status: "not_checked",
     expectations: [],
     locations: (failed.locations ?? []).slice(0, 1),
     stop_reason: "stopped by the kill switch on connector wallet_db: replica on fire",
+  };
+}
+
+/** topup_completed on tp_nohook: the ledger check fails, and the webhooks could not be read (#82). */
+export function partialValidateRun(id: string): Run {
+  const failed = failedValidateRun(id);
+  const reason = "the API did not answer";
+  return {
+    ...failed,
+    locations: (failed.locations ?? []).map((l) => (l.location === "webhook" ? { ...l, outcome: "error", reason } : l)),
+    expectations: (failed.expectations ?? []).map((e) =>
+      e.expectation === "count(webhook) >= 1" ? { ...e, result: "skip", detail: `needs webhook, which is Error (${reason})` } : e,
+    ),
+  };
+}
+
+/**
+ * topup_completed on tp_noread: ledger_db could not be read. Nothing failed, but two expectations
+ * need the ledger, so the run is Not checked (#81), not Failed.
+ */
+export function unreadableValidateRun(id: string): Run {
+  const failed = failedValidateRun(id);
+  const reason = "the connection was refused or could not be made; check the database is up and the binding is right";
+  return {
+    ...failed,
+    status: "not_checked",
+    locations: (failed.locations ?? []).map((l) => (l.location === "ledger" ? { ...l, outcome: "error", reason, caveat: null } : l)),
+    expectations: (failed.expectations ?? []).map((e) =>
+      e.expectation.includes("ledger") ? { ...e, result: "skip", detail: `needs ledger, which is Error (${reason})` } : e,
+    ),
   };
 }
 
@@ -140,7 +171,7 @@ export const walletRunPages: RunSummary[][] = [
   [
     summary("run_demo", 50),
     summary("run_draft", 45, { draft: true, status: "passed", subject: "tp_91f2b9", identifier_value: "tp_91f2b9", reason: "proactive_check", reference: null }),
-    summary("run_stopped", 40, { stop_reason: "stopped by the global kill switch: replica on fire" }),
+    summary("run_stopped", 40, { status: "not_checked", stop_reason: "stopped by the global kill switch: replica on fire" }),
   ],
   [
     summary("run_late", 30, { caveat: "replica lag unknown: 1 Missing result may not have arrived yet" }),

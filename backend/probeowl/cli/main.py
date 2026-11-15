@@ -19,6 +19,7 @@ from probeowl.checks.rules import folder_failures, pii_key_warnings
 from probeowl.checks.saving import ProbeWrites
 from probeowl.checks.time_offsets import unchecked_without_imports
 from probeowl.cli import init as init_wizard
+from probeowl.cli.audit import audit
 from probeowl.cli.catalog import catalog_app
 from probeowl.cli.connector import connector_app
 from probeowl.cli.console import colour_supported, plain_unless_coloured
@@ -70,7 +71,7 @@ app = typer.Typer(
     help=(
         "ProbeOwl: validate production data across databases and APIs, safely.\n\n"
         "owl serve loads the config folder and runs every probe. validate, inspect, catalog, "
-        "kill and reload are its clients: they take no --config, so start "
+        "kill, reload and audit are its clients: they take no --config, so start "
         "owl serve --config <folder> first. "
         "They reach it at $PROBEOWL_SERVER, else http://127.0.0.1:7878 (--server to change). "
         "check, store and connector add read the folder and the store themselves. "
@@ -87,6 +88,7 @@ app.add_typer(runbook_app, name="runbook")
 app.command("reload")(reload_config)
 app.command()(validate)
 app.command()(inspect)
+app.command()(audit)
 app.command()(mcp)
 
 
@@ -206,7 +208,9 @@ def serve(
     runs = RunService(applications, store, breaker=breaker)
     interrupted = runs.recover_interrupted()
     if interrupted:
-        typer.echo(f"{len(interrupted)} runs were left running and are now failed: interrupted")
+        typer.echo(
+            f"{len(interrupted)} runs were left running and are now not checked: interrupted"
+        )
     # One folder object: its lock covers the catalog's writes and the probes' together.
     config_folder = ConfigFolder(folder)
     build = find_web_app()

@@ -18,6 +18,7 @@ import pymysql
 import pytest
 from sqlalchemy.engine import make_url
 
+from probeowl.connectors.failures import Failure
 from probeowl.connectors.mariadb import MariaDbAdapter
 from probeowl.connectors.plan import Access
 from probeowl.connectors.sql import SqlLimits
@@ -426,7 +427,11 @@ def test_mariadb_a_login_that_can_read_plans_is_told_so(database: Database) -> N
 def test_mariadb_an_unreachable_server_says_why_but_not_where(database: Database) -> None:
     reason = database.adapter(port=1).unreachable()
     assert reason is not None
-    assert database.binding.host not in reason and database.binding.user not in reason
+    # A fixed message with its category (#91): never the host or the login.
+    assert reason.failure is Failure.CONNECTION, reason
+    assert (
+        database.binding.host not in reason.message and database.binding.user not in reason.message
+    )
 
 
 # --- Safety on a real server: runbook reads, drift, Test connection, the healthy sample -------

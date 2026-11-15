@@ -2,8 +2,9 @@
 """What the Connectors screen shows for one binding. Never where it points or who logs in."""
 
 from enum import StrEnum
+from typing import Self
 
-from pydantic import Field
+from pydantic import Field, PrivateAttr
 
 from probeowl.model.common import ProbeOwlModel
 
@@ -102,3 +103,16 @@ class ConnectionTest(ProbeOwlModel):
     reachable: bool
     reason: str | None = Field(default=None, description="Why not, when it could not be reached.")
     duration_ms: int
+    # The fixed category behind reason, such as "authentication failed", for the audit (#91).
+    # Private: never in the response or the contract.
+    _failure: str | None = PrivateAttr(default=None)
+
+    def with_failure(self, failure: str | None) -> Self:
+        """This result, carrying the category of why it could not be reached."""
+        self._failure = failure
+        return self
+
+    @property
+    def failure(self) -> str | None:
+        """The fixed category of why it could not be reached; None when it was."""
+        return self._failure

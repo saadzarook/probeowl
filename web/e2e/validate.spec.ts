@@ -69,7 +69,9 @@ test("polls the run, filling in locations, and shows Ledger Missing with its evi
   await expect(ledger).toContainText("61 ms");
   await expect(result.getByText("Failed", { exact: true })).toBeVisible();
   await expect(result.getByText(/· WALLET-482 ·/)).toBeVisible();
-  await expect(result.getByText(/First failure in dependency order: Ledger entries missing/)).toBeVisible();
+  // The expectation that failed leads (#82), not the first location that wasn't Found.
+  await expect(result.getByText("First failed expectation: count(ledger) == 2: got 0")).toBeVisible();
+  await expect(result.getByText(/First failure in dependency order/)).toHaveCount(0);
   await expect(result.getByText("Fail", { exact: true })).toBeVisible();
   await expect(result.getByText("Skip", { exact: true })).toBeVisible();
 
@@ -112,16 +114,35 @@ test("a run skipped by the circuit breaker shows its reason", async ({ page }) =
   await expect(page.getByRole("region", { name: "Run result" }).getByText("Skipped: ledger_db is paused: replica lag 120 s (max 60 s); paused for another 42 s")).toBeVisible();
 });
 
-test("a run a kill switch stopped shows why next to Failed, and no first failure", async ({ page }) => {
+test("a run a kill switch stopped is Not checked, says why, and has no first failure (#81)", async ({ page }) => {
   await page.goto("/validate");
   await page.getByLabel("Any ID").fill("tp_halted");
   await page.getByLabel("Reason").selectOption("incident");
   await page.getByLabel(/^Reference/).fill("WALLET-482");
   await page.getByRole("button", { name: "Validate" }).click();
   const result = page.getByRole("region", { name: "Run result" });
-  await expect(result.getByText("Failed", { exact: true })).toBeVisible();
-  await expect(result.getByText("Stopped, not a finding: stopped by the kill switch on connector wallet_db: replica on fire")).toBeVisible();
+  await expect(result.getByText("Not checked", { exact: true })).toBeVisible();
+  await expect(result.getByText("Stopped before checking, not a finding: stopped by the kill switch on connector wallet_db: replica on fire")).toBeVisible();
   await expect(result.getByText(/First failure/)).toHaveCount(0);
+});
+
+test("a run whose ledger could not be read is Not checked: it names what was unread, and offers no comparison (#81)", async ({ page }) => {
+  await page.goto("/validate");
+  await page.getByLabel("Any ID").fill("tp_noread");
+  await page.getByLabel("Reason").selectOption("incident");
+  await page.getByLabel(/^Reference/).fill("WALLET-482");
+  await page.getByRole("button", { name: "Validate" }).click();
+  const result = page.getByRole("region", { name: "Run result" });
+  await expect(result.getByText("Not checked", { exact: true })).toBeVisible();
+  await expect(result.getByText("0 failed, 3 passed, 2 skipped")).toBeVisible();
+  const summary = result.locator(".summary.not-checked");
+  await expect(summary).toContainText("Not checked: nothing failed, but data some expectations need could not be read.");
+  await expect(summary).toContainText("Ledger entries: error, the connection was refused or could not be made");
+  await expect(result.getByText(/First failure/)).toHaveCount(0);
+  // Neither a pass nor a finding: nothing to compare with a healthy record, no runbook to suggest.
+  await expect(page.getByRole("region", { name: "Compare with a healthy record" })).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Suggested next steps" })).toHaveCount(0);
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
 });
 
 test("a Missing on a replica whose lag is unknown never looks clean", async ({ page }) => {
@@ -134,7 +155,7 @@ test("a Missing on a replica whose lag is unknown never looks clean", async ({ p
   await expect(result.getByText("Failed - replica lag unknown: 1 Missing result may not have arrived yet")).toBeVisible();
   await expect(result.locator(".locations").getByText("Missing - replica lag unknown, the record may not have arrived yet")).toBeVisible();
   await expect(result.getByText("Fail - reads a Missing record that may not have arrived yet: replica lag unknown")).toBeVisible();
-  await expect(result.getByText(/First failure in dependency order: Ledger entries missing - replica lag unknown/)).toBeVisible();
+  await expect(result.getByText("First failed expectation: count(ledger) == 2: got 0 - reads a Missing record that may not have arrived yet: replica lag unknown")).toBeVisible();
   // The clean Missing chip is not shown for it.
   await expect(result.locator('.locations .chip[data-outcome="missing"]:not([data-caveat])')).toHaveCount(0);
   const axe = await new AxeBuilder({ page }).include(".run-result").analyze();
@@ -361,4 +382,31 @@ test("nothing is suggested until the run has finished", async ({ page }) => {
   await page.getByRole("button", { name: "Validate" }).click();
   await expect(page.getByRole("region", { name: "Run result" }).getByText("Locations are filling in")).toBeVisible();
   await expect(page.getByRole("region", { name: "Suggested next steps" })).toHaveCount(0);
+});
+
+test("the failed expectation leads, and what could not be read is listed apart (#82)", async ({ page }) => {
+  await page.goto("/validate");
+  await page.getByLabel("Any ID").fill("tp_nohook");
+  await page.getByLabel("Reason").selectOption("incident");
+  await page.getByLabel(/^Reference/).fill("WALLET-482");
+  await page.getByRole("button", { name: "Validate" }).click();
+  const result = page.getByRole("region", { name: "Run result" });
+  await expect(result.getByText("First failed expectation: count(ledger) == 2: got 0")).toBeVisible();
+  const unread = result.getByRole("note");
+  await expect(unread).toContainText("Not read, so not part of that failure:");
+  await expect(unread).toContainText("Webhook deliveries: error, the API did not answer");
+  await expect(result.getByText(/First failure in dependency order/)).toHaveCount(0);
+  expect((await new AxeBuilder({ page }).include(".run-result").analyze()).violations).toEqual([]);
+});
+
+test("the Reference field's example names no application, on Validate and Inspect alike (#86)", async ({ page }) => {
+  const example = "Jira key or case ID, such as PROJ-123";
+  for (const app of [/Wallet/, /Card access/]) {
+    for (const screen of ["/validate", "/inspect"]) {
+      await page.goto(screen);
+      await page.getByRole("button", { name: "Application" }).click();
+      await page.getByRole("button", { name: app }).last().click();
+      await expect(page.getByLabel(/^Reference/)).toHaveAttribute("placeholder", example);
+    }
+  }
 });

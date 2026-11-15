@@ -61,3 +61,15 @@ export function keyLine(location: LocationResult, entity: Entity | undefined): s
   }
   return from ? `${keys} · ${from}` : keys;
 }
+
+/**
+ * A location as a person names it. A fan-out row adds the key it was looked up by, as its evidence
+ * bound it ("Door controller (card_id C204518)"), else which parent row it is, so rows that share a
+ * title can be told apart (#82).
+ */
+export function locationName(location: LocationResult): string {
+  if (location.parent == null) return location.title || location.location;
+  const [key] = Object.entries(location.evidence?.parameters ?? {});
+  const which = key ? `${key[0]} ${shownParameter(key[1])}` : `${location.parent} row ${(location.row ?? 0) + 1}`;
+  return `${location.title || location.location} (${which})`;
+}

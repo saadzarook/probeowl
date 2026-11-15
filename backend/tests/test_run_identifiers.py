@@ -55,14 +55,14 @@ def test_an_identifier_that_finds_nothing_fails_the_run_with_nothing_else_read(
     assert not setup.fakes["ledger_db"].calls and not setup.fakes["checkout_api"].calls
 
 
-def test_an_identifier_that_cannot_be_looked_up_fails_the_run(setup: Setup) -> None:
+def test_an_identifier_that_cannot_be_looked_up_is_not_checked(setup: Setup) -> None:
     def broken(lookup: str, parameters: Any) -> list[dict[str, Any]]:
         raise ConnectorError("the statement timed out after 2 s")
 
     setup.fakes["wallet_db"].answer = broken
     client = setup.client()
     run = finished(client, start(client, value="pay_7hq2m9"))
-    assert run["status"] == "failed"
+    assert run["status"] == "not_checked"
     assert run["stop_reason"] == "the identifier could not be looked up"
     assert run["resolution"]["outcome"] == "error"
     assert run["resolution"]["reason"] == "the statement timed out after 2 s"

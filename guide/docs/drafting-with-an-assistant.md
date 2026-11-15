@@ -89,5 +89,8 @@ non-Production environments only"*.
   with no value.
 - **Listen on the network.** It runs on stdio only.
 
-Every tool call is recorded in the audit as you, *via MCP*, with the tool's name and whether it
-succeeded, never what was sent to it. `~/.probeowl/owl-mcp.log` holds the same.
+Every tool call is recorded in the audit as you, *via MCP*, with the tool's name, the application
+and environment it asked about, and whether it succeeded, never what was sent to it. A call that
+didn't succeed has a fixed reason: `production_refused`, `not_found`, `invalid`,
+`credential_found`, `too_large`, `save_checks_failed` or `failed`. `~/.probeowl/owl-mcp.log` holds
+the same.

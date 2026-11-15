@@ -420,13 +420,13 @@ class RunService:
         return page, ((page[-1].started_at, page[-1].id) if more else None)
 
     def recover_interrupted(self) -> list[str]:
-        """Mark runs left running by a stopped owl serve as failed; their ids."""
+        """Mark runs left running by a stopped owl serve as not checked; their ids."""
         with self._store.connect() as conn:
             ids = running_run_ids(conn, self._workspace)
         for run_id in ids:
             run = self.get(run_id)
-            failed = _finished(run, RunStatus.FAILED, stop_reason=INTERRUPTED)
-            self._save_and_audit(failed, ("run_interrupted", {"stop_reason": INTERRUPTED}))
+            stopped = _finished(run, RunStatus.NOT_CHECKED, stop_reason=INTERRUPTED)
+            self._save_and_audit(stopped, ("run_interrupted", {"stop_reason": INTERRUPTED}))
         return ids
 
     def shutdown(self) -> None:
@@ -645,8 +645,8 @@ class RunService:
         app, entity = self._definitions(failing)
         if failing.subject is None or failing.status not in {RunStatus.PASSED, RunStatus.FAILED}:
             raise RequestError(
-                f"run {run_id} is {failing.status.value}: only a finished run on one subject "
-                "can be compared",
+                f"run {run_id} is {failing.status.value}: only a run that passed or failed, on "
+                "one subject, can be compared",
                 {"run": "wait for it to finish, or pick a subject"},
             )
         if failing.investigation is None:
@@ -983,18 +983,20 @@ class RunService:
         except KillSwitchEngaged as err:
             # Before its first read it is a new run that never started; after, it stopped.
             if read:
-                finished = _finished(run, RunStatus.FAILED, stop_reason=str(err), locations=read)
+                finished = _finished(
+                    run, RunStatus.NOT_CHECKED, stop_reason=str(err), locations=read
+                )
             else:
                 finished = _finished(run, RunStatus.SKIPPED, skip_reason=str(err))
         except ReadsStopped as err:
-            finished = _finished(run, RunStatus.FAILED, stop_reason=str(err), locations=read)
+            finished = _finished(run, RunStatus.NOT_CHECKED, stop_reason=str(err), locations=read)
         except Exception as err:
             # Not a connector failure (those are Error outcomes): a fault in ProbeOwl. The
-            # run is recorded as failed rather than left running, and the fault is logged.
+            # run is recorded as not checked rather than left running, and the fault is logged.
             log.exception("run %s stopped by an unexpected error", run.id)
             finished = _finished(
                 run,
-                RunStatus.FAILED,
+                RunStatus.NOT_CHECKED,
                 stop_reason=f"stopped by an unexpected error ({type(err).__name__})",
                 locations=read,
             )
@@ -1042,7 +1044,7 @@ class RunService:
         if found.result.outcome is Outcome.AMBIGUOUS:
             return _finished(run, RunStatus.AMBIGUOUS)
         if found.result.outcome is Outcome.ERROR:
-            return _finished(run, RunStatus.FAILED, stop_reason=_NOT_LOOKED_UP)
+            return _finished(run, RunStatus.NOT_CHECKED, stop_reason=_NOT_LOOKED_UP)
         return _finished(run, RunStatus.FAILED, stop_reason=found.result.reason)
 
     def _try_each(self, prepared: _Prepared) -> Run:

@@ -165,3 +165,32 @@ function fromPairs(pairs: string[]): ParsedConnection {
   }
   return result;
 }
+
+const PASSWORD_KEYS = ["password", "pwd"];
+
+function isPasswordPair(pair: string): boolean {
+  const i = pair.indexOf("=");
+  return i >= 0 && PASSWORD_KEYS.includes(pair.slice(0, i).trim().toLowerCase());
+}
+
+/**
+ * The connection string as it may stay on screen: every form parseConnectionString reads, with its
+ * password taken out (#92). The password goes to the password field alone, never two places.
+ */
+export function withoutPassword(text: string): string {
+  const s = text.trim();
+  if (/^jdbc:oracle:thin:/i.test(s)) return s.replace(/^(jdbc:oracle:thin:)([^/@]*)\/[^@]*@/i, "$1$2@");
+  if (/^jdbc:sqlserver:\/\//i.test(s)) {
+    const [server = "", ...pairs] = splitPairs(s.replace(/^jdbc:sqlserver:\/\//i, ""), true);
+    return `jdbc:sqlserver://${[server, ...pairs.filter((p) => !isPasswordPair(p))].join(";")}`;
+  }
+  if (/^(?:jdbc:)?[a-z][a-z0-9+]*:\/\//i.test(s)) {
+    // user:password@ in the authority, then password= in the query.
+    const shown = s
+      .replace(/^((?:jdbc:)?[a-z][a-z0-9+]*:\/\/[^/:@?#]*):[^@/?#]*@/i, "$1@")
+      .replace(/([?&])(?:password|pwd)=[^&#]*&?/gi, "$1")
+      .replace(/[?&]+$/, "");
+    return shown;
+  }
+  return splitPairs(s).filter((p) => !isPasswordPair(p)).join(";");
+}

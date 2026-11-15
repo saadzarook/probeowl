@@ -19,6 +19,7 @@ import oracledb
 import pytest
 from sqlalchemy.engine import make_url
 
+from probeowl.connectors.failures import Failure
 from probeowl.connectors.oracle import OracleAdapter
 from probeowl.connectors.plan import Access
 from probeowl.connectors.sql import SqlLimits
@@ -618,7 +619,11 @@ def test_oracle_an_unreachable_server_says_why_but_not_where(database: Database)
     binding = database.binding.model_copy(update={"port": 1})
     reason = OracleAdapter(binding, database.password).unreachable()
     assert reason is not None
-    assert database.binding.host not in reason and database.binding.user not in reason
+    # A fixed message with its category (#91): never the host or the login.
+    assert reason.failure is Failure.CONNECTION, reason
+    assert (
+        database.binding.host not in reason.message and database.binding.user not in reason.message
+    )
 
 
 # --- Safety on a real server: runbook reads, drift, Test connection, v$session ----------------
