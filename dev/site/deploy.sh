@@ -11,12 +11,15 @@ STAGE="$(cd "${1:?usage: dev/site/deploy.sh <built folder>}" && pwd)"
 [ -f "$STAGE/index.html" ] && [ -f "$STAGE/guide/index.html" ] && [ -f "$STAGE/.nojekyll" ] \
   || { echo "$STAGE is not a folder built by dev/site/build.sh" >&2; exit 1; }
 COMMIT="$(git -C "$REPO" rev-parse --short HEAD)"
+# Only a GitHub noreply address signs the commit: never a private email (#104).
+EMAIL="$(git -C "$REPO" config user.email || true)"
+bash "$REPO/dev/site/check_identity.sh" "$EMAIL"
 
 cd "$STAGE"
 rm -rf .git
 git init -q -b gh-pages
 git add -A
-git -c user.name="$(git -C "$REPO" config user.name)" -c user.email="$(git -C "$REPO" config user.email)" \
+git -c user.name="$(git -C "$REPO" config user.name)" -c user.email="$EMAIL" \
   commit -q -m "Site from $(git -C "$REPO" rev-parse --abbrev-ref HEAD) $COMMIT"
 git push --force https://github.com/saadzarook/probeowl.git gh-pages
 echo "Pushed. Pages takes a minute or two; then check the live site."

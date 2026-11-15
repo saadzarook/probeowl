@@ -1,7 +1,25 @@
 # Releasing ProbeOwl
 
-How a release is made by hand, as v0.1.0 is. Each step names what to check before the next. The
-automated route, for later releases, is at the end.
+How a release is made by hand, as v0.1.0 and v0.2.0 were. Each step names what to check before
+the next. The automated route, for later releases, is at the end.
+
+The steps, in order:
+
+| Step | What | Section |
+| --- | --- | --- |
+| 1 | Pre-flight on `develop`, then merge to `main` | [1. Pre-flight](#1-pre-flight) |
+| 2 | Build the wheel, and check what's in it | [2. Build the wheel](#2-build-the-wheel-and-check-whats-in-it) |
+| 3 | Install it as a newcomer would; the wheel check | [3. Install it](#3-install-it-as-a-newcomer-would) |
+| 4 | Upload the wheel from step 2 to PyPI | [4. Publish to PyPI](#4-publish-to-pypi) |
+| 5 | Tag `main`, and the GitHub release with the wheel attached | [5. Tag](#5-tag-and-create-the-github-release) |
+| 6 | Build, deploy and check the site | [6. Deploy the site](#6-deploy-the-site-once-the-repository-is-public) |
+
+Every command below uses `$VERSION`, the release's version as `backend/pyproject.toml` says it.
+Set it once, in the shell you release from, at the repository's root:
+
+```sh
+VERSION="$(cd backend && uv version --short)"     # such as 0.2.1
+```
 
 A release is one wheel, `probeowl-<version>-py3-none-any.whl`. It carries the web app, its licences
 (`THIRD_PARTY_NOTICES.txt` and the IBM Plex OFL files) and no mocks, and the guide, built to be
@@ -14,10 +32,11 @@ web app is built from `web/`, which an sdist of `backend/` would not carry.
 
 On `develop`, with everything for the release merged:
 
-1. **Version.** `version` in `backend/pyproject.toml` is the release's, such as `0.1.0`.
-   `cd backend && uv version --short` prints it. The web app's sidebar reads the same value.
+1. **Version.** `version` in `backend/pyproject.toml` is the release's. `$VERSION` (above) is
+   read from it, and the web app's sidebar reads the same value.
 2. **CHANGELOG.** Its section is complete, and its heading has the date:
-   `## [0.1.0] - 2026-11-15`. `[Unreleased]` stays above it, empty.
+   `## [$VERSION] - <date>`, such as `## [0.2.1] - 2026-11-20`. `[Unreleased]` stays above it,
+   empty.
 3. **A full native run.** Stop your own `owl serve` first: the live step uses 7878 and 4173, and
    stops whatever holds them. Then run every step on the release commit:
 
@@ -40,8 +59,9 @@ On `develop`, with everything for the release merged:
 
 ## 2. Build the wheel, and check what's in it
 
-From a clean checkout of `main` (a fresh worktree, so no stray `web/dist` or `node_modules`),
-with Node.js installed:
+From a fresh clone of `main`'s merge commit (so no stray `web/dist` or `node_modules`), with
+Node.js installed. Two builds from the same commit and the same `core.autocrlf` give the same
+file, byte for byte: on Windows, clone with `-c core.autocrlf=true`, as the release builds so far.
 
 ```sh
 cd backend
@@ -83,15 +103,15 @@ In a fresh tool environment, away from your own:
 
 ```sh
 export UV_TOOL_DIR="$(mktemp -d)" UV_TOOL_BIN_DIR="$(mktemp -d)"
-uv tool install ../dist/probeowl-0.1.0-py3-none-any.whl
-"$UV_TOOL_BIN_DIR/owl" --version                     # owl 0.1.0
+uv tool install "../dist/probeowl-$VERSION-py3-none-any.whl"
+"$UV_TOOL_BIN_DIR/owl" --version                     # owl $VERSION
 mkdir -p /tmp/owl-empty
 PROBEOWL_STORE_URL="sqlite:///$UV_TOOL_DIR/store.db" "$UV_TOOL_BIN_DIR/owl" store init
 PROBEOWL_STORE_URL="sqlite:///$UV_TOOL_DIR/store.db" "$UV_TOOL_BIN_DIR/owl" serve --config /tmp/owl-empty --port 7999
 ```
 
 Open <http://127.0.0.1:7999>. You should see "No applications yet", the sidebar reading
-`v0.1.0 · local`, and no errors in the browser's console. The notices are at
+`v$VERSION · local`, and no errors in the browser's console. The notices are at
 <http://127.0.0.1:7999/licenses/THIRD_PARTY_NOTICES.txt>. Open the empty state's Getting started
 link: the guide opens at <http://127.0.0.1:7999/guide/getting-started/>, in IBM Plex, with no
 errors in the console, and its search finds "replica". Stop it, then remove both folders.
@@ -108,45 +128,61 @@ wheel. From v0.2 each release carries one phase of No YAML required; see the roa
 
 ## 4. Publish to PyPI
 
-The first upload uses a token you make on PyPI for your account, because the project doesn't exist
-yet. It's never written to a file, a script or your shell history.
+Upload the wheel built and checked in [step 2](#2-build-the-wheel-and-check-whats-in-it),
+`../dist/probeowl-$VERSION-py3-none-any.whl`, from that clone's `backend/` folder. The token is
+never written to a file, a script or your shell history.
 
-1. On <https://pypi.org/manage/account/token/>, create a token scoped to your entire account.
+**Which token.** The very first upload (0.1.0) used a token scoped to your whole PyPI account,
+because the project didn't exist yet, and step 4 below replaced it. Every upload since uses the
+token scoped to the `probeowl` project, from your password manager.
+
+1. Have the project-scoped token ready. (First upload only: create one scoped to your entire
+   account on <https://pypi.org/manage/account/token/>.)
 2. Upload, entering the token at uv's hidden prompt (username `__token__`):
 
    ```sh
-   uv publish ../dist/probeowl-0.1.0-py3-none-any.whl
+   uv publish "../dist/probeowl-$VERSION-py3-none-any.whl"
    ```
 
    Or set it only in that terminal, without echoing it, and clear it afterwards:
 
    ```sh
    read -rs UV_PUBLISH_TOKEN && export UV_PUBLISH_TOKEN
-   uv publish ../dist/probeowl-0.1.0-py3-none-any.whl
+   uv publish "../dist/probeowl-$VERSION-py3-none-any.whl"
    unset UV_PUBLISH_TOKEN
    ```
 
    In Windows PowerShell 5.1, which has no `-MaskInput`:
    `$env:UV_PUBLISH_TOKEN = [Net.NetworkCredential]::new('', (Read-Host -AsSecureString)).Password`,
    then `Remove-Item Env:UV_PUBLISH_TOKEN` when done.
-3. Check <https://pypi.org/project/probeowl/> shows 0.1.0. Then install it from PyPI in a fresh
-   tool environment, as in step 3, with `uv tool install probeowl`.
-4. **Replace the token.** Delete the account-wide token, and create one scoped to the `probeowl`
-   project for any later manual upload. Keep it in your password manager only.
+3. Check <https://pypi.org/project/probeowl/> shows `$VERSION`. Then install it from PyPI in a
+   fresh tool environment, as in step 3, with `uv tool install probeowl`.
+4. **First upload only: replace the token.** Delete the account-wide token, and create one scoped
+   to the `probeowl` project for any later manual upload. Keep it in your password manager only.
 
 ## 5. Tag, and create the GitHub release
 
 On `main`'s merge commit:
 
 ```sh
-git tag -a v0.1.0 -m "ProbeOwl 0.1.0"
-git push origin v0.1.0
-gh release create v0.1.0 ../dist/probeowl-0.1.0-py3-none-any.whl \
-  --title "ProbeOwl 0.1.0" --notes-file notes.md --verify-tag --prerelease
+git tag -a "v$VERSION" -m "ProbeOwl $VERSION"
+git push origin "v$VERSION"
+gh release create "v$VERSION" "../dist/probeowl-$VERSION-py3-none-any.whl" \
+  --title "ProbeOwl $VERSION" --notes-file notes.md --verify-tag --prerelease
+gh release view "v$VERSION" --json assets --jq '.assets[].name'   # lists the wheel
 ```
 
-`notes.md` is the CHANGELOG's 0.1.0 section. `--prerelease` matches "v0.1 pre-release" on the
-landing page; leave it off once a release is meant for general use.
+`notes.md` is the CHANGELOG's `$VERSION` section, with the wheel's sha256 added
+(`sha256sum ../dist/probeowl-$VERSION-py3-none-any.whl`), so anyone can compare what they
+download. `--prerelease` matches "pre-release" on the landing page; leave it off once a release is
+meant for general use.
+
+The last command must list `probeowl-$VERSION-py3-none-any.whl`. If the release was created
+without it, attach it:
+
+```sh
+gh release upload "v$VERSION" "../dist/probeowl-$VERSION-py3-none-any.whl"
+```
 
 ## 6. Deploy the site, once the repository is public
 
@@ -168,7 +204,10 @@ node dev/site/check_stage.mjs https://saadzarook.github.io/probeowl/
 `build.sh` builds the guide exactly as the wheel does, offline, and only its address differs. It
 fails if any page requests something from another site, logs a console error or gets an error
 response, or if the guide's search finds nothing. The `gh-pages` branch holds only the built site,
-so replacing it each time is intended. In the repository's **Settings → Pages**, the source is
+so replacing it each time is intended. `deploy.sh` commits as the repository's git identity, and
+refuses an email that isn't a GitHub noreply address, which GitHub would refuse to push for an
+account that keeps its email private. In a fresh clone, set it first:
+`git config --local user.email <id>+<login>@users.noreply.github.com`. In the repository's **Settings → Pages**, the source is
 **Deploy from a branch**, `gh-pages`, `/ (root)`. Pages takes a minute or two to update; then the
 last command checks the live site the same way, the landing page and every page of the guide.
 
