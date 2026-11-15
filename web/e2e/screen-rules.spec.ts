@@ -143,3 +143,20 @@ test("the menu opens the navigation, goes where it is told and closes, and passe
   await expect(sheet).toHaveCount(0);
   await expect(menu).toBeFocused();
 });
+
+test("in Production the folded top bar still shows it in red, at 390 and 320 px", async ({ page }) => {
+  for (const width of [390, 320]) {
+    await open(page, VALIDATE, width);
+    await page.getByRole("button", { name: "Application" }).click();
+    await page.getByRole("button", { name: /Wallet/ }).last().click();
+    const environment = page.getByRole("banner").getByLabel("Environment");
+    await environment.selectOption({ label: "Production" });
+    await expect(environment).toBeInViewport();
+    const look = await environment.evaluate((el) => {
+      const style = getComputedStyle(el);
+      return { color: style.color, border: style.borderTopColor, weight: style.fontWeight };
+    });
+    expect(look, `at ${width}`).toEqual({ color: "rgb(180, 35, 24)", border: "rgb(180, 35, 24)", weight: "600" });
+    await expect(environment.locator("option:checked")).toHaveText("Production");
+  }
+});

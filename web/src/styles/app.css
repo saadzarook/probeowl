@@ -6,7 +6,11 @@ body {
   color: var(--color-text);
   background: var(--color-surface);
 }
-button, input, select { font: inherit; }
+/* In the base layer (ui.css names the layers), so a web/src/ui component's own font weight and
+   size win over it; unlayered, this reset would override every Tailwind font utility. */
+@layer base {
+  button, input, select { font: inherit; }
+}
 :focus-visible { outline: 2px solid var(--color-action-blue); outline-offset: 2px; }
 
 .env-select {

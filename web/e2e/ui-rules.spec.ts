@@ -102,6 +102,10 @@ test("rule 8: a disabled button says why, and a link that acts as a button looks
   await expect(save).toBeDisabled();
   await expect(save).toHaveAccessibleDescription("Fill in every field first");
   await expect(page.getByText("Fill in every field first")).toBeVisible();
+  // The components' own weights, never app.css's reset (#136): a button and Production's select.
+  const weight = (locator: ReturnType<Page["locator"]>) => locator.evaluate((el) => getComputedStyle(el).fontWeight);
+  expect(await weight(page.getByRole("button", { name: "Save", exact: true }))).toBe("600");
+  expect(await weight(page.getByLabel("Environment"))).toBe("600");
   const link = page.getByRole("link", { name: "Add connection" });
   expect(await link.evaluate((el) => getComputedStyle(el).textDecorationLine)).toBe("none");
   expect((await link.boundingBox())?.height).toBeCloseTo(40, 0);
