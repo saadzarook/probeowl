@@ -2,10 +2,11 @@
 import type { CompletionContext, CompletionResult } from "@codemirror/autocomplete";
 import { redo, redoDepth, undo, undoDepth } from "@codemirror/commands";
 import { yaml } from "@codemirror/lang-yaml";
-import { EditorState } from "@codemirror/state";
+import { EditorState, Prec } from "@codemirror/state";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { tags } from "@lezer/highlight";
 import { EditorView, basicSetup } from "codemirror";
+import { keymap } from "@codemirror/view";
 import { useEffect, useRef, useState } from "react";
 
 /** Light-on-ink colours that keep the YAML readable on the dark editor (WCAG AA). */
@@ -16,6 +17,29 @@ const darkHighlight = HighlightStyle.define([
   { tag: tags.comment, color: "#aab2bf" },
   { tag: [tags.meta, tags.punctuation, tags.separator], color: "#d6dae1" },
 ]);
+
+/**
+ * The indent a new line after this one keeps, when this line is a list item with its value on it
+ * ("  - expect: count(x) >= 1"): the dash's, so the next "- " is a sibling, not nested inside (#96).
+ * Undefined for any other line, including "- expect:" that opens a block, which the language indents.
+ */
+export function listItemIndent(text: string): string | undefined {
+  const item = /^(\s*)- \S/.exec(text);
+  if (!item || /:\s*$/.test(text)) return undefined;
+  return item[1];
+}
+
+/** Enter at the end of a list item starts the next line at the item's own indent. */
+function continueListItem(view: EditorView): boolean {
+  const { state } = view;
+  const at = state.selection.main;
+  if (!at.empty) return false;
+  const line = state.doc.lineAt(at.head);
+  const indent = at.head === line.to ? listItemIndent(line.text) : undefined;
+  if (indent === undefined) return false;
+  view.dispatch({ changes: { from: at.head, insert: `\n${indent}` }, selection: { anchor: at.head + 1 + indent.length }, scrollIntoView: true, userEvent: "input" });
+  return true;
+}
 
 interface YamlEditorProps {
   value: string;
@@ -63,6 +87,7 @@ export function YamlEditor({ value, label, onChange, readOnly = false, completio
       doc: value,
       parent: host.current,
       extensions: [
+        Prec.high(keymap.of([{ key: "Enter", run: continueListItem }])),
         basicSetup,
         yaml(),
         // basicSetup's autocompletion asks the language data for sources: this one adds the names.

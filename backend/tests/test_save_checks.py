@@ -378,6 +378,12 @@ def test_a_draft_that_fails_a_check_does_not_run(setup: Setup) -> None:
     assert "Time filter: record" in fields
     assert "Identifiers: identifier provider_payment_id" in fields
     assert no_lookups(setup) and runs_stored(setup) == 0
+    # Each says its check, and its location when it has one, as fields: never read from text (#108).
+    by_field = {e["field"]: e for e in response.json()["errors"]}
+    time_filter = by_field["Time filter: record"]
+    assert (time_filter["check"], time_filter["location"]) == ("Time filter", "record")
+    identifier = by_field["Identifiers: identifier provider_payment_id"]
+    assert identifier["check"] == "Identifiers"
 
 
 def test_a_test_run_in_production_needs_a_reference(setup: Setup) -> None:
@@ -398,8 +404,11 @@ def test_an_unbound_environment_fails_with_that_environment_named(setup: Setup) 
     probe = PROBE.replace("environments: [prod, uat]\n", "")
     report = check_draft(unbound, probe)
     environments = [c for c in report.checks if c.check == "Environments"]
-    assert [(c.status, c.environment) for c in environments] == [(CheckStatus.FAIL, "uat")]
+    # One per unbound location, each with its location and environment: the fields an editor reads.
+    assert [(c.status, c.location, c.environment) for c in environments] == [
+        (CheckStatus.FAIL, "ledger", "uat")
+    ]
     assert environments[0].message == (
         "enabled in uat, where ledger (ledger_db) has no binding; "
-        "bind it or leave uat out of the probe's environments"
+        "bind ledger_db in uat or leave uat out of the probe's environments"
     )

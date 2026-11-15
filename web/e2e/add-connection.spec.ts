@@ -104,7 +104,10 @@ test("saved: the file has the keychain name, the password goes only to the keych
   await expect(page.getByRole("listitem").filter({ hasText: "cards" })).toContainText("Transaction");
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   await page.getByRole("button", { name: "Confirm all 2 as suggested" }).click();
-  await expect(page.getByRole("status").filter({ hasText: "Confirmed" })).toContainText("Confirmed 2 in orders/catalog.yaml");
+  await expect(page.getByRole("status").filter({ hasText: "Confirmed" })).toContainText("Confirmed 2 tables' labels in orders/catalog.yaml");
+  // What was confirmed, and what comes next: never "Nothing to confirm" beside it (#100).
+  await expect(page.getByText(/Nothing to confirm here/)).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Next: create an entity" })).toHaveAttribute("href", "/probes/new-entity");
   // The password went to Test connection and to the keychain, and nowhere else.
   expect([...new Set(carried)].sort()).toEqual([
     "/api/applications/orders/connectors/orders_mariadb/environments/uat/secret",

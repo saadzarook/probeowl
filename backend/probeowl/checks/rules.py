@@ -389,21 +389,19 @@ def _environments(app: LoadedApplication, probe: Probe, entity: Entity) -> list[
         ]
     found = []
     for environment in probe.environments or list(known):
-        unbound = sorted(
-            {
-                f"{name} ({using})"
-                for name, using in _locations(entity)
-                if environment not in getattr(app.connectors.get(using), "environments", {})
-            }
-        )
-        if unbound:
-            # The environment it is about, so an editor can leave that one out of the probe.
+        for name, using in sorted(set(_locations(entity))):
+            if environment in getattr(app.connectors.get(using), "environments", {}):
+                continue
+            # One per location, with its location and environment: an editor reads these fields,
+            # never the message, to leave that environment out of the probe.
             found.append(
                 SaveCheck(
                     check="Environments",
                     status=CheckStatus.FAIL,
-                    message=f"enabled in {environment}, where {', '.join(unbound)} has no binding; "
-                    f"bind it or leave {environment} out of the probe's environments",
+                    message=f"enabled in {environment}, where {name} ({using}) has no binding; "
+                    f"bind {using} in {environment} or leave {environment} out of the probe's "
+                    "environments",
+                    location=name,
                     environment=environment,
                 )
             )

@@ -12,6 +12,8 @@
     "noEmit": true,
     "skipLibCheck": true,
     "isolatedModules": true,
+    // The backend's own answers, which the mocks import as they are (#108).
+    "resolveJsonModule": true,
     "types": ["vite/client", "node"],
     // A plugin's screens live outside web/, where nothing would find web/node_modules.
     "paths": {

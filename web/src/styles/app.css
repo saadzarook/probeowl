@@ -113,8 +113,12 @@ button, input, select { font: inherit; }
 .status[data-status="failed"] { background: var(--chip-missing-bg); color: var(--chip-missing-fg); }
 .status[data-status="passed"] { background: var(--chip-found-bg); color: var(--chip-found-fg); }
 .status[data-status="running"] { background: var(--chip-waiting-bg); color: var(--chip-waiting-fg); }
+/* Not checked (#81): not a pass and not a finding, so the waiting colours, never green or red. */
+.status[data-status="not_checked"] { background: var(--chip-waiting-bg); color: var(--chip-waiting-fg); }
 .summary { margin: 1rem 0; padding: 0.75rem 1rem; border-radius: 0.5rem; background: var(--chip-blocked-bg); }
 .summary.failure { background: var(--color-production-bg); color: var(--color-production); }
+.summary.not-checked { background: var(--chip-waiting-bg); color: var(--chip-waiting-fg); }
+.summary.not-checked ul { margin: 0.25rem 0 0; padding-left: 1.25rem; }
 .run-body { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
 .run-body h3 { font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-text-muted); }
 .locations, .expectations, .guards { list-style: none; margin: 0; padding: 0; }
@@ -574,3 +578,6 @@ input.mono { font-family: var(--font-mono); }
    line names which fields, so it is never colour alone. */
 input[data-filled] { outline: 2px solid var(--color-action-blue); outline-offset: 1px; background: #eef3fd; }
 @media (prefers-reduced-motion: no-preference) { input[data-filled] { transition: outline-color 0.4s, background 0.4s; } }
+/* The audit (#79): details wrap at any character, so a long value never widens the table. */
+.audit-filters { display: flex; flex-direction: column; gap: 0.75rem; align-items: flex-start; }
+.audit-details code { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.8rem; }

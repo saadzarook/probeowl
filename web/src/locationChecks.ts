@@ -14,17 +14,20 @@ export const TIME_FILTER = "Time filter";
 export const ROW_CEILING = "Row ceiling";
 export const PII_MASKED = "PII masked";
 
-/** A refused save's failures: by location when the check names one ("Time filter: cards"), else general. */
+/**
+ * A refused save's failures: by location when the error names one of the draft's, else general.
+ * Read from the error's check and location fields, never from its field's text (#108).
+ */
 export function failuresByLocation(errors: FieldError[], locations: string[]): { byLocation: Map<string, Failure[]>; general: Failure[] } {
   const byLocation = new Map<string, Failure[]>();
   const general: Failure[] = [];
   for (const error of errors) {
-    const split = error.field.lastIndexOf(": ");
-    const location = split < 0 ? undefined : error.field.slice(split + 2);
+    const failure = { check: error.check ?? error.field, message: error.message };
+    const location = error.location ?? undefined;
     if (location !== undefined && locations.includes(location)) {
-      byLocation.set(location, [...(byLocation.get(location) ?? []), { check: error.field.slice(0, split), message: error.message }]);
+      byLocation.set(location, [...(byLocation.get(location) ?? []), failure]);
     } else {
-      general.push({ check: error.field, message: error.message });
+      general.push(failure);
     }
   }
   return { byLocation, general };

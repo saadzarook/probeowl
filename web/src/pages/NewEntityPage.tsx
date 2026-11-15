@@ -2,8 +2,8 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
-import { saveEntity, SaveError, type EntityChange } from "../api/client";
-import { notImported, useCatalog, useSchemas } from "../api/useCatalog";
+import { saveEntity, SaveError, type EntityChange, type EnvironmentSummary, type TableReview } from "../api/client";
+import { notImported, useCatalog, useCatalogReview, useSchemas } from "../api/useCatalog";
 import { useConnectors } from "../api/useConnectors";
 import { useEntities } from "../api/useEntities";
 import { ChangePreview } from "../components/ChangePreview";
@@ -30,13 +30,21 @@ function fieldsInUse(draft: EntityDraft): Map<string, Set<string>> {
   return used;
 }
 
+/** The application's other environments where some table was imported, in the application's order. */
+function importedElsewhere(environments: EnvironmentSummary[], current: string, tables: TableReview[]): EnvironmentSummary[] {
+  const imported = new Set(tables.flatMap((t) => t.imported_in));
+  return environments.filter((e) => e.name !== current && imported.has(e.name));
+}
+
 /** A new entity, step by step from the imported schema: name, root table, locations, identifiers, then preview and create. */
 export function NewEntityPage() {
-  const { application, environment } = useSelection();
+  const { application, environment, selectEnvironment } = useSelection();
   const connectors = useConnectors(application?.name, environment?.name);
   // An entity that exists is changed with its probes, so its id is refused here, as it is typed.
   const existing = useEntities(application?.name);
   const catalog = useCatalog(application?.name);
+  // Which environments have an import, for when this one has none.
+  const review = useCatalogReview(application?.name);
   const sql = (connectors.data ?? []).filter((c) => c.type !== "rest").map((c) => c.connector);
   const schemas = useSchemas(application?.name, sql, environment?.name, new Set(sql));
   const snapshots = [...schemas.values()].flatMap((r) => (r.snapshot ? [r.snapshot] : []));
@@ -136,17 +144,30 @@ export function NewEntityPage() {
         <p>
           Written to <code>{save.data.path}</code>. Now write its first probe.
         </p>
-        <RouterLink className="btn" to={`/probes?new=inspect&entity=${encodeURIComponent(current.entity)}`}>
+        {/* Validate, as the guide's first application goes on to (#101); the kind can be changed there. */}
+        <RouterLink className="btn" to={`/probes?new=validate&entity=${encodeURIComponent(current.entity)}`}>
           Write a probe for {current.entity}
         </RouterLink>
       </section>
     );
   } else if (tables.length === 0) {
+    const elsewhere = importedElsewhere(application.environments, environment.name, review.data?.tables ?? []);
     body = (
       <EmptyState title={`No tables imported in ${environment.title}`} message="The wizard builds an entity from imported schemas. Import a SQL connector's schema first.">
-        {notices.map((n) => (
-          <p key={n} className="hint">{n}</p>
-        ))}
+        {elsewhere.length > 0 ? (
+          <div className="actions" role="group" aria-label="Imported elsewhere">
+            <p className="hint">Imported in {elsewhere.map((e) => e.title).join(", ")}. Build the entity there:</p>
+            {elsewhere.map((e) => (
+              <button key={e.name} className="btn" type="button" onClick={() => selectEnvironment(e.name)}>
+                Use {e.title}
+              </button>
+            ))}
+          </div>
+        ) : (
+          notices.map((n) => (
+            <p key={n} className="hint">{n}</p>
+          ))
+        )}
         <RouterLink to="/tables">Tables: Import from replica</RouterLink>
       </EmptyState>
     );
@@ -295,7 +316,16 @@ export function NewEntityPage() {
             Back
           </button>
           {step < STEPS.length - 1 && (
-            <button className="btn" type="button" disabled={(step === 0 && taken) || (step === 1 && current.locations.length === 0)} onClick={() => setStep(step + 1)}>
+            <button
+              className="btn"
+              type="button"
+              disabled={(step === 0 && taken) || (step === 1 && current.locations.length === 0)}
+              onClick={() => {
+                // Reaching Preview runs its save checks at once: nothing waits for Check (#99).
+                if (step + 1 === STEPS.length - 1 && preview === undefined && !save.isPending) save.mutate(undefined);
+                setStep(step + 1);
+              }}
+            >
               Next: {STEPS[step + 1]}
             </button>
           )}
