@@ -12,12 +12,25 @@ v0.2 phase (a) first-run setup and Add connection, v0.3 phase (b) the entity gra
 v0.4 phase (c) blocks and probe by example, v0.5 phase (d) templates and New runbook.
 See docs/implementation-plan.md, Releases. -->
 
+## [0.2.1] - 2026-11-15
+
+A patch release on phase (a). A run whose data couldn't be read is now **Not checked**, not
+Failed, and `owl validate` and `owl inspect` exit 0, 1 or 2 (see Changed: **if your scripts check
+owl's exit codes, update them**). The audit can be read, and the fixes from v0.2.0's first use are
+in.
+
 ### Added
 
 - Read the audit: the **Audit** screen and `owl audit`, newest first, filtered by actor, action,
   application and environment, with `--json` for scripts. Both are read-only. Details are masked
   by today's PII rules, including values stored before an identifier became PII, and never show a
   host, login or password. They read through a new `GET /api/audit`.
+- A save check's field error in the API carries `check` and `location`, so a client can tell which
+  check failed, and where, without reading the message. The web app reads only these fields.
+- The macOS Keychain is tested for real: a CI job on macOS saves, reads, resolves and deletes a
+  password in the runner's keychain, and checks that a failed write and a locked keychain write
+  nothing anywhere else (#93). On macOS, a save to a locked keychain waits for the system's unlock
+  prompt (#128).
 
 ### Changed
 
@@ -48,6 +61,10 @@ See docs/implementation-plan.md, Releases. -->
 - A REST API that doesn't answer says "the API did not answer", or "the API did not answer within
   5 s" on a timeout, instead of an exception's class name such as `ConnectError`. The class goes
   to the `owl serve` log only.
+- Add connection's Save shows the preview in a confirm dialog, and writes only on **Write
+  <connector>**.
+- Validate's result leads with the first failed expectation. Locations that couldn't be read are
+  listed apart, as not part of that failure, and a fan-out row shows its key.
 
 ### Fixed
 
@@ -61,6 +78,22 @@ See docs/implementation-plan.md, Releases. -->
   default". It no longer creates an empty folder, so a typo can't look like missing configuration.
   Only the default folder is created on first run. A path the system can't use is a fixed error,
   never a traceback. This covers `owl serve` and `owl mcp`.
+- The top bar keeps its environment across reloads, except Production, which is never restored
+  from the browser: a stored Production opens the application's first other environment, with a
+  notice to choose Production in the top bar if you meant it.
+- The entity wizard offers the environments that have imports, and runs the save checks on
+  reaching Preview instead of showing "Checking" before they run.
+- After **Confirm all**, the catalog says what was confirmed and links to creating an entity.
+- "Write a probe for <entity>" opens a Validate probe, as the guide does.
+- The YAML editor keeps a list item's indent on Enter, so the next item is a sibling.
+- Add connection: a pasted connection string stays visible without its password, and the fields it
+  filled are highlighted, with an outline as well as colour. A typed one fills the form on Enter or
+  when the field loses focus, not only on paste.
+- Setup's environment cards wrap at narrow widths, with no horizontal scroll.
+- The Reference field's example names no application: "Jira key or case ID, such as PROJ-123", on
+  Validate, Inspect and the probe editor's test run.
+- The live first-run tests confirm Add connection's Save dialog, so the release's full native run
+  passes again (#123).
 
 ## [0.2.0] - 2026-11-14
 
@@ -237,6 +270,7 @@ The first pre-release: phase 1, milestones M0 to M4, verified on test databases 
   `owl store ddl`, `owl catalog import`, `owl kill on`, `owl kill off`, `owl kill list`,
   `owl runbook hash`.
 
-[Unreleased]: https://github.com/saadzarook/probeowl/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/saadzarook/probeowl/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/saadzarook/probeowl/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/saadzarook/probeowl/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/saadzarook/probeowl/releases/tag/v0.1.0

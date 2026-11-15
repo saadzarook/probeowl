@@ -69,7 +69,7 @@ test("owl serve in an empty folder to first Validate: the browser, counted and t
   count.start("Import and confirm the labels");
   await count.click(page.getByRole("button", { name: `Import ${connector}'s tables` }));
   await count.click(page.getByRole("button", { name: /^Confirm all \d+ as suggested$/ }));
-  await expect(page.getByRole("status").filter({ hasText: /^Confirmed \d+ in/ })).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByRole("status").filter({ hasText: /^Confirmed \d+ tables?'? labels? in/ })).toBeVisible({ timeout: 60_000 });
   count.end();
 
   await entityProbeAndValidate(page, count, connector);
