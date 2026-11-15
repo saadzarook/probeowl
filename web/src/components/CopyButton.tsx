@@ -1,6 +1,6 @@
 // Author: @SaadZarook
 import { useState } from "react";
-import { copyText } from "../runbooks";
+import { copyText } from "../ui";
 
 /** A button that copies text, and says whether the browser let it. */
 export function CopyButton({ text, label = "Copy" }: { text: string; label?: string }) {

@@ -30,16 +30,6 @@ export function writeHeader(requires: string, run: Run | undefined, environment:
   return `-- WRITE · ${place} · needs ${requires}`;
 }
 
-/** Put text on the clipboard; false if the browser would not, so the screen can say so. */
-export async function copyText(text: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 /** The refusal's field that asks to run a step without its plan check, in Production. */
 export const RUN_WITHOUT_PLAN_CHECK = "run_without_plan_check";
 

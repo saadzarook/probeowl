@@ -16,3 +16,9 @@
   contract changes run `npm run generate:api` and commit the result (CI runs `npm run check:api`).
 - Mocks are MSW handlers in `web/mocks/`, enabled with `VITE_MOCK_API=true`. Runs poll
   `GET /api/runs/{id}` until the status is no longer `running`.
+- New UI is built from `src/ui/` (#105): Button, Field and FormGrid, Input, Select, Badge, Card,
+  CodeBlock, Sheet and ListOrTable, on Tailwind 4 and the tokens in `src/ui/ui.css`, the only file
+  with colours. Screens move onto it one PR at a time; until then `app.css` styles them, and its
+  rules beat Tailwind's wherever both apply. `e2e/screen-rules.spec.ts` marks the rules each screen
+  still breaks: take the mark off in the PR that moves the screen. `/ui-gallery`, in mock builds
+  only, shows every component, and `e2e/ui-rules.spec.ts` tests them there.
