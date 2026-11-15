@@ -60,6 +60,8 @@ test("owl serve in an empty folder to first Validate: the browser, counted and t
   await count.click(page.getByRole("button", { name: "Preview" }));
   await expect(page.getByLabel(`Diff of card_baseline/connectors/${connector}.yaml`)).toBeVisible({ timeout: 60_000 });
   await count.click(page.getByRole("button", { name: `Save ${connector}` }));
+  // The confirm dialog Save opens (#98): one more action on the newcomer path.
+  await count.click(page.getByRole("dialog").getByRole("button", { name: `Write ${connector}` }));
   await expect(page.getByRole("status").filter({ hasText: "The password is in this machine's keychain" })).toBeVisible({ timeout: 60_000 });
   await expect(page.getByRole("status").filter({ hasText: "Connected" })).toBeVisible({ timeout: 60_000 });
   count.end();
