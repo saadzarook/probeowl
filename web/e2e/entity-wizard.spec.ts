@@ -178,3 +178,24 @@ test("the Probe editor offers a new entity", async ({ page }) => {
   await page.goto("/probes");
   await expect(page.getByRole("link", { name: "New entity…" })).toHaveAttribute("href", "/probes/new-entity");
 });
+
+test("no tables here: the wizard offers the environments that have them, not a CLI command (#94)", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("mock-uat-only-imports", "1"));
+  await start(page, /Card access/, "prod");
+  await expect(page.getByText("No tables imported in Production")).toBeVisible();
+  const offered = page.getByRole("group", { name: "Imported elsewhere" });
+  await expect(offered).toContainText("Imported in UAT");
+  await expect(page.getByText(/owl catalog import/)).toHaveCount(0);
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await offered.getByRole("button", { name: "Use UAT" }).click();
+  await expect(page.getByLabel("Environment")).toHaveValue("uat");
+  await expect(page.getByLabel("Entity id")).toBeVisible();
+});
+
+test("no tables in any environment: the import command is still offered", async ({ page }) => {
+  await page.goto("/probes/new-entity");
+  await page.getByRole("button", { name: "Application" }).click();
+  await page.getByRole("button", { name: /Onboarding/ }).last().click();
+  await expect(page.getByText(/No tables imported in/)).toBeVisible();
+  await expect(page.getByRole("group", { name: "Imported elsewhere" })).toHaveCount(0);
+});

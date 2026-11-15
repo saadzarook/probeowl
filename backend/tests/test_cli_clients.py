@@ -27,6 +27,7 @@ CLIENTS = [
     ["kill", "list"],
     ["kill", "on", "--all", "--reason", "incident", "--reference", "INC-1"],
     ["kill", "off", "--all", "--reason", "incident", "--reference", "INC-1"],
+    ["audit"],
 ]
 
 
@@ -53,7 +54,7 @@ def test_the_hidden_option_is_not_in_a_clients_help() -> None:
 
 def test_the_root_help_says_which_commands_are_clients_of_owl_serve() -> None:
     result = CliRunner().invoke(cli.app, ["--help"])
-    assert "validate, inspect, catalog, kill and reload" in _plain(result.output)
+    assert "validate, inspect, catalog, kill, reload and audit" in _plain(result.output)
     assert "start owl serve --config <folder> first" in _plain(result.output)
 
 

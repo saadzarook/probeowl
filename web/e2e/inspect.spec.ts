@@ -114,12 +114,12 @@ test("a Production run shows the replica lag warning as a notice, apart from the
   await expect(result.getByText("3 issues")).toBeVisible();
 });
 
-test("a run a kill switch stopped shows why next to Failed", async ({ page }) => {
+test("a run a kill switch stopped is Not checked, and says why (#81)", async ({ page }) => {
   await openInspect(page);
   await inspect(page, "VP00000043");
   const result = page.getByRole("region", { name: "Inspect result" });
-  await expect(result.getByText("Failed", { exact: true })).toBeVisible();
-  await expect(result.getByText("Stopped, not a finding: stopped by the global kill switch: replica on fire")).toBeVisible();
+  await expect(result.getByText("Not checked", { exact: true })).toBeVisible();
+  await expect(result.getByText("Stopped before checking, not a finding: stopped by the global kill switch: replica on fire")).toBeVisible();
 });
 
 test("a run skipped by the circuit breaker shows its reason", async ({ page }) => {

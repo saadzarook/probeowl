@@ -8,3 +8,6 @@ export const REASON_LABELS: Record<Reason, string> = {
   audit_or_compliance: "Audit or compliance",
   proactive_check: "Proactive check",
 };
+
+/** The Reference field's example, the same in every application: it names none of them (#86). */
+export const REFERENCE_PLACEHOLDER = "Jira key or case ID, such as PROJ-123";

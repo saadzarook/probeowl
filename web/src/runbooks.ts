@@ -1,5 +1,5 @@
 // Author: @SaadZarook
-import type { Run, RunbookView } from "./api/client";
+import { ProblemError, type Run, type RunbookView } from "./api/client";
 
 export type RunbookStepView = RunbookView["steps"][number];
 
@@ -40,9 +40,12 @@ export async function copyText(text: string): Promise<boolean> {
   }
 }
 
-/** Whether a refusal is the one a person can answer: a plan that could not be read, in Production. */
-export function needsPlanAcknowledgement(message: string): boolean {
-  return message.includes("to run without plan check");
+/** The refusal's field that asks to run a step without its plan check, in Production. */
+export const RUN_WITHOUT_PLAN_CHECK = "run_without_plan_check";
+
+/** Whether a refusal is the one a person can answer: a plan that could not be read, in Production. By its field, never its message (#108). */
+export function needsPlanAcknowledgement(error: Error): boolean {
+  return error instanceof ProblemError && RUN_WITHOUT_PLAN_CHECK in error.fields;
 }
 
 /** What a minimal runbook is built from: the application, and its first entity and probe if it has them. */

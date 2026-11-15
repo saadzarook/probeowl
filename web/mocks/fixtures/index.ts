@@ -6,7 +6,7 @@ import { cardAccessReview, walletReviewTables } from "./review";
 import { cardAccessConnectors, walletConnectors } from "./connectors";
 import { draftRun } from "./probeChecks";
 import { topUpNotCredited } from "./runbooks";
-import { failedValidateRun, runningValidateRun, skippedValidateRun, stoppedValidateRun, lateValidateRun } from "./runs";
+import { failedValidateRun, runningValidateRun, skippedValidateRun, stoppedValidateRun, unreadableValidateRun, lateValidateRun } from "./runs";
 import {
   ambiguousEmailRun,
   cardAccessProbes,
@@ -29,7 +29,7 @@ export { walletConnectors, cardAccessConnectors, payoutsConnectors } from "./con
 export { walletCatalog, cardAccessCatalog, schemaSnapshots, truncatedAccessSnapshot, UNIMPORTED, addedConnectorSnapshot } from "./catalog";
 export { walletSuggestions, walletReviewTables, cardAccessReview } from "./review";
 export { draftRun, passingReport, piiReport, timeFilterReport, unboundReport, unreadableReport, TIME_FILTER_MESSAGE } from "./probeChecks";
-export { runningValidateRun, failedValidateRun, skippedValidateRun, stoppedValidateRun, lateValidateRun, walletRunPages } from "./runs";
+export { runningValidateRun, failedValidateRun, skippedValidateRun, stoppedValidateRun, unreadableValidateRun, lateValidateRun, walletRunPages } from "./runs";
 export {
   visitorEntity,
   cardAccessProbes,
@@ -89,6 +89,7 @@ export const mockedRuns = [
   { file: "mocks/fixtures/runs.ts", name: "failedValidateRun", run: failedValidateRun("run_b") },
   { file: "mocks/fixtures/runs.ts", name: "skippedValidateRun", run: skippedValidateRun("run_j") },
   { file: "mocks/fixtures/runs.ts", name: "stoppedValidateRun", run: stoppedValidateRun("run_l") },
+  { file: "mocks/fixtures/runs.ts", name: "unreadableValidateRun", run: unreadableValidateRun("run_n") },
   { file: "mocks/fixtures/runs.ts", name: "lateValidateRun", run: lateValidateRun("run_late") },
   { file: "mocks/fixtures/cardAccess.ts", name: "ambiguousEmailRun", run: ambiguousEmailRun("run_f", "email") },
   { file: "mocks/fixtures/probeChecks.ts", name: "draftRun", run: draftRun("run_k") },
