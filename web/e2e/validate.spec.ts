@@ -381,3 +381,15 @@ test("nothing is suggested until the run has finished", async ({ page }) => {
   await expect(page.getByRole("region", { name: "Run result" }).getByText("Locations are filling in")).toBeVisible();
   await expect(page.getByRole("region", { name: "Suggested next steps" })).toHaveCount(0);
 });
+
+test("the Reference field's example names no application, on Validate and Inspect alike (#86)", async ({ page }) => {
+  const example = "Jira key or case ID, such as PROJ-123";
+  for (const app of [/Wallet/, /Card access/]) {
+    for (const screen of ["/validate", "/inspect"]) {
+      await page.goto(screen);
+      await page.getByRole("button", { name: "Application" }).click();
+      await page.getByRole("button", { name: app }).last().click();
+      await expect(page.getByLabel(/^Reference/)).toHaveAttribute("placeholder", example);
+    }
+  }
+});

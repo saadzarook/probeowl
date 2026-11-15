@@ -1831,6 +1831,16 @@ export interface components {
             field: string;
             /** Message */
             message: string;
+            /**
+             * Check
+             * @description The save check that failed, when the error is one.
+             */
+            check?: string | null;
+            /**
+             * Location
+             * @description The location or identifier a failed save check is about, as it names it.
+             */
+            location?: string | null;
         };
         /**
          * FieldResult
@@ -2071,7 +2081,7 @@ export interface components {
             reason: components["schemas"]["Reason"];
             /**
              * Reference
-             * @description Jira key, support case ID or change ID, such as WALLET-482.
+             * @description Jira key, support case ID or change ID, such as PROJ-123.
              */
             reference?: string | null;
             /** Notes */

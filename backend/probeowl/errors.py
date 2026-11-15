@@ -79,11 +79,24 @@ def unknown_application(name: str, known: Iterable[str]) -> NotFoundError:
 
 
 class RequestError(ProbeOwlError):
-    """A request names things that exist but asks for something not allowed, field by field."""
+    """A request names things that exist but asks for something not allowed, field by field.
 
-    def __init__(self, message: str, fields: dict[str, str] | None = None):
+    checks and locations: for a field that is a failed save check, the check's name, and the
+    entity's location it is about if any, so a client reads them as fields rather than from the
+    field's text (#108).
+    """
+
+    def __init__(
+        self,
+        message: str,
+        fields: dict[str, str] | None = None,
+        locations: dict[str, str] | None = None,
+        checks: dict[str, str] | None = None,
+    ):
         super().__init__(message)
         self.fields = fields or {}
+        self.locations = locations or {}
+        self.checks = checks or {}
 
 
 class ConflictError(ProbeOwlError):

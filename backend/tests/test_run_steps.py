@@ -270,6 +270,8 @@ def test_in_production_an_unreadable_plan_needs_an_acknowledgement(setup: Setup)
     assert refused.status_code == 422
     assert "plan checks could not run in prod" in refused.json()["detail"]
     assert "to run without plan check, confirm it" in refused.json()["detail"]
+    # The web asks for the acknowledgement by this field, never by the message (#108).
+    assert [e["field"] for e in refused.json()["errors"]] == ["run_without_plan_check"]
     assert not [c for c in setup.fakes["wallet_db"].calls if "outbox_events" in c[0]]
 
     allowed = api.post(step_url(run_id, REVIEWED_READ), json={"run_without_plan_check": True})

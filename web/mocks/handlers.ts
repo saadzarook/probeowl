@@ -5,7 +5,7 @@ import { delay, http, HttpResponse } from "msw";
 import type { ApplicationSummary, CatalogChange, CatalogReview, CatalogTable, TableReview, DraftConnection, KillSwitch, KillTarget, ProbeChange, SaveApplication, SaveConnector, SaveEntity, SaveSecret, SaveProbe, SetKillSwitch, StartRun } from "../src/api/client";
 import type { CompareRequest } from "../../plugins/compare_files/web/types";
 import { compareFilesManifest, compareFilesResult } from "./fixtures/compareFiles";
-import type { HealthyAttempt, HealthyComparison, Run, RunbookView, StepInRun } from "../src/api/client";
+import type { FieldError, HealthyAttempt, HealthyComparison, Run, RunbookView, StepInRun } from "../src/api/client";
 import { CONFIGURATION_HEADER } from "../src/api/configuration";
 import { mockSearch, type Searchable } from "./search";
 import { detectIdentifier } from "../src/identifiers";
@@ -110,13 +110,13 @@ const KEY_ROLES = ["primary_key", "link", "external_key"];
  */
 function entityFailures(application: string, text: string): { field: string; message: string }[] {
   const entity = parse(text) as { locations?: Record<string, { using?: string; lookup?: string }> };
-  const failures: { field: string; message: string }[] = [];
+  const failures: FieldError[] = [];
   for (const [name, location] of Object.entries(entity.locations ?? {})) {
     const read = /FROM (?:\w+\.)?(\w+) WHERE (\w+) = :/.exec(location.lookup ?? "");
     if (!read) continue;
     const [, table = "", column = ""] = read;
     if (column === "status") {
-      failures.push({ field: `Index check: ${name}`, message: `the lookup would read all of ${table}: no index on status` });
+      failures.push({ field: `Index check: ${name}`, check: "Index check", location: name, message: `the lookup would read all of ${table}: no index on status` });
       continue;
     }
     const entry = catalogOf(application)?.find((t) => t.connector === location.using && t.table === table);
@@ -126,6 +126,8 @@ function entityFailures(application: string, text: string): { field: string; mes
     const label = entry.label.charAt(0).toUpperCase() + entry.label.slice(1);
     failures.push({
       field: `Time filter: ${name}`,
+      check: "Time filter",
+      location: name,
       message: `${table} is a ${label} table: filter on its time column ${time} from a parameter (for example ${time} >= :since), or look rows up by a key (a primary key, link or external key column = :parameter, or IN a short list)`,
     });
   }
@@ -486,7 +488,7 @@ export const handlers = [
     if (missing) return passwordMissingProblem(missing.connector, missing.environment);
     const failed = checksOf(body, application).checks.filter((c) => c.status === "fail");
     if (failed.length > 0) {
-      return problem(422, "Unprocessable Content", `${failed[0]?.check ?? "Probe"}: ${failed[0]?.message ?? ""}`, failed.map((c) => ({ field: c.location ? `${c.check}: ${c.location}` : c.check, message: c.message })));
+      return problem(422, "Unprocessable Content", `${failed[0]?.check ?? "Probe"}: ${failed[0]?.message ?? ""}`, failed.map((c) => ({ field: c.location ? `${c.check}: ${c.location}` : c.check, check: c.check, location: c.location ?? null, message: c.message })));
     }
     const production = applications.find((a) => a.name === application)?.environments.find((e) => e.name === body.environment)?.production;
     if (production && !body.investigation.reference) return problem(422, "Unprocessable Content", "A reference is required in Production.");
@@ -530,7 +532,7 @@ export const handlers = [
     const report = checksOf(body, application);
     const failed = report.checks.filter((c) => c.status === "fail");
     if (failed.length > 0) {
-      return problem(422, "Unprocessable Content", `${failed[0]?.check ?? "Probe"}: ${failed[0]?.message ?? ""}`, failed.map((c) => ({ field: c.location ? `${c.check}: ${c.location}` : c.check, message: c.message })));
+      return problem(422, "Unprocessable Content", `${failed[0]?.check ?? "Probe"}: ${failed[0]?.message ?? ""}`, failed.map((c) => ({ field: c.location ? `${c.check}: ${c.location}` : c.check, check: c.check, location: c.location ?? null, message: c.message })));
     }
     const production = applications.find((a) => a.name === application)?.environments.find((e) => e.name === body.environment)?.production === true;
     // As the backend does: a plan that cannot be read only warns in the preview.
@@ -1037,7 +1039,9 @@ export const handlers = [
     let warnings: string[] = [];
     if (id === "run_noplan") {
       if (!body.run_without_plan_check) {
-        return problem(422, "Unprocessable Content", "plan checks could not run in prod (index use not checked: the connection was refused); to run without plan check, confirm it: that is recorded in the audit");
+        // As the backend refuses it: the field run_without_plan_check is what the web acts on (#108).
+        const why = "plan checks could not run in prod (index use not checked: the connection was refused); to run without plan check, confirm it: that is recorded in the audit";
+        return problem(422, "Unprocessable Content", why, [{ field: "run_without_plan_check", message: why }]);
       }
       warnings = ["index use not checked: the connection was refused"];
     }
