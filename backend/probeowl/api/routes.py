@@ -749,6 +749,8 @@ def test_connection(
             "connector": connector,
             "environment": environment,
             "reachable": result.reachable,
+            # Its fixed category when not reached: tells a wrong password from a server down.
+            **({"reason": result.failure} if result.failure else {}),
         },
     )
     return result
@@ -841,6 +843,7 @@ def test_draft_connection(application: str, body: DraftConnection, http: Request
             "connector": body.connector,
             "environment": body.environment,
             "reachable": result.reachable,
+            **({"reason": result.failure} if result.failure else {}),
             "draft": True,
         },
     )

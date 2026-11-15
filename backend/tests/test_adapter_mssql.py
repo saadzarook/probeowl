@@ -18,6 +18,7 @@ import mssql_python
 import pytest
 from sqlalchemy.engine import make_url
 
+from probeowl.connectors.failures import Failure
 from probeowl.connectors.plan import Access
 from probeowl.connectors.sql import SqlLimits
 from probeowl.connectors.sqlserver import SqlServerAdapter, connection_string
@@ -655,7 +656,9 @@ def _drop_login(cursor: Any, login: str) -> None:
 def test_mssql_an_unreachable_server_says_why_but_not_where(server: Server) -> None:
     reason = server.adapter(port=1).unreachable()
     assert reason is not None
-    assert server.binding.host not in reason and server.binding.user not in reason
+    # A fixed message with its category (#91): never the host or the login.
+    assert reason.failure is Failure.CONNECTION, reason
+    assert server.binding.host not in reason.message and server.binding.user not in reason.message
 
 
 def test_mssql_the_lag_grant_named_is_the_one_that_is_enough(server: Server) -> None:

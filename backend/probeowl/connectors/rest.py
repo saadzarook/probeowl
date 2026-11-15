@@ -7,6 +7,7 @@ value URL-encoded in place, never pasted into the URL as text.
 """
 
 import json
+import logging
 import re
 import threading
 import time
@@ -18,11 +19,14 @@ from urllib.parse import parse_qsl, quote, urlsplit
 
 import httpx
 
+from probeowl.connectors.failures import Failure, Unreachable
 from probeowl.connectors.lookup import LookupResult
 from probeowl.errors import ConnectorError, GuardViolation
 from probeowl.guards.result import cap_result
 from probeowl.guards.statement import ParameterValue
 from probeowl.model.connector import DEFAULT_ROW_CEILING, RestBinding
+
+log = logging.getLogger(__name__)
 
 _PLACEHOLDER = re.compile(r"\{\{\s*(\w+)\s*\}\}")
 _RETRY_STATUSES = {429, 500, 502, 503, 504}
@@ -179,7 +183,7 @@ class RestAdapter:
             duration_ms=round((time.monotonic() - start) * 1000),
         )
 
-    def unreachable(self) -> str | None:
+    def unreachable(self) -> Unreachable | None:
         """Why the API cannot be reached, or None if it answers. One GET of its base URL, no retry.
 
         A connector names no health path, and its base URL may well answer 404: any answer means
@@ -190,11 +194,21 @@ class RestAdapter:
             with self._client.stream("GET", "") as response:
                 status = response.status_code
         except httpx.TransportError as err:
-            # Only the error's kind, as for a lookup: its text could carry the request.
-            return f"the API could not be reached: {type(err).__name__}"
-        if status in {401, 403} or status >= 500:
-            return _status_message(status)
+            return self._no_answer(err)
+        if status in {401, 403}:
+            return Unreachable(Failure.AUTHENTICATION, _status_message(status))
+        if status >= 500:
+            return Unreachable(Failure.SERVER_ERROR, _status_message(status))
         return None
+
+    def _no_answer(self, err: httpx.TransportError) -> Unreachable:
+        """A transport failure as a fixed reason, never its class or its text (#83)."""
+        # Its kind goes to the owl serve log only, to tell a timeout from a refusal there.
+        log.info("REST transport failure: %s", type(err).__name__)
+        if isinstance(err, httpx.TimeoutException):
+            seconds = f"{self._limits.timeout_s:g}"
+            return Unreachable(Failure.TIMED_OUT, f"the API did not answer within {seconds} s")
+        return Unreachable(Failure.CONNECTION, "the API did not answer")
 
     def close(self) -> None:
         """Close the HTTP client."""
@@ -208,11 +222,9 @@ class RestAdapter:
                 status, body, retry_after = self._send(request)
             except httpx.TransportError as err:
                 if last:
-                    # Only the error's kind: its text could carry the request or the response,
+                    # A fixed reason: the error's text could carry the request or the response,
                     # and a chained exception would print it in any logged traceback.
-                    raise ConnectorError(
-                        f"the API could not be reached: {type(err).__name__}"
-                    ) from None
+                    raise ConnectorError(self._no_answer(err).message) from None
                 self._sleep(self._limits.backoff_s * 2**attempt)
                 continue
             if status == 404:

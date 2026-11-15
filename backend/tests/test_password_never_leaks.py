@@ -20,6 +20,7 @@ from probeowl.api.app import create_app
 from probeowl.api.local_only import HEADER
 from probeowl.config_folder import ConfigFolder
 from probeowl.connector_status import ConnectorStatuses
+from probeowl.connectors.failures import Failure, Unreachable
 from probeowl.guards.breaker import CircuitBreaker
 from probeowl.model.connector import RestConnector, SqlConnector
 from probeowl.reload import ConfigReloader
@@ -46,8 +47,9 @@ BINDING = {
 class Refusing:
     """A draft connection whose login fails, as a wrong password does."""
 
-    def unreachable(self) -> str | None:
-        return "authentication failed; check the binding's login and secret"
+    def unreachable(self) -> Unreachable | None:
+        message = "authentication failed; check the binding's login and secret"
+        return Unreachable(Failure.AUTHENTICATION, message)
 
     def close(self) -> None:
         pass

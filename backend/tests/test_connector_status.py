@@ -11,6 +11,7 @@ from typer.testing import CliRunner
 from probeowl.api.app import create_app
 from probeowl.cli import main as cli
 from probeowl.connector_status import CACHE_S, ConnectorStatuses, unreadable_plans
+from probeowl.connectors.failures import Failure, Unreachable
 from probeowl.connectors.lookup import ReplicaLag
 from probeowl.errors import ConfigError, KillSwitchEngaged, NotFoundError
 from probeowl.guards.breaker import CircuitBreaker
@@ -47,8 +48,9 @@ class Source:
         self._plans = plans
         self.closed = 0
 
-    def unreachable(self) -> str | None:
-        return self._unreachable
+    def unreachable(self) -> Unreachable | None:
+        found = self._unreachable
+        return None if found is None else Unreachable(Failure.CONNECTION, found)
 
     def replica_lag(self) -> ReplicaLag:
         return self._lag
