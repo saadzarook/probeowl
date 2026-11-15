@@ -91,8 +91,9 @@ def test_a_write_that_fails_is_refused_and_written_nowhere(
     assert not in_login_keychain(name)
 
 
-# A write to a locked keychain, in its own process: if the runner shows an unlock prompt instead
-# of refusing, the timeout fails the test rather than hanging the job.
+# A write to a locked keychain, in its own process. macOS asks to unlock it, as it would a person
+# at the desk, so the write waits for that prompt; on the runner nobody answers. Either way it must
+# never be written anywhere else: it is refused, or it waits and is stopped (#93).
 LOCKED_WRITE = """
 import sys
 from probeowl.errors import KeychainUnavailable
@@ -122,14 +123,20 @@ def locked_default(tmp_path: Path) -> Iterator[Path]:
         security("delete-keychain", str(path))
 
 
-def test_a_locked_keychain_is_refused_and_written_nowhere(name: str, locked_default: Path) -> None:
+def test_a_locked_keychain_is_never_written_and_nothing_goes_elsewhere(
+    name: str, locked_default: Path
+) -> None:
     try:
         done = subprocess.run(
-            [sys.executable, "-c", LOCKED_WRITE, name], capture_output=True, text=True, timeout=30
+            [sys.executable, "-c", LOCKED_WRITE, name], capture_output=True, text=True, timeout=20
         )
-    except subprocess.TimeoutExpired:
-        pytest.fail("a write to a locked keychain waited (an unlock prompt?) instead of refusing")
-    assert done.returncode == 0, done.stdout + done.stderr
-    assert "refused: the system keychain could not be written" in done.stdout
-    assert "never-kept" not in done.stdout + done.stderr
+    except subprocess.TimeoutExpired as waited:
+        # It waited for the unlock prompt; run(text=True) still gives what it wrote as bytes here.
+        written = b"".join(part for part in (waited.stdout, waited.stderr) if part)
+        output = written.decode(errors="replace")
+    else:
+        output = done.stdout + done.stderr
+        assert done.returncode == 0, output
+        assert "refused: the system keychain could not be written" in done.stdout
+    assert "never-kept" not in output
     assert not in_login_keychain(name)

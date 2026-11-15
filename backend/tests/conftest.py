@@ -56,9 +56,10 @@ class MemoryKeychain:
 def machine_keychain(
     request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
 ) -> MemoryKeychain:
-    """No test reads or writes this machine's keychain; test_secrets tests the real functions."""
+    """No test reads or writes this machine's keychain; test_secrets tests the real functions,
+    and test_keychain_macos the real macOS Keychain (#93), which only its own job lets it write."""
     memory = MemoryKeychain()
-    if request.module.__name__.endswith("test_secrets"):
+    if request.module.__name__.endswith(("test_secrets", "test_keychain_macos")):
         return memory
     monkeypatch.setattr(secrets, "secret_saved", memory.saved)
     monkeypatch.setattr(secrets, "read_keychain", memory.read)
