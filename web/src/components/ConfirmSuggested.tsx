@@ -59,9 +59,10 @@ export function ConfirmSuggested({ application, connector, environment }: Confir
           <p role="status">
             Imported {run.data.tables.length} {run.data.tables.length === 1 ? "table" : "tables"}.
           </p>
-          {review.isPending || catalog.isPending ? (
+          {confirmAll.data ? null : review.isPending || catalog.isPending ? (
             <p aria-busy="true">Reading the suggestions…</p>
           ) : suggested.length === 0 ? (
+            // Only when there was nothing to confirm: never beside what was just confirmed (#100).
             <p className="hint">Nothing to confirm here: label its tables on Tables.</p>
           ) : (
             <>
@@ -84,9 +85,14 @@ export function ConfirmSuggested({ application, connector, environment }: Confir
             </>
           )}
           {confirmAll.data && (
-            <p role="status" className="written">
-              Confirmed {confirmAll.data.length} in <code>{application.name}/catalog.yaml</code>. Review and commit it with git.
-            </p>
+            <>
+              <p role="status" className="written">
+                Confirmed {confirmAll.data.length} {confirmAll.data.length === 1 ? "table's label" : "tables' labels"} in <code>{application.name}/catalog.yaml</code>. Review and commit it with git.
+              </p>
+              <RouterLink className="btn" to="/probes/new-entity">
+                Next: create an entity
+              </RouterLink>
+            </>
           )}
           {confirmAll.isError && (
             <div role="alert" className="error-state">

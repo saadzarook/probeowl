@@ -5,7 +5,8 @@ import { delay, http, HttpResponse } from "msw";
 import type { ApplicationSummary, CatalogChange, CatalogReview, CatalogTable, TableReview, DraftConnection, KillSwitch, KillTarget, ProbeChange, SaveApplication, SaveConnector, SaveEntity, SaveSecret, SaveProbe, SetKillSwitch, StartRun } from "../src/api/client";
 import type { CompareRequest } from "../../plugins/compare_files/web/types";
 import { compareFilesManifest, compareFilesResult } from "./fixtures/compareFiles";
-import type { HealthyAttempt, HealthyComparison, Run, RunbookView, StepInRun } from "../src/api/client";
+import { auditEvents } from "./fixtures/audit";
+import type { FieldError, HealthyAttempt, HealthyComparison, Run, RunbookView, StepInRun } from "../src/api/client";
 import { CONFIGURATION_HEADER } from "../src/api/configuration";
 import { mockSearch, type Searchable } from "./search";
 import { detectIdentifier } from "../src/identifiers";
@@ -34,6 +35,7 @@ import {
   stoppedCardRun,
   lateValidateRun,
   stoppedValidateRun,
+  unreadableValidateRun,
   skippedValidateRun,
   schemaSnapshots,
   truncatedAccessSnapshot,
@@ -92,6 +94,9 @@ const KEPT_COMMENT = "# A comment only the real file has.";
 
 // mock-no-catalog: Wallet as owl init leaves it, its schema imported but no catalog.yaml yet.
 const noCatalog = (application: string) => application === "wallet" && localStorage.getItem("mock-no-catalog") !== null;
+// mock-uat-only-imports: Card access imported in UAT only, so Production has no tables (#94).
+const notImportedHere = (application: string, environment: string) =>
+  application === "card_access" && environment === "prod" && localStorage.getItem("mock-uat-only-imports") !== null;
 
 const catalogOf = (application: string): CatalogTable[] | undefined => {
   const added = written.get(application) ?? [];
@@ -109,13 +114,13 @@ const KEY_ROLES = ["primary_key", "link", "external_key"];
  */
 function entityFailures(application: string, text: string): { field: string; message: string }[] {
   const entity = parse(text) as { locations?: Record<string, { using?: string; lookup?: string }> };
-  const failures: { field: string; message: string }[] = [];
+  const failures: FieldError[] = [];
   for (const [name, location] of Object.entries(entity.locations ?? {})) {
     const read = /FROM (?:\w+\.)?(\w+) WHERE (\w+) = :/.exec(location.lookup ?? "");
     if (!read) continue;
     const [, table = "", column = ""] = read;
     if (column === "status") {
-      failures.push({ field: `Index check: ${name}`, message: `the lookup would read all of ${table}: no index on status` });
+      failures.push({ field: `Index check: ${name}`, check: "Index check", location: name, message: `the lookup would read all of ${table}: no index on status` });
       continue;
     }
     const entry = catalogOf(application)?.find((t) => t.connector === location.using && t.table === table);
@@ -125,6 +130,8 @@ function entityFailures(application: string, text: string): { field: string; mes
     const label = entry.label.charAt(0).toUpperCase() + entry.label.slice(1);
     failures.push({
       field: `Time filter: ${name}`,
+      check: "Time filter",
+      location: name,
       message: `${table} is a ${label} table: filter on its time column ${time} from a parameter (for example ${time} >= :since), or look rows up by a key (a primary key, link or external key column = :parameter, or IN a short list)`,
     });
   }
@@ -132,7 +139,11 @@ function entityFailures(application: string, text: string): { field: string; mes
 }
 
 function reviewOf(application: string): CatalogReview | undefined {
-  const base = baseReviewOf(application);
+  const found = baseReviewOf(application);
+  const base =
+    found && notImportedHere(application, "prod")
+      ? { ...found, tables: found.tables.map((t) => ({ ...t, imported_in: t.imported_in.filter((e) => e !== "prod") })) }
+      : found;
   const added = addedImports.get(application) ?? [];
   if (!base || added.length === 0) return base;
   // A connector added through Add connection: its tables suggested, until each is confirmed.
@@ -246,7 +257,8 @@ function checksOf(body: DraftBody, application = "") {
   } catch (e) {
     return unreadableReport(e instanceof Error ? e.message.split("\n")[0] ?? "" : "");
   }
-  if (prodUnbound(application)) return unboundReport(name, (environments ?? ["prod", "uat"]).filter((e) => e === "prod"));
+  // Enabled in Production (named, or by having no list): the backend's answer; otherwise it passes.
+  if (prodUnbound(application) && (environments ?? ["prod"]).includes("prod")) return unboundReport(name);
   const entity = body.entity ?? "";
   if (/FROM topups WHERE status = :status/.test(entity)) return timeFilterReport(name);
   if (/SELECT customer_email/.test(entity)) return piiReport(name);
@@ -281,6 +293,7 @@ function runFor(id: string, request: StartRun, running: boolean): Run {
   if (request.probe === "visitor_cards") return cardRun(id, request, running);
   if (request.value === "tp_paused") return skippedValidateRun(id);
   if (request.value === "tp_halted") return stoppedValidateRun(id);
+  if (request.value === "tp_noread") return unreadableValidateRun(id);
   if (request.value === "tp_lagunk" && !running) return lateValidateRun(id);
   return running ? runningValidateRun(id) : failedValidateRun(id);
 }
@@ -484,7 +497,7 @@ export const handlers = [
     if (missing) return passwordMissingProblem(missing.connector, missing.environment);
     const failed = checksOf(body, application).checks.filter((c) => c.status === "fail");
     if (failed.length > 0) {
-      return problem(422, "Unprocessable Content", `${failed[0]?.check ?? "Probe"}: ${failed[0]?.message ?? ""}`, failed.map((c) => ({ field: c.location ? `${c.check}: ${c.location}` : c.check, message: c.message })));
+      return problem(422, "Unprocessable Content", `${failed[0]?.check ?? "Probe"}: ${failed[0]?.message ?? ""}`, failed.map((c) => ({ field: c.location ? `${c.check}: ${c.location}` : c.check, check: c.check, location: c.location ?? null, message: c.message })));
     }
     const production = applications.find((a) => a.name === application)?.environments.find((e) => e.name === body.environment)?.production;
     if (production && !body.investigation.reference) return problem(422, "Unprocessable Content", "A reference is required in Production.");
@@ -528,7 +541,7 @@ export const handlers = [
     const report = checksOf(body, application);
     const failed = report.checks.filter((c) => c.status === "fail");
     if (failed.length > 0) {
-      return problem(422, "Unprocessable Content", `${failed[0]?.check ?? "Probe"}: ${failed[0]?.message ?? ""}`, failed.map((c) => ({ field: c.location ? `${c.check}: ${c.location}` : c.check, message: c.message })));
+      return problem(422, "Unprocessable Content", `${failed[0]?.check ?? "Probe"}: ${failed[0]?.message ?? ""}`, failed.map((c) => ({ field: c.location ? `${c.check}: ${c.location}` : c.check, check: c.check, location: c.location ?? null, message: c.message })));
     }
     const production = applications.find((a) => a.name === application)?.environments.find((e) => e.name === body.environment)?.production === true;
     // As the backend does: a plan that cannot be read only warns in the preview.
@@ -814,9 +827,12 @@ export const handlers = [
     const application = String(params["application"]);
     const connector = query.get("connector") ?? "";
     const environment = query.get("environment") ?? "";
+    const neverImported =
+      notImportedHere(application, environment) ||
+      (application === UNIMPORTED.application && connector === UNIMPORTED.connector && environment === UNIMPORTED.environment);
     const found =
       imported.get(importKey(application, connector, environment)) ??
-      (application === UNIMPORTED.application && connector === UNIMPORTED.connector && environment === UNIMPORTED.environment
+      (neverImported
         ? undefined
         : schemaSnapshots.find((s) => s.application === application && s.connector === connector && s.environment === environment));
     return found
@@ -934,6 +950,23 @@ export const handlers = [
     return json(mockSearch(q, limit, items, runs));
   }),
 
+  // The audit (#79): filters by exact name, 50 per page, as owl serve answers.
+  http.get("/api/audit", ({ request }) => {
+    const query = new URL(request.url).searchParams;
+    if (localStorage.getItem("mock-audit-error")) return problem(500, "Internal Server Error", "The store could not be read.");
+    const actor = query.get("actor");
+    const matching = auditEvents.filter(
+      (e) =>
+        (!actor || e.actor.name === actor || e.actor.on_behalf_of === actor) &&
+        (!query.get("action") || e.action === query.get("action")) &&
+        (!query.get("application") || e.application === query.get("application")) &&
+        (!query.get("environment") || e.environment === query.get("environment")),
+    );
+    const start = Number(query.get("before") ?? "0");
+    const events = matching.slice(start, start + 50);
+    return json({ events, next: start + 50 < matching.length ? String(start + 50) : null });
+  }),
+
   http.get("/api/runs", ({ request }) => {
     const query = new URL(request.url).searchParams;
     const wallet = query.get("application") === "wallet" && query.get("environment") === "uat";
@@ -1035,7 +1068,9 @@ export const handlers = [
     let warnings: string[] = [];
     if (id === "run_noplan") {
       if (!body.run_without_plan_check) {
-        return problem(422, "Unprocessable Content", "plan checks could not run in prod (index use not checked: the connection was refused); to run without plan check, confirm it: that is recorded in the audit");
+        // As the backend refuses it: the field run_without_plan_check is what the web acts on (#108).
+        const why = "plan checks could not run in prod (index use not checked: the connection was refused); to run without plan check, confirm it: that is recorded in the audit";
+        return problem(422, "Unprocessable Content", why, [{ field: "run_without_plan_check", message: why }]);
       }
       warnings = ["index use not checked: the connection was refused"];
     }

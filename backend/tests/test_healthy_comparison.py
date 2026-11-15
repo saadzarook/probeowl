@@ -247,7 +247,7 @@ def test_a_run_that_did_not_finish_on_a_subject_is_refused(setup: Setup) -> None
     assert finished(api, run_id)["status"] == "skipped"
     response = api.post(url(run_id), json={"subject": HEALTHY})
     assert response.status_code == 422
-    assert "only a finished run" in response.json()["detail"]
+    assert "only a run that passed or failed, on one subject" in response.json()["detail"]
 
 
 def test_a_kill_switch_on_the_samples_connector_refuses_it(setup: Setup) -> None:
@@ -614,19 +614,19 @@ def test_a_refused_comparison_leaves_the_last_one_in_place(setup: Setup) -> None
 # --- Outcomes that show nothing ------------------------------------------------------------------
 
 
-def test_a_connector_error_on_both_sides_is_not_compared(setup: Setup) -> None:
+def test_a_run_that_could_not_read_its_data_is_not_compared(setup: Setup) -> None:
+    # A connector error leaves the run Not checked (#81): nothing in it was found wrong, so
+    # there is nothing to compare with a healthy record.
     def fails(lookup: str, p: Mapping[str, object]) -> list[dict[str, Any]]:
         raise ConnectorError("the connection was refused")
 
     api = setup.client()
     setup.fakes["wallet_db"].answer = fails
     broken = start(api, value=FAILING)
-    assert finished(api, broken)["status"] == "failed"
-    found = started(api, broken, subject=HEALTHY)
-    record = row(found, "record")
-    assert record["failing"] == record["healthy"] == "Error, 0 rows"
-    assert record["result"] == "not_compared"
-    assert row(found, "ledger")["result"] == "not_compared"
+    assert finished(api, broken)["status"] == "not_checked"
+    response = api.post(url(broken), json={"subject": HEALTHY})
+    assert response.status_code == 422, response.text
+    assert "only a run that passed or failed, on one subject, can be compared" in response.text
 
 
 def test_an_outcome_on_one_side_only_is_a_difference(setup: Setup) -> None:
