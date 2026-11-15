@@ -20,6 +20,7 @@ from probeowl.cli.defaults import (
     unsuitable_for_config,
 )
 from probeowl.connectors.failures import show_raw_driver_errors
+from probeowl.errors import ConfigError
 
 EXAMPLES = Path(__file__).resolve().parents[2] / "examples"
 
@@ -294,3 +295,56 @@ def test_a_folder_named_explicitly_keeps_its_errors(
     monkeypatch.setenv(CONFIG_VARIABLE, str(nothing_told))
     named = CliRunner().invoke(cli.app, ["serve"])
     assert named.exit_code != 0 and "errors" in str(named.exception)
+
+
+# --- The chosen folder: only the default is ever created (#85) ---------------------------------
+
+
+def test_a_named_folder_that_does_not_exist_is_refused_and_not_created(tmp_path: Path) -> None:
+    named = tmp_path / "typo"
+    with pytest.raises(ConfigError, match="does not exist: create it, or leave out --config"):
+        defaults.ready_config_folder(defaults.ConfigChoice(named, by_default=False))
+    assert not named.exists()
+
+
+def test_the_default_folder_is_created_on_first_run(tmp_path: Path) -> None:
+    default = tmp_path / "probeowl"
+    assert defaults.ready_config_folder(defaults.ConfigChoice(default, by_default=True))
+    assert default.is_dir()
+    assert not defaults.ready_config_folder(defaults.ConfigChoice(default, by_default=True))
+
+
+def test_a_folder_that_cannot_be_created_is_a_fixed_error(tmp_path: Path) -> None:
+    blocker = tmp_path / "a-file"
+    blocker.write_text("not a folder", encoding="utf-8")
+    with pytest.raises(ConfigError, match="could not be created") as failure:
+        defaults.ready_config_folder(defaults.ConfigChoice(blocker / "probeowl", by_default=True))
+    assert failure.value.__cause__ is None  # a fixed message, never a chained traceback
+
+
+def test_a_file_named_as_the_folder_is_refused(tmp_path: Path) -> None:
+    file = tmp_path / "config.yaml"
+    file.write_text("", encoding="utf-8")
+    with pytest.raises(ConfigError, match="is a file, not a folder"):
+        defaults.ready_config_folder(defaults.ConfigChoice(file, by_default=False))
+
+
+def test_owl_serve_with_a_named_folder_that_does_not_exist_stops_without_a_traceback(
+    tmp_path: Path,
+) -> None:
+    named = tmp_path / "typo"
+    result = CliRunner().invoke(
+        cli.app, ["serve", "--config", str(named), "--url", f"sqlite:///{tmp_path / 's.db'}"]
+    )
+    assert result.exit_code != 0
+    assert isinstance(result.exception, (ConfigError, SystemExit))
+    assert not named.exists()
+
+
+def test_owl_mcp_refuses_a_named_folder_that_does_not_exist(tmp_path: Path) -> None:
+    named = tmp_path / "typo"
+    result = CliRunner().invoke(
+        cli.app, ["mcp", "--config", str(named), "--url", f"sqlite:///{tmp_path / 's.db'}"]
+    )
+    assert result.exit_code != 0
+    assert not named.exists()

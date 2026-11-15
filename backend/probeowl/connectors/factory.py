@@ -14,7 +14,7 @@ from probeowl.connectors.sql import SqlAdapter, SqlLimits
 from probeowl.connectors.sqlserver import SqlServerAdapter
 from probeowl.errors import ConfigError
 from probeowl.model.connector import RestConnector, SqlConnector
-from probeowl.secrets import resolve_secret
+from probeowl.secrets import resolve_secret, without_line_break
 
 log = logging.getLogger(__name__)
 
@@ -91,7 +91,7 @@ def _secret(
     secrets: Callable[[str], str],
 ) -> str:
     try:
-        return secrets(reference)
+        value = secrets(reference)
     except ConfigError as err:
         # The reason names the keychain entry or variable: for the terminal owl serve runs in,
         # never for a response.
@@ -100,3 +100,16 @@ def _secret(
             f"the secret of connector {connector.connector} in {environment} cannot be read; "
             "the owl serve terminal says why"
         ) from None
+    trimmed = without_line_break(value)
+    if trimmed != value:
+        # Fixed, naming the binding: never the value or its length (#84).
+        log.warning(
+            "connector %s in %s: its secret ended with a line break, which was removed",
+            connector.connector,
+            environment,
+        )
+    if trimmed == "":
+        raise ConfigError(
+            f"the secret of connector {connector.connector} in {environment} is empty; set it again"
+        )
+    return trimmed

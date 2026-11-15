@@ -269,3 +269,12 @@ def test_a_kill_switch_engaged_while_the_password_was_asked_for_stops_the_run_ag
     run = finished(api, again.json()["id"])
     assert "kill switch" in (run["stop_reason"] or run["skip_reason"] or "")
     assert no_lookups(setup)
+
+
+def test_a_password_ending_in_a_line_break_is_saved_without_it(
+    setup: Setup, missing: MemoryKeychain
+) -> None:
+    # As one pasted from a file carries (#84); a space or tab at the end is the password's own.
+    response = client(setup).put(URL, json={"password": f"{TEST_PASSWORD}\r\n"})
+    assert response.status_code == 204
+    assert missing.entries[ENTRY] == TEST_PASSWORD
