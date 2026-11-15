@@ -36,6 +36,7 @@ from probeowl.api.models import (
 )
 from probeowl.api.redaction import Redactor
 from probeowl.api.titles import titled
+from probeowl.audit_reads import AuditPage, AuditReader
 from probeowl.catalog.service import CatalogService
 from probeowl.checks.saving import ProbeWrites
 from probeowl.checks.service import check_draft, runnable
@@ -76,6 +77,7 @@ from probeowl.runs import RunService
 from probeowl.search import MAX_QUERY, search
 from probeowl.secret_writes import SecretWrites
 from probeowl.setup_writes import SetupWrites
+from probeowl.store.audit import AuditFilter
 
 # The media type is set to application/problem+json in app.py.
 _PROBLEM = {"model": Problem}
@@ -543,6 +545,50 @@ def list_recent_runs(
         for run in page
     ]
     return RunList(runs=shown, next=f"{more[0].isoformat()}|{more[1]}" if more else None)
+
+
+@router.get("/audit", tags=["audit"], responses=_problems(422))
+def list_audit(
+    http: Request,
+    before: str | None = None,
+    actor: Annotated[str | None, Query(min_length=1, max_length=128)] = None,
+    action: Name | None = None,
+    application: Name | None = None,
+    environment: Name | None = None,
+) -> AuditPage:
+    """The audit, newest first, 50 at a time; read-only, and not itself audited (#79).
+
+    Each filter given narrows the list, by exact name. actor: who acted, or the person an agent
+    acted for, so s.khan finds "s.khan via MCP" too. Details are shown masked by today's PII
+    rules, and with every loaded binding's host, login and secret redacted. before: the next
+    value of the previous page.
+    """
+    service = _runs(http)
+    reader = AuditReader(service.applications, service.store)
+    found = AuditFilter(
+        actor=actor, action=action, application=application, environment=environment
+    )
+    page = reader.page(found, _before(before))
+    redactor: Redactor = http.app.state.redactor
+    return page.model_copy(
+        update={
+            "events": [
+                e.model_copy(update={"details": _redacted(e.details, redactor)})
+                for e in page.events
+            ]
+        }
+    )
+
+
+def _redacted(value: Any, redactor: Redactor) -> Any:
+    """Every string inside value, with bindings' hosts, logins and secrets taken out."""
+    if isinstance(value, str):
+        return redactor.text(value)
+    if isinstance(value, dict):
+        return {k: _redacted(v, redactor) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_redacted(v, redactor) for v in value]
+    return value
 
 
 def _before(cursor: str | None) -> tuple[datetime, str] | None:

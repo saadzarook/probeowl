@@ -51,7 +51,7 @@ def test_c204518_shows_its_visitors_three_card_issues(api: Setup) -> None:
 
 def test_the_shared_email_is_ambiguous_with_both_profiles(api: Setup) -> None:
     result = owl("contractor.one@example.com", *PROD)
-    assert result.exit_code == 3, result.output
+    assert result.exit_code == 2, result.output  # no finding, not fully checked
     out = result.output
     assert "email [masked] matches 2 subjects via profile.email; nothing else ran:" in out
     assert re.search(r"^  VP00012931  .*status active", out, re.M)
@@ -62,14 +62,16 @@ def test_the_shared_email_is_ambiguous_with_both_profiles(api: Setup) -> None:
         out,
         re.M,
     )
-    assert re.search(r"^Run [0-9a-f-]{36}: ambiguous$", out, re.M)
+    # A 2 always says why (Saad, 2026-11-15).
+    why = "ambiguous (the value matches 2 subjects; nothing else ran)"
+    assert re.search(rf"^Run [0-9a-f-]{{36}}: {re.escape(why)}$", out, re.M)
     assert not api.fakes["door_controller_api"].calls
 
 
 def test_an_identifier_without_a_pattern_is_chosen(api: Setup) -> None:
     result = owl("EMP-100231", *PROD, "--identifier", "employee_no")
     # Both seeded profiles share the employee number too.
-    assert result.exit_code == 3, result.output
+    assert result.exit_code == 2, result.output  # no finding, not fully checked
     assert "employee_no EMP-100231 matches 2 subjects via profile.employee_no" in result.output
 
 

@@ -8,6 +8,8 @@ export type EnvironmentSummary = components["schemas"]["EnvironmentSummary"];
 export type Run = components["schemas"]["Run"];
 export type RunSummary = components["schemas"]["RunSummary"];
 export type RunList = components["schemas"]["RunList"];
+export type AuditEvent = components["schemas"]["AuditEvent"];
+export type AuditPage = components["schemas"]["AuditPage"];
 export type StartRun = components["schemas"]["StartRun"];
 export type Match = components["schemas"]["Match"];
 export type Entity = components["schemas"]["Entity"];
@@ -251,6 +253,21 @@ export async function fetchRuns(application: string, environment: string, before
   const { data, error } = await api.GET("/api/runs", { params: { query: { application, environment, before } } });
   if (data) return data;
   throw problemError(error, "The runs could not be loaded.");
+}
+
+/** What the Audit page filters by; each one given narrows the list, by exact name. */
+export interface AuditFilters {
+  actor?: string;
+  action?: string;
+  application?: string;
+  environment?: string;
+}
+
+/** A page of the audit, newest first, masked; before is the last page's next. */
+export async function fetchAudit(filters: AuditFilters, before: string | undefined): Promise<AuditPage> {
+  const { data, error } = await api.GET("/api/audit", { params: { query: { ...filters, before } } });
+  if (data) return data;
+  throw problemError(error, "The audit could not be loaded.");
 }
 
 /** Read a run as it progresses. */

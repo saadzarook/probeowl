@@ -23,6 +23,7 @@ folder or the store themselves, and need nothing running.
 | `owl catalog import <connector>` | Imports a SQL connector's schema: tables, columns, keys, indexes, row estimates; never data | `owl serve` |
 | `owl kill on`, `off`, `list` | Turns kill switches on and off, and lists those on | `owl serve` |
 | `owl reload` | Makes `owl serve` load its config folder again, without a restart | `owl serve` |
+| `owl audit` | Lists the audit, newest first: who did what, where; filters, and `--json` | `owl serve` |
 | `owl store init`, `upgrade` | Creates or upgrades ProbeOwl's own store | Nothing |
 | `owl store ddl --dialect <name>` | Prints the SQL that creates the store, for a DBA to run | Nothing |
 | `owl runbook hash <file>` | Prints each read query's `sql_sha256`, for its reviewed block | Nothing |
@@ -117,10 +118,14 @@ status. Exit codes:
 
 | Code | Meaning |
 | --- | --- |
-| 0 | Passed |
-| 1 | Failed, or skipped (a paused connector, a kill switch) |
-| 2 | Not run: refused before it started, or `owl serve` couldn't be reached or followed |
-| 3 | Ambiguous (inspect): the value matched several subjects, and nothing else ran |
+| 0 | Passed: everything evaluated held |
+| 1 | A finding, Failed: an expectation didn't hold, or the subject or a record is absent |
+| 2 | No finding, but not fully checked. **Not checked:** data couldn't be read (an Error, Stale data, a run that stopped). **Skipped:** a paused connector or a kill switch before any lookup. **Ambiguous:** the value matched several subjects, and nothing else ran. Or the run couldn't start: refused, or `owl serve` couldn't be reached or followed |
+
+A 2 always prints why, on the run's last line: `Run …: skipped (ledger_db is paused: …)`,
+`Run …: ambiguous (the value matches 2 subjects; nothing else ran)`, or
+`Run …: not_checked (could not read ledger: error, timed out)`. A script can treat 1 as "look
+at this flow" and 2 as "look at the reason, then run it again".
 
 The run header names the probe by its title, then its id:
 `Run 9305b99c-...: Top-up completed (wallet/topup_completed) on tp_91f2c7 in uat`.
@@ -164,6 +169,22 @@ the Probe editor is kept and checked again against what was loaded.
 If `owl serve` would refuse the folder at start, nothing changes and the first error is shown
 (`owl check <folder>` lists them all). It's refused while a run is running. Kill switches stay as
 they are. Plugins, the port, the store and the log file change only with a restart.
+
+## `owl audit`
+
+```sh
+owl audit                                    # the 50 newest events
+owl audit --actor s.khan --limit 200         # yours, and what an assistant did for you
+owl audit --action run_started --application wallet --env prod
+owl audit --action secret_saved --json       # one JSON array, for scripts
+```
+
+Lists the audit, newest first: when, who, the action, the application and environment, the run,
+and the details. Each filter narrows the list by exact name. `--actor` finds what someone did,
+and what an assistant did for them through `owl mcp` (`s.khan via MCP`). Details are masked by
+today's PII rules, including values stored before an identifier became PII, and never show a host,
+login or password. It changes nothing, and reading it isn't itself recorded. The **Audit** screen
+shows the same.
 
 ## `owl mcp`
 

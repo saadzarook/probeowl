@@ -35,3 +35,16 @@ for (const width of [1152, 1280, 1440]) {
     await expectNoOverflow(page, `the wizard's Preview at ${width}`);
   });
 }
+
+for (const width of [320, 390]) {
+  test(`setup's environment cards wrap at ${width} px, with a long name (#102)`, async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem("mock-no-applications", "1"));
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/setup");
+    await page.getByLabel("Name").fill("Customer onboarding and identity verification platform");
+    await page.getByLabel("Owning team").fill("onboarding-team");
+    await page.getByRole("button", { name: "Next: Environments" }).click();
+    for (const box of await page.getByRole("checkbox").all()) if (!(await box.isChecked())) await box.check();
+    await expectNoOverflow(page, `setup's environments at ${width}`);
+  });
+}
