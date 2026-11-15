@@ -240,7 +240,7 @@ kbd { font-family: var(--font-mono); font-size: 0.82em; font-weight: 500; paddin
 .measure h3 { margin-bottom: 4px; }
 .measure .unit { font-family: var(--font-mono); font-size: 12px; font-weight: 500; color: var(--fg-quiet); margin-left: 8px; }
 .measure .m-head { margin-top: 6px; font-size: 14px; font-weight: 600; }
-.bar { display: grid; grid-template-columns: 112px minmax(0, 1fr) 56px; gap: 14px; align-items: center; font-size: 14.5px; }
+.bar { display: grid; grid-template-columns: 128px minmax(0, 1fr) 56px; gap: 14px; align-items: center; font-size: 14.5px; }
 .bar .lbl { font-family: var(--font-mono); font-size: 13px; color: var(--fg-quiet); }
 .bar .track { height: 12px; background: var(--rule); border-radius: 6px; overflow: hidden; }
 .bar .fill { display: block; height: 100%; width: var(--w); background: var(--amber-bright); border-radius: 6px; }
@@ -276,7 +276,7 @@ footer { margin-top: 96px; border-top: 1px solid var(--rule); }
   .compare tr:last-child { border-bottom: 0; }
   .compare th, .compare td, .compare tbody th { padding: 4px 0; border: 0; width: auto; }
   .compare td::before { content: attr(data-label); display: block; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg-quiet); margin-top: 6px; }
-  .bar { grid-template-columns: 104px minmax(0, 1fr) 40px; gap: 10px; }
+  .bar { grid-template-columns: 120px minmax(0, 1fr) 40px; gap: 10px; }
   .bar .lbl { font-size: 12px; }
   section.s { padding-block: 64px 0; }
 }
@@ -391,7 +391,7 @@ footer { margin-top: 96px; border-top: 1px solid var(--rule); }
           </div>
           <a class="btn btn-amber" href="./guide/">Read the guide</a>
         </div>
-        <p class="meta">v0.2 pre-release · <a href="#new">what’s new</a> · Apache 2.0 · runs on your machine</p>
+        <p class="meta"><a href="https://github.com/saadzarook/probeowl/releases/tag/v0.2.1">v0.2.1 pre-release</a> · <a href="#new">what’s new</a> · Apache 2.0 · runs on your machine</p>
       </div>
 
       <figure class="term" style="margin:0" aria-label="A ProbeOwl run in the terminal">
@@ -426,6 +426,7 @@ footer { margin-top: 96px; border-top: 1px solid var(--rule); }
       <li><h3>Search with <kbd>Ctrl</kbd>+<kbd>K</kbd></h3><p>Applications, entities, probes, connectors, runbooks, tables, runs and the guide, from the keyboard. A masked value shows as <code>[masked]</code> and never matches.</p></li>
       <li><h3>Drafting with an AI assistant</h3><p><code>owl mcp</code> lets an assistant draft a probe and check it. Drafts only: no tool writes a file, returns data or a secret, or touches Production. You paste it in.</p></li>
     </ul>
+    <p class="new-note">New in 0.2.1: a run whose data couldn’t be read is <strong>Not checked</strong>, not Failed, and <code>owl validate</code> and <code>owl inspect</code> exit 0, 1 or 2, so update scripts that check exit codes. The audit can be read, on the Audit screen and with <code>owl audit</code>. And the fixes from newcomers’ first runs are in.</p>
     <p class="new-note">Also in 0.2.0: a security fix for v0.1. Runs of an entity whose key is personal data are now stored and shown masked; if you used v0.1 with one, run <code>owl store mask-pii</code>. <a href="https://github.com/saadzarook/probeowl/blob/main/CHANGELOG.md">Changelog</a></p>
   </section>
 
@@ -768,7 +769,7 @@ footer { margin-top: 96px; border-top: 1px solid var(--rule); }
           <div class="tl-head"><span class="ver">v0.2</span><span class="chip chip-done">Shipped 14 Nov 2026</span></div>
           <h3>Set up in the browser</h3>
           <ul><li>First-run setup and Add connection</li><li>Search everything with Ctrl+K</li><li>AI assistants draft, you paste</li></ul>
-          <a href="https://github.com/saadzarook/probeowl/releases/tag/v0.2.0">Release notes</a>
+          <a href="https://github.com/saadzarook/probeowl/releases/tag/v0.2.1">0.2.1 release notes</a>
         </div>
       </li>
       <li class="tl now">
@@ -799,20 +800,20 @@ footer { margin-top: 96px; border-top: 1px solid var(--rule); }
         </div>
       </li>
     </ol>
-    <p class="rules-note">Every release keeps the same rules: read-only, the same guards, tests on every supported database, and a newcomer test by hand before it ships. Both releases so far are pre-releases; a security review comes before 1.0.</p>
+    <p class="rules-note">Every release keeps the same rules: read-only, the same guards, tests on every supported database, and a newcomer test by hand before it ships. Every release so far is a pre-release; a security review comes before 1.0.</p>
     <div class="measure" role="group" aria-label="Install to a first Validate: actions and characters typed, lower is better">
       <h3>Install to a first Validate <span class="unit">lower is better</span></h3>
       <p class="m-head">Actions</p>
       <div class="bar"><span class="lbl">v0.1 measured</span><span class="track"><span class="fill" style="--w:100%"></span></span><span class="n">61</span></div>
-      <div class="bar"><span class="lbl">v0.2 measured</span><span class="track"><span class="fill" style="--w:80%"></span></span><span class="n">49</span></div>
+      <div class="bar"><span class="lbl">v0.2.1 measured</span><span class="track"><span class="fill" style="--w:82%"></span></span><span class="n">50</span></div>
       <div class="bar"><span class="lbl">0.3 target</span><span class="track"><span class="fill target" style="--w:69%"></span></span><span class="n">~42</span></div>
       <div class="bar"><span class="lbl">0.4 target</span><span class="track"><span class="fill target" style="--w:49%"></span></span><span class="n">≤30</span></div>
       <p class="m-head">Characters typed</p>
       <div class="bar"><span class="lbl">v0.1 measured</span><span class="track"><span class="fill" style="--w:100%"></span></span><span class="n">366</span></div>
-      <div class="bar"><span class="lbl">v0.2 measured</span><span class="track"><span class="fill" style="--w:72%"></span></span><span class="n">264</span></div>
+      <div class="bar"><span class="lbl">v0.2.1 measured</span><span class="track"><span class="fill" style="--w:72%"></span></span><span class="n">264</span></div>
       <div class="bar"><span class="lbl">0.3 target</span><span class="track"><span class="fill target" style="--w:66%"></span></span><span class="n">~240</span></div>
       <div class="bar"><span class="lbl">0.4 target</span><span class="track"><span class="fill target" style="--w:33%"></span></span><span class="n">≤120</span></div>
-      <p class="note">Every command, answer, click and field a newcomer needs, from installing ProbeOwl to a first Validate on the card example. v0.1.0 and v0.2.0 are measured, counted the same way by a scripted run on each release wheel; 0.3 and 0.4 are targets, measured when they ship.</p>
+      <p class="note">Every command, answer, click and field a newcomer needs, from installing ProbeOwl to a first Validate on the card example. v0.1.0 and v0.2.1 are measured, counted the same way by a scripted run on each release wheel: 50 actions is one more than v0.2.0, one confirm step added in 0.2.1. 0.3 and 0.4 are targets, measured when they ship.</p>
     </div>
   </section>
 
@@ -853,7 +854,7 @@ footer { margin-top: 96px; border-top: 1px solid var(--rule); }
 
 <footer>
   <div class="wrap foot">
-    <span>ProbeOwl · v0.2 pre-release · Apache License 2.0</span>
+    <span>ProbeOwl · v0.2.1 pre-release · Apache License 2.0</span>
     <nav aria-label="Footer">
       <a href="./guide/">Guide</a>
       <a href="https://github.com/saadzarook/probeowl">GitHub</a>
