@@ -58,7 +58,9 @@ class SecretWrites:
             # The event is written first, in a transaction that commits last.
             with self._store.begin() as conn:
                 append_event(conn, self._workspace, event)
-                secrets.save_secret(service, username, body.password.get_secret_value())
+                # A line break at the end, as a pasted password may carry, is never saved (#84).
+                password = secrets.without_line_break(body.password.get_secret_value())
+                secrets.save_secret(service, username, password)
                 saved = True
         except BaseException:
             if saved:

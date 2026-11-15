@@ -87,6 +87,45 @@ def config_path(config: Path | None) -> Path:
     return choose_config_folder(config).folder
 
 
+def ready_config_folder(choice: ConfigChoice, create: bool = True) -> bool:
+    """Check the chosen config folder can be used; True when it was just created.
+
+    Only the default folder is created, on first run: a folder named with --config or
+    PROBEOWL_CONFIG that does not exist is refused, so a typo never starts on an empty folder
+    (#85). A path the system cannot use is a fixed error, never a traceback.
+    """
+    folder = choice.folder
+    try:
+        if folder.exists():
+            if not folder.is_dir():
+                raise ConfigError(f"config folder {folder} is a file, not a folder")
+            return False
+    except (OSError, ValueError) as err:
+        raise ConfigError(f"config folder {folder} cannot be used: {_why(err)}") from None
+    if not choice.by_default:
+        raise ConfigError(
+            f"config folder {folder} does not exist: create it, or leave out --config and "
+            f"{CONFIG_VARIABLE} to use the default"
+        )
+    if not create:
+        return False
+    try:
+        folder.mkdir(parents=True)
+    except (OSError, ValueError) as err:
+        raise ConfigError(
+            f"config folder {folder} could not be created: {_why(err)}; choose another with "
+            f"--config or {CONFIG_VARIABLE}"
+        ) from None
+    return True
+
+
+def _why(err: OSError | ValueError) -> str:
+    # The system's own words for the path, never a traceback.
+    if isinstance(err, OSError) and err.strerror:
+        return err.strerror.rstrip(".").lower()
+    return "not a valid path"
+
+
 def choose_config_folder(
     config: Path | None,
     here: Path | None = None,

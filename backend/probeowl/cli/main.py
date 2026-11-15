@@ -30,6 +30,7 @@ from probeowl.cli.defaults import (
     create_store,
     default_store_url,
     ensure_default_store,
+    ready_config_folder,
     warn_inline_password,
 )
 from probeowl.cli.inspect import inspect
@@ -186,10 +187,8 @@ def serve(
         typer.echo(f"warning: {unknown}", err=True)
     choice = choose_config_folder(config)
     folder = choice.folder
-    created = not folder.exists()
-    if created:
-        # First run: the setup screen writes the first application here.
-        folder.mkdir(parents=True)
+    # First run: the setup screen writes the first application in the default folder.
+    created = ready_config_folder(choice)
     if choice.by_default:
         typer.echo(f"Config folder: {folder.resolve()}{' (new, empty)' if created else ''}")
         if choice.not_loaded is not None:

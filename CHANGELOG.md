@@ -49,6 +49,19 @@ See docs/implementation-plan.md, Releases. -->
   5 s" on a timeout, instead of an exception's class name such as `ConnectError`. The class goes
   to the `owl serve` log only.
 
+### Fixed
+
+- A password that ends in a line break, as one exported from a file or pasted with its newline
+  carries, has it removed. The database used to refuse it with "refused by the database" and no
+  reason. This applies to `env:` and keychain secrets, Change password and `owl connector add`.
+  `owl serve` logs a fixed warning naming the connector and environment, never the value. Only
+  line breaks at the end are removed: a space or tab is kept.
+- `--config` (and `PROBEOWL_CONFIG`) naming a folder that doesn't exist now stops with "config
+  folder … does not exist: create it, or leave out --config and PROBEOWL_CONFIG to use the
+  default". It no longer creates an empty folder, so a typo can't look like missing configuration.
+  Only the default folder is created on first run. A path the system can't use is a fixed error,
+  never a traceback. This covers `owl serve` and `owl mcp`.
+
 ## [0.2.0] - 2026-11-14
 
 Phase (a) of No YAML required: set up in the browser. The newcomer path, from install to a first
