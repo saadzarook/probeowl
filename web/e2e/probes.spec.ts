@@ -338,3 +338,54 @@ test("a save that would break the folder names the file", async ({ page }) => {
   await dialog.getByRole("button", { name: "Confirm" }).click();
   await expect(dialog.getByRole("alert")).toContainText("saving would break the folder: wallet/connectors/broken.yaml");
 });
+
+/** A new Card access probe, with access_db bound in UAT only (#95). */
+async function newCardProbe(page: Page, name: string) {
+  await page.addInitScript(() => localStorage.setItem("mock-prod-unbound", "1"));
+  await page.goto("/probes");
+  await page.getByRole("button", { name: "Application" }).click();
+  await page.getByRole("button", { name: /Card access/ }).last().click();
+  await page.getByLabel("Environment").first().selectOption("UAT");
+  await page.getByRole("button", { name: "New probe" }).click();
+  const form = page.getByRole("form", { name: "New probe" });
+  await form.getByLabel("Probe id").fill(name);
+  await form.getByLabel("Title").fill(`Draft ${name}`);
+  await form.getByRole("button", { name: "Start the draft" }).click();
+}
+
+test("a new probe is enabled only where all its entity's connectors are bound (#95)", async ({ page }) => {
+  await newCardProbe(page, "visitor_badges");
+  const yaml = page.getByLabel("Probe YAML");
+  // From the draft's first checks: Production has no access_db binding, so only UAT is written.
+  await expect(yaml).toContainText("environments: [uat]");
+  const enabled = page.getByRole("group", { name: "Enabled in" });
+  await expect(enabled.getByLabel("UAT")).toBeChecked();
+  await expect(enabled.getByLabel("Production")).not.toBeChecked();
+  await expect(enabled).toContainText("access_db not bound");
+  await expect(page.getByRole("button", { name: "Save", exact: true })).toBeEnabled();
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+});
+
+test("environments the person lists in a new probe are kept as they are", async ({ page }) => {
+  await newCardProbe(page, "visitor_badges");
+  const yaml = page.getByLabel("Probe YAML");
+  await expect(yaml).toContainText("environments: [uat]");
+  // Unticking UAT again is the person's choice: nothing writes it back.
+  await page.getByRole("group", { name: "Enabled in" }).getByLabel("UAT").uncheck();
+  await expect(yaml).toContainText("environments: []");
+  await page.waitForTimeout(1000); // past the checks' debounce, so a fresh answer has come back
+  await expect(yaml).toContainText("environments: []");
+});
+
+test("an opened probe keeps its own environments", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("mock-prod-unbound", "1"));
+  await page.goto("/probes");
+  await page.getByRole("button", { name: "Application" }).click();
+  await page.getByRole("button", { name: /Card access/ }).last().click();
+  await page.getByLabel("Open probe").selectOption("visitor_cards");
+  await page.getByRole("button", { name: "Retry" }).click(); // the mocks fail this file's first read
+  const yaml = page.getByLabel("Probe YAML");
+  await expect(yaml).toContainText("probe: visitor_cards");
+  await expect(page.getByRole("group", { name: "Enabled in" })).toContainText("access_db not bound");
+  await expect(yaml).not.toContainText("environments:");
+});

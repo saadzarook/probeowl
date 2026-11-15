@@ -129,7 +129,7 @@ def test_failing_lookups_in_a_row_pause_the_connector(setup: Setup) -> None:
     client = setup.client()
     for _ in range(SLOW_IN_A_ROW):
         # Each run reads payment once (no fallback after an error).
-        assert finished(client, start(client))["status"] == "failed"
+        assert finished(client, start(client))["status"] == "not_checked"
     run = finished(client, start(client))
     assert run["status"] == "skipped"
     assert run["skip_reason"].startswith(

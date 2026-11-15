@@ -38,7 +38,7 @@ def test_missing_on_a_replica_behind_the_window_is_stale() -> None:
     [count] = [e for e in result.expectations if e.expectation == "count(ledger) == 2"]
     assert count.result is ExpectationResult.SKIP
     assert count.detail == f"needs ledger, which is Stale ({reason})"
-    assert result.status is RunStatus.FAILED
+    assert result.status is RunStatus.NOT_CHECKED
 
 
 @pytest.mark.parametrize(
