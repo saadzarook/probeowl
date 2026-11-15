@@ -1,6 +1,7 @@
 # Author: @SaadZarook
 """Save checks of a draft probe, and its test run: nothing is saved."""
 
+import dataclasses
 import re
 from pathlib import Path
 from typing import Any
@@ -384,3 +385,21 @@ def test_a_test_run_in_production_needs_a_reference(setup: Setup) -> None:
     assert response.status_code == 422
     assert "reference" in response.json()["detail"]
     assert no_lookups(setup)
+
+
+def test_an_unbound_environment_fails_with_that_environment_named(setup: Setup) -> None:
+    # The Probe editor leaves such environments out of a new probe (#95): it reads which from here.
+    app = wallet(setup)
+    ledger = app.connectors["ledger_db"]
+    without_uat = ledger.model_copy(
+        update={"environments": {k: v for k, v in ledger.environments.items() if k != "uat"}}
+    )
+    unbound = dataclasses.replace(app, connectors={**app.connectors, "ledger_db": without_uat})
+    probe = PROBE.replace("environments: [prod, uat]\n", "")
+    report = check_draft(unbound, probe)
+    environments = [c for c in report.checks if c.check == "Environments"]
+    assert [(c.status, c.environment) for c in environments] == [(CheckStatus.FAIL, "uat")]
+    assert environments[0].message == (
+        "enabled in uat, where ledger (ledger_db) has no binding; "
+        "bind it or leave uat out of the probe's environments"
+    )
