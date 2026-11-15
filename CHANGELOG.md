@@ -12,6 +12,13 @@ v0.2 phase (a) first-run setup and Add connection, v0.3 phase (b) the entity gra
 v0.4 phase (c) blocks and probe by example, v0.5 phase (d) templates and New runbook.
 See docs/implementation-plan.md, Releases. -->
 
+### Added
+
+- Read the audit: the **Audit** screen and `owl audit`, newest first, filtered by actor, action,
+  application and environment, with `--json` for scripts. Both are read-only. Details are masked
+  by today's PII rules, including values stored before an identifier became PII, and never show a
+  host, login or password. They read through a new `GET /api/audit`.
+
 ## [0.2.0] - 2026-11-14
 
 Phase (a) of No YAML required: set up in the browser. The newcomer path, from install to a first

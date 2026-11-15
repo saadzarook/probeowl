@@ -568,3 +568,6 @@ input.mono { font-family: var(--font-mono); }
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-border);
 }
+/* The audit (#79): details wrap at any character, so a long value never widens the table. */
+.audit-filters { display: flex; flex-direction: column; gap: 0.75rem; align-items: flex-start; }
+.audit-details code { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.8rem; }

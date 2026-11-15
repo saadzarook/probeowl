@@ -67,6 +67,7 @@ nav:
       - Connectors: web-app/connectors.md
       - Knowledge base: web-app/knowledge-base.md
       - Compare files: web-app/compare-files.md
+      - Audit: web-app/audit.md
   - Safety: safety.md
   - CLI reference: cli.md
   - Troubleshooting: troubleshooting.md
