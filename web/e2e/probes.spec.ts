@@ -56,8 +56,11 @@ test("the Test run and Inspect ID fields name this entity's root key, never anot
   await page.getByRole("button", { name: "Retry" }).click();
   const box = page.getByRole("form", { name: "Test run" });
   await expect(box.getByLabel("ID", { exact: true })).toHaveAttribute("placeholder", "a visitor_profile_id or another identifier");
-  // Inspect opens on Wallet: its entity is the top-up, so the field names topup_id.
+  // Inspect keeps Card access (#94): its entity is the visitor. On Wallet, the top-up's topup_id.
   await page.goto("/inspect");
+  await expect(page.getByLabel("Identifier")).toHaveAttribute("placeholder", "a visitor_profile_id or another identifier");
+  await page.getByRole("button", { name: "Application" }).click();
+  await page.getByRole("button", { name: /Wallet/ }).last().click();
   await expect(page.getByLabel("Identifier")).toHaveAttribute("placeholder", "a topup_id or another identifier");
 });
 
