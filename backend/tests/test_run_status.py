@@ -92,10 +92,25 @@ def test_what_could_not_be_read_and_what_is_absent(read: LocationRead, cannot_re
     assert unreadable(read) is cannot_read
 
 
-def run(status: RunStatus, *, caveat: str | None = None, stop: str | None = None) -> Run:
+def run(
+    status: RunStatus,
+    *,
+    caveat: str | None = None,
+    stop: str | None = None,
+    skip: str | None = None,
+    matches: int = 0,
+    locations: tuple[LocationResult, ...] = (),
+) -> Run:
     """What finish() reads of a run: its id, status, warnings, reasons and caveat."""
     fields = SimpleNamespace(
-        id="run_1", status=status, warnings=[], stop_reason=stop, skip_reason=None, caveat=caveat
+        id="run_1",
+        status=status,
+        warnings=[],
+        stop_reason=stop,
+        skip_reason=skip,
+        caveat=caveat,
+        matches=[object()] * matches,
+        locations=list(locations),
     )
     return cast(Run, fields)
 
@@ -103,10 +118,12 @@ def run(status: RunStatus, *, caveat: str | None = None, stop: str | None = None
 @pytest.mark.parametrize(
     ("status", "code"),
     [
-        (RunStatus.FAILED, server.FAILED),
-        (RunStatus.NOT_CHECKED, server.NOT_RUN),
-        (RunStatus.PASSED, server.PASSED),
-        (RunStatus.AMBIGUOUS, server.AMBIGUOUS),
+        # 1 is a finding; 2 is no finding, but not fully checked (Saad, 2026-11-15).
+        (RunStatus.FAILED, 1),
+        (RunStatus.NOT_CHECKED, 2),
+        (RunStatus.SKIPPED, 2),
+        (RunStatus.AMBIGUOUS, 2),
+        (RunStatus.PASSED, 0),
     ],
 )
 def test_exit_codes_follow_the_rule(status: RunStatus, code: int) -> None:
@@ -133,3 +150,28 @@ def test_a_failed_missing_on_a_replica_of_unknown_lag_keeps_its_caveat(
         server.finish(run(RunStatus.FAILED, caveat=caveat))
     assert exited.value.exit_code == server.FAILED
     assert f"Run run_1: failed - {caveat}" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    ("found", "says"),
+    [
+        (run(RunStatus.AMBIGUOUS, matches=3), "(the value matches 3 subjects; nothing else ran)"),
+        (run(RunStatus.SKIPPED, skip="ledger_db is paused"), "(ledger_db is paused)"),
+        (run(RunStatus.SKIPPED), "(skipped before any lookup)"),
+        (
+            run(
+                RunStatus.NOT_CHECKED,
+                locations=(
+                    LocationResult(location="record", outcome=Outcome.FOUND),
+                    LocationResult(location="ledger", outcome=Outcome.ERROR, reason="timed out"),
+                ),
+            ),
+            "(could not read ledger: error, timed out)",
+        ),
+    ],
+)
+def test_every_2_prints_why(found: Run, says: str, capsys: pytest.CaptureFixture[str]) -> None:
+    with pytest.raises(typer.Exit) as exited:
+        server.finish(found)
+    assert exited.value.exit_code == 2
+    assert says in capsys.readouterr().out

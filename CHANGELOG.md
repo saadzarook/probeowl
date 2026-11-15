@@ -24,7 +24,9 @@ See docs/implementation-plan.md, Releases. -->
     read, an identifier lookup that errors, or a restart of `owl serve`.
   - **Passed:** everything evaluated held.
 
-  `owl validate` and `owl inspect` exit 1, 2 and 0 for them. A Not checked run names the locations
+  `owl validate` and `owl inspect` exit 1, 2 and 0 for them. Exit code 2 now means "no finding, but
+  not fully checked", and covers Not checked, Skipped (which used to exit 1) and Ambiguous (which
+  used to exit 3). A 2 always prints why on its last line. A Not checked run names the locations
   it couldn't read, and isn't compared with a healthy record. Runs stored before keep their status.
 
 ## [0.2.0] - 2026-11-14
