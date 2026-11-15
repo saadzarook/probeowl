@@ -9,7 +9,7 @@ export { cn, CONTROL as controlClass } from "./cn";
 export { CodeBlock } from "./CodeBlock";
 export { Field, FormGrid } from "./Field";
 export { Input } from "./Input";
-export { ListOrTable, type Column } from "./ListOrTable";
+export { ListOrTable, type Column, type Highlight } from "./ListOrTable";
 export { Select } from "./Select";
 export { Sheet } from "./Sheet";
 export { useMediaQuery } from "./useMediaQuery";

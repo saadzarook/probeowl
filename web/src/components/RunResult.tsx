@@ -79,7 +79,7 @@ export function RunResult({ runId }: { runId: string }) {
         <StopReason run={run} />
         <div>
           <h2>
-            {run.probe_title} on {run.identifier_value}
+            {run.probe_title} on <code className="font-mono">{run.identifier_value}</code>
           </h2>
           <p className="hint">
             Looked up as <code>{run.identifier}</code>

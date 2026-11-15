@@ -84,7 +84,9 @@ body {
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .run-header { display: flex; gap: 1rem; align-items: flex-start; }
-.run-header h2 { margin: 0; font-size: 1.25rem; font-family: var(--font-mono); }
+/* Below 640 px the status sits above the title, so the title and its command get the full width. */
+@media (max-width: 639px) { .run-header { flex-direction: column; gap: 0.5rem; } .run-header > div { min-width: 0; width: 100%; } }
+.run-header h2 { margin: 0; font-size: 1.25rem; }
 .run-header [data-production="true"] { color: var(--color-production); font-weight: 600; }
 .status { border-radius: 999px; padding: 0.15rem 0.75rem; font-size: 0.875rem; font-weight: 600; background: var(--chip-blocked-bg); color: var(--chip-blocked-fg); }
 .status[data-status="failed"] { background: var(--chip-missing-bg); color: var(--chip-missing-fg); }
@@ -128,11 +130,6 @@ body {
 .record-fields { display: flex; flex-wrap: wrap; gap: 0.5rem 2rem; margin: 0; }
 .record-fields dt { font-size: 0.75rem; color: var(--color-text-muted); }
 .record-fields dd { margin: 0; font-weight: 500; }
-.records { width: 100%; border-collapse: collapse; }
-.records th { text-align: left; font-size: 0.875rem; color: var(--color-text-muted); padding: 0.5rem; border-bottom: 1px solid var(--color-border); }
-.records td { padding: 0.6rem 0.5rem; border-bottom: 1px solid var(--color-border); vertical-align: top; }
-.records tr[data-problem="true"] { background: var(--color-production-bg); }
-.records td .hint { margin: 0.25rem 0 0; }
 .expectations li { align-items: flex-start; }
 .expectations li .hint { margin: 0; }
 .evidence-details summary { cursor: pointer; font-weight: 500; }
@@ -290,24 +287,13 @@ body {
 .compare-header .hint { margin: 0.25rem 0 0; }
 .compare-choices { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0.5rem; }
 .compare-choices .filter-chip[aria-pressed="true"] { background: var(--color-ink, #14171c); color: #fff; }
-.compare-paste { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.75rem; margin-top: 0.75rem; }
-.compare-paste input { display: block; margin-top: 0.25rem; padding: 0.5rem 0.75rem; border: 1px solid var(--color-border); border-radius: 0.5rem; font: inherit; font-family: var(--font-mono); }
 .compare-replaced { margin: 0.75rem 0 0; }
 .healthy-comparison .table-scroll { margin-top: 1rem; }
-.compare-fields { width: 100%; border-collapse: collapse; }
-.compare-fields th { text-align: left; padding: 0.75rem; font-size: 0.875rem; color: var(--color-text-muted); }
-.compare-fields td { padding: 0.6rem 0.75rem; border-top: 1px solid var(--color-border); vertical-align: top; overflow-wrap: anywhere; }
-.compare-fields tr[data-result="different"] td { background: #fdf6e9; }
-.compare-source { display: block; font-size: 0.8rem; }
-.compare-result { white-space: nowrap; border-radius: 999px; padding: 0.15rem 0.7rem; font-size: 0.8rem; font-weight: 600; background: var(--chip-blocked-bg); color: var(--chip-blocked-fg); }
-.compare-result[data-result="different"] { background: var(--chip-missing-bg); color: var(--chip-missing-fg); }
-.compare-result[data-result="same"] { background: var(--chip-found-bg); color: var(--chip-found-fg); }
 .compare-footer { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.75rem; margin-top: 0.75rem; }
 .compare-footer .hint { margin: 0; }
 .next-steps { list-style: none; margin: 0.75rem 0 0; padding: 0; }
 .next-steps li { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.5rem 1rem; padding: 0.75rem 0; border-top: 1px solid var(--color-border); }
 .next-steps .hint { margin: 0.2rem 0 0; }
-.next-steps a.btn { text-decoration: none; }
 .runbook-layout { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); }
 .runbook-filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem 0.75rem; margin-bottom: 0.75rem; }
 .runbook-filters .field { display: grid; gap: 0.25rem; font-weight: 500; font-size: 0.875rem; }
@@ -378,7 +364,6 @@ body {
 .expectations li > :not(.result) { grid-column: 2; }
 .expectations code { overflow-wrap: anywhere; }
 .location-block { overflow-x: auto; }
-.records td:not(:last-child) { white-space: nowrap; }
 .status { white-space: nowrap; }
 .run-list { width: 100%; border-collapse: collapse; }
 .run-list th, .run-list td { text-align: left; padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--color-border); vertical-align: top; }

@@ -69,11 +69,14 @@ test("rule 6: nothing scrolls sideways; rows are a table from 768 px and cards b
   await expect(page.getByRole("list", { name: "Bindings" })).toBeVisible();
   await expect(page.getByRole("table")).toHaveCount(0);
   await expect(page.getByRole("list", { name: "Bindings" }).getByRole("listitem")).toHaveCount(3);
+  await expect(page.locator("li[data-highlight]")).toContainText("ledger_db");
   await gallery(page, 768);
   await expect(page.getByRole("table", { name: "Bindings" })).toBeVisible();
   await expect(page.getByRole("list", { name: "Bindings" })).toHaveCount(0);
   await expect(page.getByText("No bindings yet.")).toBeVisible();
   await expect(page.getByRole("columnheader")).toHaveText(["Connector", "Role", "Status"]);
+  await expect(page.locator("tr[data-highlight]")).toHaveCount(1);
+  await expect(page.locator("tr[data-highlight]")).toContainText("ledger_db");
 });
 
 test.describe("rule 7", () => {

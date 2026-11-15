@@ -7,6 +7,7 @@ import { useEntities } from "../api/useEntities";
 import { useProbes } from "../api/useProbes";
 import { REASON_LABELS, REFERENCE_PLACEHOLDER } from "../reasons";
 import { useSelection } from "../selection";
+import { Button, Card, Field, FormGrid, Input, Select } from "../ui";
 import { NoProbes } from "./NoProbes";
 import { RunNeedsPassword } from "./RunNeedsPassword";
 
@@ -78,141 +79,127 @@ export function ValidateForm({ onStarted }: ValidateFormProps) {
     );
   }
 
+  // Why Validate can't be pressed yet, next to it (rule 8).
+  const missing = [
+    value.trim() === "" && "an ID",
+    reason === "" && "a reason",
+    production && reference.trim() === "" && "a reference",
+    probe === undefined && "a probe",
+  ].filter((part): part is string => typeof part === "string");
+
   // The prompt is a form of its own, so it sits beside this one: forms never nest.
   return (
     <>
-      <form className="card validate-form" onSubmit={submit}>
-        <div className="form-row">
-          <label>
-            Environment
-            <select
-              className="env-select"
-              data-production={production}
-              value={environment?.name ?? ""}
-              onChange={(e) => selectEnvironment(e.target.value)}
+      <Card className="mb-6 flex flex-col gap-4">
+        <form aria-label="Validate" onSubmit={submit} className="flex flex-col gap-4">
+          <FormGrid>
+            <Field id="validate-environment" label="Environment">
+              <Select
+                tone={production ? "production" : undefined}
+                value={environment?.name ?? ""}
+                onChange={(e) => selectEnvironment(e.target.value)}
+              >
+                {application?.environments.map((choice) => (
+                  <option key={choice.name} value={choice.name}>
+                    {choice.title}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field id="validate-entity" label="Entity">
+              <Select value={entity ?? ""} onChange={(e) => setEntityChoice(e.target.value)}>
+                {entities.data.map((e) => (
+                  <option key={e.entity} value={e.entity}>
+                    {e.title}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field
+              id="validate-value"
+              label="Any ID"
+              help="Accepts any identifier of the entity; the key graph resolves the rest."
+              error={failed.field}
             >
-              {application?.environments.map((choice) => (
-                <option key={choice.name} value={choice.name}>
-                  {choice.title}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Entity
-            <select value={entity ?? ""} onChange={(e) => setEntityChoice(e.target.value)}>
-              {entities.data.map((e) => (
-                <option key={e.entity} value={e.entity}>
-                  {e.title}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="identifier-field">
-            <label>
-              Any ID
-              <input
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                placeholder={identifiers[0] ?? ""}
-                aria-describedby={failed.field ? "value-error" : undefined}
-                aria-invalid={failed.field ? true : undefined}
-                required
-              />
-            </label>
-            <label className="find-by">
-              Find by
-              <select value={chosen} onChange={(e) => setChosen(e.target.value)}>
+              <Input value={value} onChange={(e) => setValue(e.target.value)} placeholder={identifiers[0] ?? ""} required />
+            </Field>
+            <Field id="validate-find-by" label="Find by">
+              <Select value={chosen} onChange={(e) => setChosen(e.target.value)}>
                 <option value="">Detect automatically</option>
                 {identifiers.map((name) => (
                   <option key={name} value={name}>
                     {name}
                   </option>
                 ))}
-              </select>
-            </label>
-            {failed.field && (
-              <p className="form-error" id="value-error" role="alert">
-                {failed.field}
-              </p>
-            )}
-          </div>
-          <label>
-            Probe
-            <select value={probe ?? ""} onChange={(e) => setProbeChoice(e.target.value)}>
-              {validateProbes.map((p) => (
-                <option key={p.name} value={p.name}>
-                  {p.title}
-                </option>
-              ))}
-            </select>
+              </Select>
+            </Field>
             {/* The id, as the CLI and the probe's file name it; the select already names the probe. */}
-            {probe && <span className="field-id" aria-hidden="true">{probe}</span>}
-          </label>
-        </div>
-        <p className="hint">Accepts any identifier of the entity; the key graph resolves the rest.</p>
-        {probes.isError && (
-          <p role="alert" className="form-error">
-            {probes.error.message}
-          </p>
-        )}
-        {validateProbes.length === 0 && probes.isSuccess && (
-          <NoProbes kind="validate" application={application?.title ?? "this application"} entity={entity} />
-        )}
-
-        <fieldset className="record">
-          <legend>
-            Investigation record <span className="hint">saved with the run for audit</span>
-          </legend>
-          <div className="form-row">
-            <label>
-              Reason
-              <select value={reason} onChange={(e) => setReason(e.target.value as Reason | "")} required>
-                <option value="">Select a reason</option>
-                {Object.entries(REASON_LABELS).map(([key, label]) => (
-                  <option key={key} value={key}>
-                    {label}
+            <Field id="validate-probe" label="Probe" help={probe && <code aria-hidden="true" className="font-mono">{probe}</code>}>
+              <Select value={probe ?? ""} onChange={(e) => setProbeChoice(e.target.value)}>
+                {validateProbes.map((p) => (
+                  <option key={p.name} value={p.name}>
+                    {p.title}
                   </option>
                 ))}
-              </select>
-            </label>
-            <label>
-              Reference{production ? "" : " (optional)"}
-              <input
-                value={reference}
-                onChange={(e) => setReference(e.target.value)}
-                placeholder={REFERENCE_PLACEHOLDER}
-                required={production}
-              />
-            </label>
-            <label>
-              Customer reference (optional)
-              <input
-                value={customerReference}
-                onChange={(e) => setCustomerReference(e.target.value)}
-                placeholder="Stored masked"
-              />
-            </label>
-            <label>
-              Notes (optional)
-              <input value={notes} onChange={(e) => setNotes(e.target.value)} />
-            </label>
-          </div>
-          <p className="hint">
-            Reason is always required; Reference is required in Production. Investigator, environment, time and probe
-            version are recorded automatically.
-          </p>
-        </fieldset>
+              </Select>
+            </Field>
+          </FormGrid>
+          {probes.isError && (
+            <p role="alert" className="m-0 text-sm text-production-text">
+              {probes.error.message}
+            </p>
+          )}
+          {validateProbes.length === 0 && probes.isSuccess && (
+            <NoProbes kind="validate" application={application?.title ?? "this application"} entity={entity} />
+          )}
 
-        {failed.rest && !(start.error instanceof PasswordMissingError) && (
-          <p role="alert" className="form-error">
-            {failed.rest}
-          </p>
-        )}
-        <button className="btn" type="submit" disabled={!ready || start.isPending}>
-          {start.isPending ? "Starting…" : "Validate"}
-        </button>
-      </form>
+          <fieldset className="m-0 flex flex-col gap-2 border-0 border-t border-border p-0 pt-4">
+            <legend className="float-left mb-2 w-full p-0 text-base font-semibold">
+              Investigation record <span className="text-sm font-normal text-muted">saved with the run for audit</span>
+            </legend>
+            <FormGrid>
+              <Field id="validate-reason" label="Reason">
+                <Select value={reason} onChange={(e) => setReason(e.target.value as Reason | "")} required>
+                  <option value="">Select a reason</option>
+                  {Object.entries(REASON_LABELS).map(([key, label]) => (
+                    <option key={key} value={key}>
+                      {label}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field id="validate-reference" label={`Reference${production ? "" : " (optional)"}`}>
+                <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder={REFERENCE_PLACEHOLDER} required={production} />
+              </Field>
+              <Field id="validate-customer-reference" label="Customer reference (optional)">
+                <Input value={customerReference} onChange={(e) => setCustomerReference(e.target.value)} placeholder="Stored masked" />
+              </Field>
+              <Field id="validate-notes" label="Notes (optional)">
+                <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
+              </Field>
+            </FormGrid>
+            <p className="m-0 text-sm text-muted">
+              Reason is always required; Reference is required in Production. Investigator, environment, time and probe
+              version are recorded automatically.
+            </p>
+          </fieldset>
+
+          {failed.rest && !(start.error instanceof PasswordMissingError) && (
+            <p role="alert" className="m-0 text-sm text-production-text">
+              {failed.rest}
+            </p>
+          )}
+          <div>
+            <Button
+              type="submit"
+              disabled={!ready || start.isPending}
+              disabledReason={start.isPending ? undefined : missing.length > 0 ? `To validate: ${missing.join(", ")}.` : undefined}
+            >
+              {start.isPending ? "Starting…" : "Validate"}
+            </Button>
+          </div>
+        </form>
+      </Card>
       {application && (
         <RunNeedsPassword
           error={start.error}

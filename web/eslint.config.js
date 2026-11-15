@@ -7,7 +7,7 @@ import tseslint from "typescript-eslint";
 // A Tailwind class off the spacing scale, or with an arbitrary value, in a string that is a class
 // name: a className, or an argument of cn() or cva().
 const OFF_SCALE = String.raw`/(^|\s)([a-z0-9-]+:)*-?(p|px|py|pt|pr|pb|pl|ps|pe|m|mx|my|mt|mr|mb|ml|ms|me|gap|gap-x|gap-y|space-x|space-y)-(0\.5|1\.5|2\.5|3\.5|5|7|9|10|11|1[3-9]|[2-9][0-9])(\s|$)/`;
-const ARBITRARY = String.raw`/(^|\s)([a-z0-9-]+:)*-?[a-z][a-z0-9-]*-\[/`;
+const ARBITRARY = String.raw`/(^|\s)([a-z0-9-]+:)*(-?[a-z][a-z0-9-]*-)?\[/`;
 // Each string once: a className's own string, or any string inside cn() or cva().
 const CLASS_NAME = "JSXAttribute[name.name='className']";
 const CLASS_CALL = "CallExpression[callee.name=/^(cn|cva)$/]";
@@ -43,7 +43,7 @@ export default tseslint.config(
     },
   },
   {
-    // Arbitrary values ("gap-[…]") only inside web/src/ui, where the components are made.
+    // Arbitrary values ("gap-[…]") and properties ("[overflow-wrap:…]") only inside web/src/ui, where the components are made.
     files: ["src/**/*.tsx", "mocks/**/*.tsx", "plugins/**/*.tsx"],
     ignores: ["src/ui/**"],
     rules: {

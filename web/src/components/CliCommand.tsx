@@ -1,14 +1,9 @@
 // Author: @SaadZarook
 import type { Run } from "../api/client";
 import { cliCommand } from "../runFormat";
-import { CopyButton } from "./CopyButton";
+import { CodeBlock } from "../ui";
 
-/** The owl command that runs this probe on this subject again, to copy. */
+/** The owl command that runs this probe on this subject again, to copy: it wraps, and Copy stays clear of it (rule 7). */
 export function CliCommand({ run }: { run: Run }) {
-  const command = cliCommand(run);
-  return (
-    <p className="cli-command">
-      <code>{command}</code> <CopyButton text={command} label="Copy command" />
-    </p>
-  );
+  return <CodeBlock code={cliCommand(run)} copyLabel="Copy command" />;
 }

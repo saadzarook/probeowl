@@ -24,7 +24,7 @@ test("a time typed with an offset is refused at the identifier field", async ({ 
   await expect(field).toHaveAccessibleDescription(
     /^this column stores time without an offset; enter it without \+0400, in the column's own time/,
   );
-  const axe = await new AxeBuilder({ page }).include(".validate-form").analyze();
+  const axe = await new AxeBuilder({ page }).include("main form").analyze();
   expect(axe.violations).toEqual([]);
 });
 
