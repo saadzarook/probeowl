@@ -84,6 +84,7 @@ export function ValidateForm({ onStarted }: ValidateFormProps) {
     value.trim() === "" && "an ID",
     reason === "" && "a reason",
     production && reference.trim() === "" && "a reference",
+    probe === undefined && "a probe",
   ].filter((part): part is string => typeof part === "string");
 
   // The prompt is a form of its own, so it sits beside this one: forms never nest.

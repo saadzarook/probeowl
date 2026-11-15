@@ -213,4 +213,41 @@ test("rule 8: Validate and Inspect say what they still need while disabled", asy
   const inspect = page.getByRole("button", { name: "Inspect", exact: true });
   await expect(inspect).toBeDisabled();
   await expect(page.getByText(/^To inspect: an identifier, a reason/)).toBeVisible();
+  // An application with no Inspect probe says so at the button too, not only above it.
+  await page.getByRole("button", { name: "Application" }).click();
+  await page.getByRole("button", { name: /Wallet/ }).last().click();
+  await expect(page.getByText(/^To inspect: .*a probe\.$/)).toBeVisible();
+});
+
+test("rule 8: the disabled reason asks for a reference only in Production", async ({ page }) => {
+  for (const [path, button, id, application] of [
+    ["/validate", "Validate", "Any ID", /Wallet/],
+    ["/inspect", "Inspect", "Identifier", /Card access/],
+  ] as const) {
+    const verb = button.toLowerCase();
+    const what = id === "Any ID" ? "an ID" : "an identifier";
+    await open(page, { name: button, path }, 1440);
+    await page.getByRole("button", { name: "Application" }).click();
+    await page.getByRole("button", { name: application }).last().click();
+    const submit = page.getByRole("button", { name: button, exact: true });
+    const environment = page.getByRole("main").getByLabel("Environment");
+    // The environment carries across screens (#94): start each form in Production.
+    await environment.selectOption("prod");
+    await expect(submit).toHaveAccessibleDescription(`To ${verb}: ${what}, a reason, a reference.`);
+    await expect(page.getByLabel("Reference", { exact: true })).toBeVisible();
+
+    for (const other of ["uat", "dev"]) {
+      if ((await environment.locator(`option[value="${other}"]`).count()) === 0) continue;
+      await environment.selectOption(other);
+      await expect(page.getByLabel("Reference (optional)", { exact: true })).toBeVisible();
+      await expect(submit).toHaveAccessibleDescription(`To ${verb}: ${what}, a reason.`);
+      await page.getByLabel(id).fill("C204518");
+      await page.getByLabel("Reason").selectOption({ index: 1 });
+      // Optional here: with no reference it can be pressed, and says nothing.
+      await expect(submit).toBeEnabled();
+      await expect(page.getByText(new RegExp(`^To ${verb}:`))).toHaveCount(0);
+      await page.getByLabel(id).fill("");
+      await page.getByLabel("Reason").selectOption("");
+    }
+  }
 });

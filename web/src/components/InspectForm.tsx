@@ -78,6 +78,7 @@ export function InspectForm({ entity, pending, error, valueError, onSubmit }: In
     value.trim() === "" && "an identifier",
     reason === "" && "a reason",
     production && reference.trim() === "" && "a reference",
+    probe === undefined && "a probe",
   ].filter((part): part is string => typeof part === "string");
 
   return (
