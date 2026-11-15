@@ -40,7 +40,8 @@ for (const [text, expected] of cases) {
     const shown = withoutPassword(text);
     if (expected?.password && expected.password.length > 2) expect(shown).not.toContain(expected.password);
     // Still the same connection: it reads the same, apart from the password.
-    const { password: _gone, ...rest } = expected ?? {};
+    const rest = { ...expected };
+    delete rest.password;
     expect(parseConnectionString(shown)).toEqual(rest);
   });
 }
