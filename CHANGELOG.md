@@ -14,6 +14,10 @@ See docs/implementation-plan.md, Releases. -->
 
 ### Changed
 
+- **Exit codes of `owl validate` and `owl inspect`.** 0: passed. 1: a finding (Failed). 2: no
+  finding, but not fully checked: Not checked, Skipped (which used to exit 1) and Ambiguous (which
+  used to exit 3), as well as a run that couldn't start. A 2 always prints why on the run's last
+  line. **If your scripts check owl's exit codes, update them.**
 - A new run status, **Not checked**, for a run whose data couldn't be read. Before, it showed
   Failed and exited 1, as if a check had found something. The rule, in order:
   - **Failed:** an expectation was evaluated and didn't hold, or the subject or a record was read
@@ -24,10 +28,8 @@ See docs/implementation-plan.md, Releases. -->
     read, an identifier lookup that errors, or a restart of `owl serve`.
   - **Passed:** everything evaluated held.
 
-  `owl validate` and `owl inspect` exit 1, 2 and 0 for them. Exit code 2 now means "no finding, but
-  not fully checked", and covers Not checked, Skipped (which used to exit 1) and Ambiguous (which
-  used to exit 3). A 2 always prints why on its last line. A Not checked run names the locations
-  it couldn't read, and isn't compared with a healthy record. Runs stored before keep their status.
+  They exit 1, 2 and 0 (see the exit codes above). A Not checked run names the locations it
+  couldn't read, and isn't compared with a healthy record. Runs stored before keep their status.
 
 ## [0.2.0] - 2026-11-14
 
