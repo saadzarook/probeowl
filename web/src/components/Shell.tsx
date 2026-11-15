@@ -42,9 +42,9 @@ export function Shell() {
   }, []);
 
   return (
-    <div className="shell">
+    <div className="min-h-screen lg:flex">
       <Sidebar />
-      <div className="main">
+      <div className="min-w-0 flex-1 px-4 pb-6 md:px-8 md:pb-8">
         <TopBar onSearch={openSearch} />
         <SearchPalette open={searching} onOpenChange={setSearching} onNotice={setNotice} returnFocus={() => opener.current?.focus()} />
         {notice && (

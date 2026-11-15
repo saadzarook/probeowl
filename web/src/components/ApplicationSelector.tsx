@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import type { ApplicationSummary } from "../api/client";
 import { useSelection } from "../selection";
+import { cn, controlClass } from "../ui";
 
 function matches(app: ApplicationSummary, query: string): boolean {
   const q = query.trim().toLowerCase();
@@ -45,9 +46,13 @@ export function ApplicationSelector() {
 
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
-      <Popover.Trigger id="app-trigger" className="app-trigger" aria-labelledby="app-label app-trigger">
-        <span className="grow">{application?.title ?? "All applications"}</span>
-        {application && <span className="app-team">{application.owner}</span>}
+      <Popover.Trigger
+        id="app-trigger"
+        className={cn(controlClass, "flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left sm:max-w-80")}
+        aria-labelledby="app-label app-trigger"
+      >
+        <span className="min-w-0 flex-1 truncate font-medium">{application?.title ?? "All applications"}</span>
+        {application && <span className="hidden shrink-0 text-muted md:inline">{application.owner}</span>}
         <span aria-hidden="true">▾</span>
       </Popover.Trigger>
       <Popover.Portal>
