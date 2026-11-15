@@ -1,0 +1,37 @@
+# Author: @SaadZarook
+name: keychain
+
+# The macOS Keychain, for real (#93). ProbeOwl keeps passwords only in the operating system's
+# keychain (backend/probeowl/secrets.py): Windows and Linux are tested against theirs elsewhere,
+# and this job tests macOS's, on the runner's own login keychain. Only the tests marked keychain
+# run: no dev stack and no web build, so it stays quick.
+on:
+  # No paths filter: a required check that did not run leaves the pull request unmergeable.
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  macos-keychain:
+    runs-on: macos-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+      - run: uv sync --locked
+      - name: Keychain tests
+        env:
+          PROBEOWL_KEYCHAIN_TESTS: "1"
+        # A skipped test would pass with nothing checked: on macOS, every one must run.
+        run: |
+          uv run pytest -m keychain -v -p no:cacheprovider --junitxml="$RUNNER_TEMP/keychain.xml"
+          grep -q 'skipped="0"' "$RUNNER_TEMP/keychain.xml" || {
+            echo "a keychain test was skipped: on macOS every one must run"
+            exit 1
+          }

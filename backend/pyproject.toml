@@ -104,4 +104,5 @@ testpaths = ["tests"]
 addopts = "-ra --strict-markers"
 markers = [
     "database: needs a real PostgreSQL, SQL Server, MariaDB or Oracle (URL or CI container)",
+    "keychain: writes to the real macOS Keychain; the keychain job runs them (PROBEOWL_KEYCHAIN_TESTS=1)",
 ]
