@@ -4,7 +4,7 @@ import type { ExpectationEvaluation, LocationResult, Run } from "../api/client";
 import { useEntity } from "../api/useEntities";
 import { useRun } from "../api/useRun";
 import { REASON_LABELS } from "../reasons";
-import { RESULT_LABELS, formatTime, keyLine, titleCase, withCaveat } from "../runFormat";
+import { RESULT_LABELS, formatTime, keyLine, locationName, titleCase, withCaveat } from "../runFormat";
 import { useSelection } from "../selection";
 import { CliCommand } from "./CliCommand";
 import { EvidencePanel } from "./EvidencePanel";
@@ -17,15 +17,25 @@ function countOf(run: Run, result: ExpectationEvaluation["result"]): number {
   return (run.expectations ?? []).filter((e) => e.result === result).length;
 }
 
-/** Where the dependency order first breaks: the first location that was not Found, else the first failed expectation. */
-function firstFailure(run: Run): string | undefined {
-  const location = (run.locations ?? []).find((l) => l.outcome !== "found");
-  if (location) {
-    const reason = location.reason ? `: ${location.reason}` : "";
-    return `${location.title} ${withCaveat(location.outcome.replaceAll("_", " "), location.caveat)}${reason}`;
-  }
+// Locations whose data could not be read: listed apart from what failed (#82).
+const UNREAD: ReadonlySet<LocationResult["outcome"]> = new Set(["error", "stale", "not_configured", "waiting", "blocked"]);
+
+/** What to lead with: the first failed expectation, else where the dependency order first breaks. */
+function firstFailure(run: Run): { failed?: string; order?: string } {
   const failed = (run.expectations ?? []).find((e) => e.result === "fail");
-  return failed ? `${failed.expectation}${failed.detail ? `: ${failed.detail}` : ""}` : undefined;
+  // With its caveat, such as a Missing record on a replica of unknown lag: never shown as certain.
+  if (failed) return { failed: withCaveat(`${failed.expectation}${failed.detail ? `: ${failed.detail}` : ""}`, failed.caveat) };
+  const location = (run.locations ?? []).find((l) => l.outcome !== "found");
+  if (!location) return {};
+  const reason = location.reason ? `: ${location.reason}` : "";
+  return { order: `${locationName(location)} ${withCaveat(location.outcome.replaceAll("_", " "), location.caveat)}${reason}` };
+}
+
+/** The locations that could not be read, each named (a fan-out row by its key) with its reason. */
+function unreadLocations(run: Run): string[] {
+  return (run.locations ?? [])
+    .filter((l) => UNREAD.has(l.outcome))
+    .map((l) => `${locationName(l)}: ${l.outcome.replaceAll("_", " ")}${l.reason ? `, ${l.reason}` : ""}`);
 }
 
 /** A run as it progresses and once finished: header, locations, expectations and evidence. */
@@ -53,7 +63,8 @@ export function RunResult({ runId }: { runId: string }) {
   const expectations = run.expectations ?? [];
   const running = run.status === "running";
   // A stopped run judged nothing, so it has no first failure to report.
-  const failure = run.status === "failed" && !run.stop_reason ? firstFailure(run) : undefined;
+  const failure = run.status === "failed" && !run.stop_reason ? firstFailure(run) : {};
+  const unread = failure.failed ? unreadLocations(run) : [];
   const firstBad = locations.findIndex((l) => l.outcome !== "found");
   const current: LocationResult | undefined = locations[selected ?? (firstBad >= 0 ? firstBad : 0)];
   const environment = application?.environments.find((e) => e.name === run.environment);
@@ -95,7 +106,18 @@ export function RunResult({ runId }: { runId: string }) {
 
       <RunWarnings run={run} />
       {run.status === "skipped" && run.skip_reason && <p className="summary">Skipped: {run.skip_reason}</p>}
-      {failure && <p className="summary failure">First failure in dependency order: {failure}</p>}
+      {failure.failed && <p className="summary failure">First failed expectation: {failure.failed}</p>}
+      {unread.length > 0 && (
+        <div className="summary" role="note">
+          <p>Not read, so not part of that failure:</p>
+          <ul>
+            {unread.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {failure.order && <p className="summary failure">First failure in dependency order: {failure.order}</p>}
       <NotChecked run={run} />
 
       <div className="run-body">
@@ -107,7 +129,7 @@ export function RunResult({ runId }: { runId: string }) {
               <li key={`${l.location}:${l.row ?? ""}`}>
                 <button type="button" aria-pressed={l === current} onClick={() => setSelected(index)}>
                   <span className="location-name">
-                    {l.title}
+                    {locationName(l)}
                     {l.evidence && <span className="hint"> {l.evidence.connector}</span>}
                   </span>
                   <OutcomeChip outcome={l.outcome} caveat={l.caveat} />

@@ -35,6 +35,7 @@ import {
   stoppedCardRun,
   lateValidateRun,
   stoppedValidateRun,
+  partialValidateRun,
   unreadableValidateRun,
   skippedValidateRun,
   schemaSnapshots,
@@ -293,6 +294,7 @@ function runFor(id: string, request: StartRun, running: boolean): Run {
   if (request.probe === "visitor_cards") return cardRun(id, request, running);
   if (request.value === "tp_paused") return skippedValidateRun(id);
   if (request.value === "tp_halted") return stoppedValidateRun(id);
+  if (request.value === "tp_nohook") return partialValidateRun(id);
   if (request.value === "tp_noread") return unreadableValidateRun(id);
   if (request.value === "tp_lagunk" && !running) return lateValidateRun(id);
   return running ? runningValidateRun(id) : failedValidateRun(id);
