@@ -23,8 +23,9 @@ test("tp_91f2c7 in UAT fails: ledger entries Missing", async ({ page }) => {
   // The failed expectation leads (#82); the location that caused it still reads Missing above.
   await expect(result(page).getByText(/^First failed expectation: count\(ledger\) == 2: 0 == 2/)).toBeVisible();
   await expect(result(page).getByText(/First failure in dependency order/)).toHaveCount(0);
-  await expect(result(page).getByText("count(ledger) == 2")).toBeVisible();
-  await expect(result(page).getByText("0 == 2")).toBeVisible();
+  // The expectation's own row, not the banner, which repeats its text.
+  await expect(result(page).getByText("count(ledger) == 2", { exact: true })).toBeVisible();
+  await expect(result(page).getByText("0 == 2", { exact: true })).toBeVisible();
 });
 
 test("tp_91f2b9 in UAT passes: every location Found", async ({ page }) => {
