@@ -27,13 +27,17 @@ class Outcome(StrEnum):
 class RunStatus(StrEnum):
     """Where a run is.
 
-    Skipped: a guard or circuit breaker stopped it before any lookup. Ambiguous: the
-    identifier matched several subjects, so nothing else ran; see the run's matches.
+    Failed: an expectation was evaluated and failed. Not checked: none failed, but one or more
+    could not be evaluated because data they need could not be read, or the run stopped before
+    it could check anything. Passed: every expectation that applies was evaluated and passed.
+    Skipped: a guard or circuit breaker stopped it before any lookup. Ambiguous: the identifier
+    matched several subjects, so nothing else ran; see the run's matches.
     """
 
     RUNNING = "running"
     PASSED = "passed"
     FAILED = "failed"
+    NOT_CHECKED = "not_checked"
     SKIPPED = "skipped"
     AMBIGUOUS = "ambiguous"
 

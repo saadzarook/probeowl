@@ -207,7 +207,9 @@ def serve(
     runs = RunService(applications, store, breaker=breaker)
     interrupted = runs.recover_interrupted()
     if interrupted:
-        typer.echo(f"{len(interrupted)} runs were left running and are now failed: interrupted")
+        typer.echo(
+            f"{len(interrupted)} runs were left running and are now not checked: interrupted"
+        )
     # One folder object: its lock covers the catalog's writes and the probes' together.
     config_folder = ConfigFolder(folder)
     build = find_web_app()

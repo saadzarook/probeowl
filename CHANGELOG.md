@@ -12,6 +12,25 @@ v0.2 phase (a) first-run setup and Add connection, v0.3 phase (b) the entity gra
 v0.4 phase (c) blocks and probe by example, v0.5 phase (d) templates and New runbook.
 See docs/implementation-plan.md, Releases. -->
 
+### Changed
+
+- **Exit codes of `owl validate` and `owl inspect`.** 0: passed. 1: a finding (Failed). 2: no
+  finding, but not fully checked: Not checked, Skipped (which used to exit 1) and Ambiguous (which
+  used to exit 3), as well as a run that couldn't start. A 2 always prints why on the run's last
+  line. **If your scripts check owl's exit codes, update them.**
+- A new run status, **Not checked**, for a run whose data couldn't be read. Before, it showed
+  Failed and exited 1, as if a check had found something. The rule, in order:
+  - **Failed:** an expectation was evaluated and didn't hold, or the subject or a record was read
+    and is absent (Missing, an empty link).
+  - **Not checked:** nothing failed, and at least one expectation couldn't be evaluated because
+    data couldn't be read (an Error, Stale data, a row not looked up, or a chain starting at one of
+    those). A run that stopped before checking is Not checked too: a kill switch after its first
+    read, an identifier lookup that errors, or a restart of `owl serve`.
+  - **Passed:** everything evaluated held.
+
+  They exit 1, 2 and 0 (see the exit codes above). A Not checked run names the locations it
+  couldn't read, and isn't compared with a healthy record. Runs stored before keep their status.
+
 ## [0.2.0] - 2026-11-14
 
 Phase (a) of No YAML required: set up in the browser. The newcomer path, from install to a first

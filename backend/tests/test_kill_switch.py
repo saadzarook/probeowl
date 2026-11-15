@@ -181,7 +181,7 @@ def test_a_lookup_in_flight_finishes_then_the_run_stops_with_the_reason(setup: S
     setup.fakes["wallet_db"] = fake
     api = setup.client()
     run = finished(api, start(api, value="tp_91f2b9"))
-    assert run["status"] == "failed"
+    assert run["status"] == "not_checked"
     assert "kill switch on connector wallet_db" in run["stop_reason"]
     # The record's lookup finished and is kept; wallet_db's webhook lookup never went out.
     assert len(fake.calls) == 1
@@ -204,7 +204,7 @@ def test_losing_the_store_during_a_run_stops_it(setup: Setup) -> None:
     setup.fakes["wallet_db"] = fake
     api = setup.client()
     run = finished(api, start(api, value="tp_91f2b9"))
-    assert run["status"] == "failed"
+    assert run["status"] == "not_checked"
     assert "kill switch cannot be checked" in run["stop_reason"]
     assert len(fake.calls) == 1
 
@@ -448,7 +448,7 @@ def test_owl_validate_says_why_a_run_was_skipped(setup: Setup, owl: Any) -> None
         cli.app,
         ["validate", "topup", "tp_91f2b9", "--env", "uat", "--reason", "incident"],
     )
-    assert result.exit_code == 1
+    assert result.exit_code == 2  # no finding, not fully checked: skipped
     assert ": skipped (stopped by the kill switch on connector wallet_db" in result.output
 
 
