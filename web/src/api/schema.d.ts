@@ -2071,7 +2071,7 @@ export interface components {
             reason: components["schemas"]["Reason"];
             /**
              * Reference
-             * @description Jira key, support case ID or change ID, such as WALLET-482.
+             * @description Jira key, support case ID or change ID, such as PROJ-123.
              */
             reference?: string | null;
             /** Notes */
