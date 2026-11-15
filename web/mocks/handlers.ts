@@ -5,6 +5,7 @@ import { delay, http, HttpResponse } from "msw";
 import type { ApplicationSummary, CatalogChange, CatalogReview, CatalogTable, TableReview, DraftConnection, KillSwitch, KillTarget, ProbeChange, SaveApplication, SaveConnector, SaveEntity, SaveSecret, SaveProbe, SetKillSwitch, StartRun } from "../src/api/client";
 import type { CompareRequest } from "../../plugins/compare_files/web/types";
 import { compareFilesManifest, compareFilesResult } from "./fixtures/compareFiles";
+import { auditEvents } from "./fixtures/audit";
 import type { FieldError, HealthyAttempt, HealthyComparison, Run, RunbookView, StepInRun } from "../src/api/client";
 import { CONFIGURATION_HEADER } from "../src/api/configuration";
 import { mockSearch, type Searchable } from "./search";
@@ -936,6 +937,23 @@ export const handlers = [
     });
     const runs = walletRunPages.flat().filter((run) => scope.some((a) => a.name === run.application));
     return json(mockSearch(q, limit, items, runs));
+  }),
+
+  // The audit (#79): filters by exact name, 50 per page, as owl serve answers.
+  http.get("/api/audit", ({ request }) => {
+    const query = new URL(request.url).searchParams;
+    if (localStorage.getItem("mock-audit-error")) return problem(500, "Internal Server Error", "The store could not be read.");
+    const actor = query.get("actor");
+    const matching = auditEvents.filter(
+      (e) =>
+        (!actor || e.actor.name === actor || e.actor.on_behalf_of === actor) &&
+        (!query.get("action") || e.action === query.get("action")) &&
+        (!query.get("application") || e.application === query.get("application")) &&
+        (!query.get("environment") || e.environment === query.get("environment")),
+    );
+    const start = Number(query.get("before") ?? "0");
+    const events = matching.slice(start, start + 50);
+    return json({ events, next: start + 50 < matching.length ? String(start + 50) : null });
   }),
 
   http.get("/api/runs", ({ request }) => {

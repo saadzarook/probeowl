@@ -504,6 +504,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Audit
+         * @description The audit, newest first, 50 at a time; read-only, and not itself audited (#79).
+         *
+         *     Each filter given narrows the list, by exact name. actor: who acted, or the person an agent
+         *     acted for, so s.khan finds "s.khan via MCP" too. Details are shown masked by today's PII
+         *     rules, and with every loaded binding's host, login and secret redacted. before: the next
+         *     value of the previous page.
+         */
+        get: operations["list_audit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runs/{run_id}": {
         parameters: {
             query?: never;
@@ -1037,6 +1062,51 @@ export interface components {
          * @enum {string}
          */
         ArrayMatch: "by_position" | "any_order" | "by_key";
+        /**
+         * AuditEvent
+         * @description One audit record. Never changed or removed once written.
+         */
+        AuditEvent: {
+            /** Id */
+            id?: string;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at?: string;
+            /**
+             * Action
+             * @description What happened, such as run_started or write_query_copied.
+             */
+            action: string;
+            actor: components["schemas"]["Actor"];
+            /** Application */
+            application?: string | null;
+            /** Environment */
+            environment?: string | null;
+            /** Run Id */
+            run_id?: string | null;
+            /**
+             * Details
+             * @description Masked values only.
+             */
+            details?: {
+                [key: string]: components["schemas"]["JsonValue"];
+            };
+        };
+        /**
+         * AuditPage
+         * @description A page of audit events, newest first.
+         */
+        AuditPage: {
+            /** Events */
+            events: components["schemas"]["AuditEvent"][];
+            /**
+             * Next
+             * @description Pass as before for the next, older page; null when none.
+             */
+            next?: string | null;
+        };
         /**
          * BindingHealth
          * @description How a binding is doing right now.
@@ -5223,6 +5293,68 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    list_audit: {
+        parameters: {
+            query?: {
+                before?: string | null;
+                actor?: string | null;
+                action?: string | null;
+                application?: string | null;
+                environment?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditPage"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
