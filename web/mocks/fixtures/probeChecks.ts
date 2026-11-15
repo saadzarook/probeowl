@@ -1,6 +1,7 @@
 // Author: @SaadZarook
 import type { Run, SaveCheck, SaveCheckReport } from "../../src/api/client";
 import { failedValidateRun } from "./runs";
+import environmentUnbound from "./backend/save-checks-environment-unbound.json";
 
 /** The message a Transaction table read without a time filter or key fails with. */
 export const TIME_FILTER_MESSAGE =
@@ -30,17 +31,12 @@ export const passingReport = (probe: string | null) => report(probe, allPass);
 export const timeFilterReport = (probe: string | null) => report(probe, failing("Time filter", TIME_FILTER_MESSAGE, "record"));
 export const piiReport = (probe: string | null) =>
   report(probe, failing("PII masked", "customer_email is selected by record but not listed in pii, so it would not be masked", "record"));
-/** As the backend reports a probe enabled where a location's connector has no binding: one failure per environment. */
-export function unboundReport(probe: string | null, unboundIn: string[]): SaveCheckReport {
-  const failures: SaveCheck[] = unboundIn.map((environment) => ({
-    check: "Environments",
-    status: "fail",
-    message: `enabled in ${environment}, where cards (access_db) has no binding; bind it or leave ${environment} out of the probe's environments`,
-    environment,
-    plan_not_run: false,
-  }));
-  return report(probe, failures.length > 0 ? [...allPass.filter((c) => c.check !== "Environments"), ...failures] : allPass);
-}
+/**
+ * The backend's own answer for a probe enabled in Production while access_db has no binding there:
+ * one failure per location, each naming its location and environment. Written and checked by
+ * backend/tests/test_mock_answers.py, so the mocks can't say anything the backend doesn't (#108).
+ */
+export const unboundReport = (probe: string | null): SaveCheckReport => ({ ...(environmentUnbound as SaveCheckReport), probe });
 export const unreadableReport = (reason: string): SaveCheckReport => ({
   probe: null,
   entity: null,

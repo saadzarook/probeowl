@@ -2,7 +2,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import type { Entity } from "../api/client";
+import type { Entity, SaveCheck } from "../api/client";
 import { useEntities, useEntity, useEntityYaml } from "../api/useEntities";
 import { fetchProbeYaml } from "../api/client";
 import { useApplicationProbes } from "../api/useProbes";
@@ -36,17 +36,18 @@ function ErrorBlock({ message, onRetry }: { message: string; onRetry: () => void
 }
 
 /**
- * Connectors a failed Environments check says are not bound, by environment name. The check names
- * its environment, and each unbound location with its connector: "cards (access_db) has no binding".
+ * The connectors not bound in each environment, from the failed Environments checks' structured
+ * fields: each names its environment and location, and the entity says which connector that
+ * location uses. Never read from the message (#108).
  */
-function unboundBy(checks: { check: string; status: string; message: string; environment?: string | null }[]): Map<string, string> {
-  const unbound = new Map<string, string>();
+function unboundBy(checks: Pick<SaveCheck, "check" | "status" | "location" | "environment">[], entity: Entity | undefined): Map<string, string> {
+  const unbound = new Map<string, Set<string>>();
   for (const c of checks) {
     if (c.check !== "Environments" || c.status !== "fail" || !c.environment) continue;
-    const connectors = [...new Set([...c.message.matchAll(/\(([\w-]+)\)/g)].map((m) => m[1]))];
-    unbound.set(c.environment, connectors.join(", ") || "a connector");
+    const using = c.location ? entity?.locations[c.location]?.using : undefined;
+    unbound.set(c.environment, (unbound.get(c.environment) ?? new Set()).add(using ?? "a connector"));
   }
-  return unbound;
+  return new Map([...unbound].map(([environment, connectors]) => [environment, [...connectors].join(", ")]));
 }
 
 const firstLocation = (entity: Entity | undefined) => Object.keys(entity?.locations ?? {})[0] ?? "record";
@@ -114,7 +115,7 @@ export function ProbeEditorPage({ item }: { item: NavItem }) {
   // Adjusted while rendering, once, as React advises for state that follows a query's answer.
   if (choosingEnvironments && application && probeYaml !== undefined && checks.data && !checks.isPlaceholderData && !checks.isFetching) {
     setChoosingEnvironments(false);
-    const unbound = unboundBy(checks.data.checks);
+    const unbound = unboundBy(checks.data.checks, entity.data);
     const bound = application.environments.map((e) => e.name).filter((e) => !unbound.has(e));
     // The person chose already, or none is bound: then the checks say what is missing where.
     if (readFields(probeYaml)?.environments === undefined && unbound.size > 0 && bound.length > 0) {
@@ -219,7 +220,7 @@ export function ProbeEditorPage({ item }: { item: NavItem }) {
   } else if (!enabled) {
     body = <EmptyState title="Pick a probe or start a new one" message="Open a probe above to edit it, or start a new draft." />;
   } else {
-    const unbound = unboundBy(checks.data?.checks ?? []);
+    const unbound = unboundBy(checks.data?.checks ?? [], entity.data);
     const checked = (env: string) => (fields?.environments ? fields.environments.includes(env) : !unbound.has(env));
     const toggle = (env: string) => {
       const current = application.environments.map((e) => e.name).filter((e) => checked(e));

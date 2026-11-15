@@ -1,0 +1,75 @@
+{
+  "probe": "visitor_cards",
+  "entity": "visitor",
+  "checks": [
+    {
+      "check": "Expectations",
+      "status": "pass",
+      "message": "3 expectations read locations of visitor",
+      "location": null,
+      "environment": null,
+      "plan_not_run": false
+    },
+    {
+      "check": "Environments",
+      "status": "fail",
+      "message": "enabled in prod, where cards (access_db) has no binding; bind access_db in prod or leave prod out of the probe's environments",
+      "location": "cards",
+      "environment": "prod",
+      "plan_not_run": false
+    },
+    {
+      "check": "Environments",
+      "status": "fail",
+      "message": "enabled in prod, where profile (access_db) has no binding; bind access_db in prod or leave prod out of the probe's environments",
+      "location": "profile",
+      "environment": "prod",
+      "plan_not_run": false
+    },
+    {
+      "check": "Row ceiling",
+      "status": "pass",
+      "message": "every location's max_rows is within its connector's",
+      "location": null,
+      "environment": null,
+      "plan_not_run": false
+    },
+    {
+      "check": "Healthy sample",
+      "status": "pass",
+      "message": "it selects visitor_profile_id, with each parameter's source",
+      "location": null,
+      "environment": null,
+      "plan_not_run": false
+    },
+    {
+      "check": "Read-only SQL",
+      "status": "pass",
+      "message": "every SQL lookup is a single SELECT with its keys bound as parameters; every REST lookup is a GET",
+      "location": null,
+      "environment": null,
+      "plan_not_run": false
+    },
+    {
+      "check": "Time filter",
+      "status": "pass",
+      "message": "every lookup on a Transaction, Log or Audit table is keyed or time-bounded",
+      "location": null,
+      "environment": null,
+      "plan_not_run": false
+    },
+    {
+      "check": "PII masked",
+      "status": "pass",
+      "message": "every PII column a lookup selects is masked",
+      "location": null,
+      "environment": null,
+      "plan_not_run": false
+    }
+  ],
+  "passed": 6,
+  "warnings": 0,
+  "failed": 2,
+  "can_save": false,
+  "plans_not_run": 0
+}
