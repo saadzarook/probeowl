@@ -1,6 +1,7 @@
 # Author: @SaadZarook
 """owl serve serving the web app's build: the pages, the bundles, and what it never serves."""
 
+import logging
 import re
 from collections.abc import Mapping
 from pathlib import Path
@@ -135,3 +136,62 @@ def test_without_a_build_the_page_saying_so_has_no_inline_style(tmp_path: Path) 
     assert response.status_code == 404
     assert "style=" not in response.text
     assert "unsafe-inline" not in response.headers["content-security-policy"]
+
+
+def test_the_nonce_is_128_bits_from_the_secrets_csprng_and_new_for_each_response(
+    build: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    asked: list[int] = []
+    real = web_app.secrets.token_urlsafe
+
+    def counted(nbytes: int) -> str:
+        asked.append(nbytes)
+        return real(nbytes)
+
+    # The module's own secrets, the OS's CSPRNG: never random, never a counter or a time.
+    monkeypatch.setattr(web_app.secrets, "token_urlsafe", counted)
+    served = client(build)
+    first, second = served.get("/inspect"), served.get("/inspect")
+    assert asked == [16, 16]  # one call per response, 16 bytes each: 128 bits
+    assert nonce_of(first) != nonce_of(second)
+    assert len(nonce_of(first)) == 22  # base64url of 16 bytes, no padding
+    assert f'nonce="{nonce_of(first)}"' in first.text
+    assert nonce_of(first) not in second.text
+
+
+@pytest.mark.parametrize("path", ["/", "/inspect", "/index.html"])
+def test_a_page_with_a_nonce_is_never_stored_and_bundles_keep_their_caching(
+    build: Path, path: str
+) -> None:
+    served = client(build)
+    page = served.get(path)
+    assert nonce_of(page)
+    assert "no-store" in page.headers["cache-control"].split(", ")
+    # A bundle never carries a nonce, so it keeps its long caching; other files are revalidated.
+    assert served.get("/assets/index-abc123.js").headers["cache-control"] == web_app.IMMUTABLE
+    assert served.get("/owl.svg").headers["cache-control"] == web_app.NO_CACHE
+    missing = client(None).get(path)
+    assert nonce_of(missing)
+    assert "no-store" in missing.headers["cache-control"].split(", ")
+
+
+def test_the_nonce_is_only_in_its_page_and_policy_never_in_logs_urls_or_the_api(
+    build: Path, caplog: pytest.LogCaptureFixture, capfd: pytest.CaptureFixture[str]
+) -> None:
+    caplog.set_level(logging.DEBUG)
+    served = client(build)
+    page = served.get("/validate?probe=topup_completed")
+    nonce = nonce_of(page)
+    # Where it belongs: the page and its policy, nowhere else in the response.
+    other_headers = {k: v for k, v in page.headers.items() if k != "content-security-policy"}
+    assert nonce not in str(other_headers)
+    assert nonce not in str(page.url)
+    assert "set-cookie" not in page.headers
+    # Never in what the API answers, before or after the page.
+    for api in ("/api/plugins", "/api/applications", "/api/me", "/api/no-such-route"):
+        answer = served.get(api)
+        assert nonce not in answer.text
+        assert nonce not in str(answer.headers)
+    # Never in any log line or anything printed while serving.
+    out, err = capfd.readouterr()
+    assert nonce not in caplog.text + out + err
