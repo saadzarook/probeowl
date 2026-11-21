@@ -136,8 +136,12 @@ for (const theme of THEMES) {
       await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
       // Material's stylesheet applied: its header bar has a colour, not the browser's nothing.
       expect(await page.locator(".md-header").evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe("rgba(0, 0, 0, 0)");
-      // Material's search: at this width its box is always shown; its worker answers.
-      await page.locator("input.md-search__input").fill("connector");
+      // Material's search: at this width its box is always shown; its worker answers. Wait until the
+      // worker says it is ready, then type: Material queries on key presses, which fill() doesn't send.
+      const search = page.locator("input.md-search__input");
+      await search.focus();
+      await expect(page.locator(".md-search-result__meta")).toHaveText(/Type to start searching/i, { timeout: 30_000 });
+      await search.pressSequentially("connector");
       await expect(page.locator(".md-search-result__item").first()).toBeVisible();
       await expect(page.locator(".md-search-result__item").first()).toContainText(/connector/i);
       // Another page, under its own policy: its inline scripts allowed by their hashes, nothing else.
