@@ -240,7 +240,7 @@ kbd { font-family: var(--font-mono); font-size: 0.82em; font-weight: 500; paddin
 .measure h3 { margin-bottom: 4px; }
 .measure .unit { font-family: var(--font-mono); font-size: 12px; font-weight: 500; color: var(--fg-quiet); margin-left: 8px; }
 .measure .m-head { margin-top: 6px; font-size: 14px; font-weight: 600; }
-.bar { display: grid; grid-template-columns: 112px minmax(0, 1fr) 56px; gap: 14px; align-items: center; font-size: 14.5px; }
+.bar { display: grid; grid-template-columns: 128px minmax(0, 1fr) 56px; gap: 14px; align-items: center; font-size: 14.5px; }
 .bar .lbl { font-family: var(--font-mono); font-size: 13px; color: var(--fg-quiet); }
 .bar .track { height: 12px; background: var(--rule); border-radius: 6px; overflow: hidden; }
 .bar .fill { display: block; height: 100%; width: var(--w); background: var(--amber-bright); border-radius: 6px; }
@@ -276,7 +276,7 @@ footer { margin-top: 96px; border-top: 1px solid var(--rule); }
   .compare tr:last-child { border-bottom: 0; }
   .compare th, .compare td, .compare tbody th { padding: 4px 0; border: 0; width: auto; }
   .compare td::before { content: attr(data-label); display: block; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg-quiet); margin-top: 6px; }
-  .bar { grid-template-columns: 104px minmax(0, 1fr) 40px; gap: 10px; }
+  .bar { grid-template-columns: 120px minmax(0, 1fr) 40px; gap: 10px; }
   .bar .lbl { font-size: 12px; }
   section.s { padding-block: 64px 0; }
 }
@@ -391,7 +391,7 @@ footer { margin-top: 96px; border-top: 1px solid var(--rule); }
           </div>
           <a class="btn btn-amber" href="./guide/">Read the guide</a>
         </div>
-        <p class="meta">v0.2 pre-release · <a href="#new">what’s new</a> · Apache 2.0 · runs on your machine</p>
+        <p class="meta"><a href="https://github.com/saadzarook/probeowl/releases/tag/v0.2.1">v0.2.1 pre-release</a> · <a href="#new">what’s new</a> · Apache 2.0 · runs on your machine</p>
       </div>
 
       <figure class="term" style="margin:0" aria-label="A ProbeOwl run in the terminal">
@@ -426,6 +426,7 @@ footer { margin-top: 96px; border-top: 1px solid var(--rule); }
       <li><h3>Search with <kbd>Ctrl</kbd>+<kbd>K</kbd></h3><p>Applications, entities, probes, connectors, runbooks, tables, runs and the guide, from the keyboard. A masked value shows as <code>[masked]</code> and never matches.</p></li>
       <li><h3>Drafting with an AI assistant</h3><p><code>owl mcp</code> lets an assistant draft a probe and check it. Drafts only: no tool writes a file, returns data or a secret, or touches Production. You paste it in.</p></li>
     </ul>
+    <p class="new-note">New in 0.2.1: a run whose data couldn’t be read is <strong>Not checked</strong>, not Failed, and <code>owl validate</code> and <code>owl inspect</code> exit 0, 1 or 2, so update scripts that check exit codes. The audit can be read, on the Audit screen and with <code>owl audit</code>. And the fixes from newcomers’ first runs are in.</p>
     <p class="new-note">Also in 0.2.0: a security fix for v0.1. Runs of an entity whose key is personal data are now stored and shown masked; if you used v0.1 with one, run <code>owl store mask-pii</code>. <a href="https://github.com/saadzarook/probeowl/blob/main/CHANGELOG.md">Changelog</a></p>
   </section>
 
@@ -685,22 +686,22 @@ footer { margin-top: 96px; border-top: 1px solid var(--rule); }
     <div class="s-head">
       <p class="eyebrow">Testing</p>
       <h2 id="tested-h">Tested like it reads production.</h2>
-      <p class="lede">ProbeOwl reads systems people depend on, so each guard is tested the way it would fail. The numbers are v0.2.0’s, from its release checks on 14 Nov 2026.</p>
+      <p class="lede">ProbeOwl reads systems people depend on, so each guard is tested the way it would fail. The numbers are v0.2.1’s, from its release checks on 15 Nov 2026.</p>
     </div>
     <div class="stats">
-      <div><span class="num">2,317</span><span class="what">backend tests</span></div>
-      <div><span class="num">231</span><span class="what">browser tests on mocks, and 36 live against real databases</span></div>
+      <div><span class="num">2,407</span><span class="what">backend tests</span></div>
+      <div><span class="num">268</span><span class="what">browser tests on mocks, and 36 live against real databases</span></div>
       <div><span class="num">154</span><span class="what">database tests, run on installed SQL Server, Oracle, MariaDB and PostgreSQL</span></div>
       <div><span class="num">4</span><span class="what">end-to-end exit checks</span></div>
     </div>
     <div class="safety-wrap" style="margin-top:24px">
       <table class="safety">
         <tbody>
-          <tr><th scope="row">Every pull request</th><td>The backend and browser tests; the database tests against SQL Server, Oracle, MariaDB and PostgreSQL in containers, with SQLite as the default store; live browser tests against <code>owl serve</code> and the example databases; and the four end-to-end exit checks, one per milestone.</td></tr>
+          <tr><th scope="row">Every pull request</th><td>The backend and browser tests; the database tests against SQL Server, Oracle, MariaDB and PostgreSQL in containers, with SQLite as the default store; live browser tests against <code>owl serve</code> and the example databases; the four end-to-end exit checks, one per milestone; and on macOS, the keychain tests against a real Keychain.</td></tr>
           <tr><th scope="row">Before every release</th><td>The same tests and exit checks again on real servers installed on a machine, not containers: SQL Server 2025, Oracle AI Database 26ai Free, MariaDB 11.8 and PostgreSQL 16.</td></tr>
           <tr><th scope="row">Guards tested by attack</th><td>Writes (inside a CTE too), locks and lock hints, temporary tables, links to other databases, query hints, and comments a database would execute are each refused. Hostile identifiers (quotes, <code>OR '1'='1'</code>, <code>DROP TABLE</code>, <code>xp_cmdshell</code>, 10,000 characters) must reach the driver as one bound value, never as SQL. On a real SQL Server, a test checks that the parallelism cap sits before a trailing comment, so the comment can’t swallow it.</td></tr>
           <tr><th scope="row">Leak scans</th><td>Tests send a known email or secret through and check it never appears in API responses, the logs or the audit, and that a file comparison masks it. Before a release, a secrets scan covers every commit on every branch.</td></tr>
-          <tr><th scope="row">As users get it</th><td>The release wheel is installed with <code>uv tool install</code> and a fresh dependency resolution, then <code>owl init</code>, <code>owl check</code> and <code>owl serve</code> run on it, and the guide it bundles is opened in a browser with no request leaving the machine. A scripted newcomer run on that wheel goes from install to a first Validate through first-run setup in the browser. Built twice from the release commit, the v0.2.0 wheel is byte-for-byte the same file.</td></tr>
+          <tr><th scope="row">As users get it</th><td>The release wheel is installed with <code>uv tool install</code> and a fresh dependency resolution, then <code>owl init</code>, <code>owl check</code> and <code>owl serve</code> run on it, and the guide it bundles is opened in a browser with no request leaving the machine. A scripted newcomer run on that wheel goes from install to a first Validate through first-run setup in the browser. Built twice from the release commit, the v0.2.1 wheel is byte-for-byte the same file.</td></tr>
         </tbody>
       </table>
     </div>
@@ -768,7 +769,7 @@ footer { margin-top: 96px; border-top: 1px solid var(--rule); }
           <div class="tl-head"><span class="ver">v0.2</span><span class="chip chip-done">Shipped 14 Nov 2026</span></div>
           <h3>Set up in the browser</h3>
           <ul><li>First-run setup and Add connection</li><li>Search everything with Ctrl+K</li><li>AI assistants draft, you paste</li></ul>
-          <a href="https://github.com/saadzarook/probeowl/releases/tag/v0.2.0">Release notes</a>
+          <a href="https://github.com/saadzarook/probeowl/releases/tag/v0.2.1">0.2.1 release notes</a>
         </div>
       </li>
       <li class="tl now">
@@ -799,20 +800,20 @@ footer { margin-top: 96px; border-top: 1px solid var(--rule); }
         </div>
       </li>
     </ol>
-    <p class="rules-note">Every release keeps the same rules: read-only, the same guards, tests on every supported database, and a newcomer test by hand before it ships. Both releases so far are pre-releases; a security review comes before 1.0.</p>
+    <p class="rules-note">Every release keeps the same rules: read-only, the same guards, tests on every supported database, and a newcomer test by hand before it ships. Every release so far is a pre-release; a security review comes before 1.0.</p>
     <div class="measure" role="group" aria-label="Install to a first Validate: actions and characters typed, lower is better">
       <h3>Install to a first Validate <span class="unit">lower is better</span></h3>
       <p class="m-head">Actions</p>
       <div class="bar"><span class="lbl">v0.1 measured</span><span class="track"><span class="fill" style="--w:100%"></span></span><span class="n">61</span></div>
-      <div class="bar"><span class="lbl">v0.2 measured</span><span class="track"><span class="fill" style="--w:80%"></span></span><span class="n">49</span></div>
+      <div class="bar"><span class="lbl">v0.2.1 measured</span><span class="track"><span class="fill" style="--w:82%"></span></span><span class="n">50</span></div>
       <div class="bar"><span class="lbl">0.3 target</span><span class="track"><span class="fill target" style="--w:69%"></span></span><span class="n">~42</span></div>
       <div class="bar"><span class="lbl">0.4 target</span><span class="track"><span class="fill target" style="--w:49%"></span></span><span class="n">≤30</span></div>
       <p class="m-head">Characters typed</p>
       <div class="bar"><span class="lbl">v0.1 measured</span><span class="track"><span class="fill" style="--w:100%"></span></span><span class="n">366</span></div>
-      <div class="bar"><span class="lbl">v0.2 measured</span><span class="track"><span class="fill" style="--w:72%"></span></span><span class="n">264</span></div>
+      <div class="bar"><span class="lbl">v0.2.1 measured</span><span class="track"><span class="fill" style="--w:72%"></span></span><span class="n">264</span></div>
       <div class="bar"><span class="lbl">0.3 target</span><span class="track"><span class="fill target" style="--w:66%"></span></span><span class="n">~240</span></div>
       <div class="bar"><span class="lbl">0.4 target</span><span class="track"><span class="fill target" style="--w:33%"></span></span><span class="n">≤120</span></div>
-      <p class="note">Every command, answer, click and field a newcomer needs, from installing ProbeOwl to a first Validate on the card example. v0.1.0 and v0.2.0 are measured, counted the same way by a scripted run on each release wheel; 0.3 and 0.4 are targets, measured when they ship.</p>
+      <p class="note">Every command, answer, click and field a newcomer needs, from installing ProbeOwl to a first Validate on the card example. v0.1.0 and v0.2.1 are measured, counted the same way by a scripted run on each release wheel: 50 actions is one more than v0.2.0, one confirm step added in 0.2.1. 0.3 and 0.4 are targets, measured when they ship.</p>
     </div>
   </section>
 
@@ -853,7 +854,7 @@ footer { margin-top: 96px; border-top: 1px solid var(--rule); }
 
 <footer>
   <div class="wrap foot">
-    <span>ProbeOwl · v0.2 pre-release · Apache License 2.0</span>
+    <span>ProbeOwl · v0.2.1 pre-release · Apache License 2.0</span>
     <nav aria-label="Footer">
       <a href="./guide/">Guide</a>
       <a href="https://github.com/saadzarook/probeowl">GitHub</a>
