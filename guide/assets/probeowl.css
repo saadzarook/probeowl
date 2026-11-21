@@ -1,0 +1,13 @@
+/* Author: @SaadZarook */
+/* ProbeOwl's colours from docs/screens/brand.png: Ink, Action blue; the owl amber stays in the logo. */
+:root {
+  --md-primary-fg-color: #14171c;
+  --md-primary-fg-color--light: #2a2f37;
+  --md-primary-fg-color--dark: #0b0d10;
+  --md-accent-fg-color: #1f5bd8;
+  --md-typeset-a-color: #1f5bd8;
+}
+[data-md-color-scheme="slate"] {
+  --md-typeset-a-color: #7aa2f7;
+}
+.md-typeset img.screen { border: 1px solid #d7dbe0; border-radius: 6px; }
