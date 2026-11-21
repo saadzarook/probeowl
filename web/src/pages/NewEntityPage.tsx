@@ -1,4 +1,5 @@
 // Author: @SaadZarook
+import { Button, buttonClass } from "../ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
@@ -134,7 +135,7 @@ export function NewEntityPage() {
     body = (
       <div className="error-state" role="alert">
         <p>{connectors.error.message}</p>
-        <button className="btn" type="button" onClick={() => void connectors.refetch()}>Retry</button>
+        <Button type="button" onClick={() => void connectors.refetch()}>Retry</Button>
       </div>
     );
   } else if (done) {
@@ -145,7 +146,7 @@ export function NewEntityPage() {
           Written to <code>{save.data.path}</code>. Now write its first probe.
         </p>
         {/* Validate, as the guide's first application goes on to (#101); the kind can be changed there. */}
-        <RouterLink className="btn" to={`/probes?new=validate&entity=${encodeURIComponent(current.entity)}`}>
+        <RouterLink className={buttonClass()} to={`/probes?new=validate&entity=${encodeURIComponent(current.entity)}`}>
           Write a probe for {current.entity}
         </RouterLink>
       </section>
@@ -158,9 +159,9 @@ export function NewEntityPage() {
           <div className="actions" role="group" aria-label="Imported elsewhere">
             <p className="hint">Imported in {elsewhere.map((e) => e.title).join(", ")}. Build the entity there:</p>
             {elsewhere.map((e) => (
-              <button key={e.name} className="btn" type="button" onClick={() => selectEnvironment(e.name)}>
+              <Button key={e.name} onClick={() => selectEnvironment(e.name)}>
                 Use {e.title}
-              </button>
+              </Button>
             ))}
           </div>
         ) : (
@@ -269,9 +270,9 @@ export function NewEntityPage() {
                   {failing.join(", ")} {failing.length === 1 ? "fails" : "fail"} a save check. Fix or remove {failing.length === 1 ? "it" : "them"} on the Locations step:
                   nothing is left out of the entity without you.
                 </p>
-                <button className="btn btn-outline" type="button" onClick={() => setStep(2)}>
+                <Button variant="outline" type="button" onClick={() => setStep(2)}>
                   Back to Locations
-                </button>
+                </Button>
               </div>
             )}
             {problems.length > 0 ? (
@@ -299,25 +300,23 @@ export function NewEntityPage() {
                     the audit with my name
                   </label>
                 )}
-                <button
-                  className="btn"
+                <Button
                   type="button"
                   disabled={!preview || stale || !preview.change.report.can_save || save.isPending}
                   onClick={() => preview && save.mutate(preview.change.base)}
                 >
                   Create {current.entity}
-                </button>
+                </Button>
               </>
             )}
           </section>
         )}
         <div className="wizard-nav">
-          <button className="btn btn-outline" type="button" disabled={step === 0} onClick={() => setStep(step - 1)}>
+          <Button variant="outline" type="button" disabled={step === 0} onClick={() => setStep(step - 1)}>
             Back
-          </button>
+          </Button>
           {step < STEPS.length - 1 && (
-            <button
-              className="btn"
+            <Button
               type="button"
               disabled={(step === 0 && taken) || (step === 1 && current.locations.length === 0)}
               onClick={() => {
@@ -327,7 +326,7 @@ export function NewEntityPage() {
               }}
             >
               Next: {STEPS[step + 1]}
-            </button>
+            </Button>
           )}
         </div>
       </>

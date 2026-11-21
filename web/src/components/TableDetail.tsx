@@ -187,9 +187,9 @@ export function TableDetail({ row, application, schema, environmentTitle, enviro
           <div role="alert" className="error-state">
             <p>{change.error.message}</p>
             {change.error instanceof ConfirmError && change.error.status === 409 && (
-              <button className="btn secondary" type="button" disabled={entry === undefined} onClick={() => entry && change.mutate({ entry })}>
+              <Button variant="outline" type="button" disabled={entry === undefined} onClick={() => entry && change.mutate({ entry })}>
                 Preview again
-              </button>
+              </Button>
             )}
           </div>
         )}

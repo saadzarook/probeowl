@@ -7,7 +7,7 @@ import { RESULT_LABELS, formatTime, titleCase, withCaveat } from "../runFormat";
 import { useSelection } from "../selection";
 import { AmbiguousMatches, showValue } from "./AmbiguousMatches";
 import { CliCommand } from "./CliCommand";
-import { ListOrTable, type Column } from "../ui";
+import { Button, type Column, ListOrTable } from "../ui";
 import { EvidencePanel } from "./EvidencePanel";
 import { OutcomeChip } from "./OutcomeChip";
 import { NotChecked } from "./NotChecked";
@@ -158,9 +158,9 @@ export function InspectResult({ runId, entity, onInspect, onStarted }: InspectRe
     return (
       <div className="error-state" role="alert">
         <p>{query.error.message}</p>
-        <button className="btn" type="button" onClick={() => void query.refetch()}>
+        <Button type="button" onClick={() => void query.refetch()}>
           Retry
-        </button>
+        </Button>
       </div>
     );
   }

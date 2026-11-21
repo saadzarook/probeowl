@@ -1,4 +1,5 @@
 // Author: @SaadZarook
+import { Button } from "../ui";
 import { useState } from "react";
 import type { Entity } from "../api/client";
 import { probeIdProblem, type ProbeKindChoice } from "../draftYaml";
@@ -69,12 +70,12 @@ export function NewProbeForm({ entities, taken, initial, onStart, onCancel }: Ne
         </select>
       </label>
       <div className="wizard-nav">
-        <button className="btn btn-outline" type="button" onClick={onCancel}>
+        <Button variant="outline" type="button" onClick={onCancel}>
           Cancel
-        </button>
-        <button className="btn" type="submit" disabled={!ready}>
+        </Button>
+        <Button type="submit" disabled={!ready}>
           Start the draft
-        </button>
+        </Button>
       </div>
     </form>
   );

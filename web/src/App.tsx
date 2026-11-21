@@ -1,4 +1,5 @@
 // Author: @SaadZarook
+import { Button } from "./ui";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { usePlugins } from "./api/usePlugins";
 import { Shell } from "./components/Shell";
@@ -26,9 +27,9 @@ function PluginPage({ screen }: { screen: PluginScreen }) {
     return (
       <div className="error-state" role="alert">
         <p>{plugins.error.message}</p>
-        <button className="btn" type="button" onClick={() => void plugins.refetch()}>
+        <Button type="button" onClick={() => void plugins.refetch()}>
           Retry
-        </button>
+        </Button>
       </div>
     );
   }

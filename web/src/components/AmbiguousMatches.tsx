@@ -1,4 +1,5 @@
 // Author: @SaadZarook
+import { Button } from "../ui";
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { pickMatchesByNumber, type Match } from "../api/client";
@@ -54,9 +55,9 @@ function BySubject({ identifier, value, matches, onInspect }: AmbiguousMatchesPr
               <code>{match.id}</code>
               <p className="hint">{match.detail}</p>
             </div>
-            <button className="btn-outline" type="button" onClick={() => onInspect([match.id])}>
+            <Button variant="outline" type="button" onClick={() => onInspect([match.id])}>
               Inspect this one<span className="sr-only"> {match.id}</span>
-            </button>
+            </Button>
           </li>
         ))}
       </ul>
@@ -105,9 +106,9 @@ function ByNumber({ identifier, value, matches, runId, onStarted }: AmbiguousMat
               <strong>Match {i + 1}</strong>
               <p className="hint">{Object.values(match.fields ?? {}).map(showValue).join(" · ")}</p>
             </div>
-            <button className="btn-outline" type="button" disabled={pasted === "" || pick.isPending} onClick={() => pick.mutate([i + 1])}>
+            <Button variant="outline" type="button" disabled={pasted === "" || pick.isPending} onClick={() => pick.mutate([i + 1])}>
               Inspect this one<span className="sr-only"> match {i + 1}</span>
-            </button>
+            </Button>
           </li>
         ))}
       </ul>

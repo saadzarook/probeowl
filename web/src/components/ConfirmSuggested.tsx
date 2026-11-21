@@ -1,4 +1,5 @@
 // Author: @SaadZarook
+import { Button, buttonClass } from "../ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link as RouterLink } from "react-router-dom";
 import { confirmTable, type ApplicationSummary, type EnvironmentSummary } from "../api/client";
@@ -44,14 +45,14 @@ export function ConfirmSuggested({ application, connector, environment }: Confir
       <h3 id="import-step">Its tables</h3>
       <p className="hint">The import reads {connector}'s tables, columns and indexes in {environment.title}, never data, and suggests a label for each.</p>
       {!run.data && (
-        <button className="btn" type="button" disabled={run.isPending} onClick={() => run.mutate(connector)}>
+        <Button type="button" disabled={run.isPending} onClick={() => run.mutate(connector)}>
           {run.isPending ? "Importing…" : `Import ${connector}'s tables`}
-        </button>
+        </Button>
       )}
       {run.isError && (
         <div role="alert" className="error-state">
           <p>{run.error.message}</p>
-          <button className="btn" type="button" onClick={() => run.mutate(connector)}>Retry</button>
+          <Button type="button" onClick={() => run.mutate(connector)}>Retry</Button>
         </div>
       )}
       {run.data && (
@@ -76,10 +77,10 @@ export function ConfirmSuggested({ application, connector, environment }: Confir
               </ul>
               {!confirmAll.data && (
                 <div className="wizard-nav">
-                  <button className="btn" type="button" disabled={confirmAll.isPending} onClick={() => confirmAll.mutate()}>
+                  <Button type="button" disabled={confirmAll.isPending} onClick={() => confirmAll.mutate()}>
                     {confirmAll.isPending ? "Confirming…" : `Confirm all ${suggested.length} as suggested`}
-                  </button>
-                  <RouterLink className="btn btn-outline" to="/tables">Review them on Tables</RouterLink>
+                  </Button>
+                  <RouterLink className={buttonClass({ variant: "outline" })} to="/tables">Review them on Tables</RouterLink>
                 </div>
               )}
             </>
@@ -89,7 +90,7 @@ export function ConfirmSuggested({ application, connector, environment }: Confir
               <p role="status" className="written">
                 Confirmed {confirmAll.data.length} {confirmAll.data.length === 1 ? "table's label" : "tables' labels"} in <code>{application.name}/catalog.yaml</code>. Review and commit it with git.
               </p>
-              <RouterLink className="btn" to="/probes/new-entity">
+              <RouterLink className={buttonClass()} to="/probes/new-entity">
                 Next: create an entity
               </RouterLink>
             </>

@@ -170,9 +170,9 @@ export function FirstRunPage() {
         {preview.isError && (
           <div role="alert" className="error-state">
             <p>{preview.error.message}</p>
-            <button className="btn" type="button" onClick={() => void preview.refetch()}>
+            <Button type="button" onClick={() => void preview.refetch()}>
               Retry
-            </button>
+            </Button>
           </div>
         )}
         {save.error && (
@@ -213,9 +213,9 @@ export function FirstRunPage() {
       {setup.isError && (
         <div role="alert" className="error-state">
           <p>{setup.error.message}</p>
-          <button className="btn" type="button" onClick={() => void setup.refetch()}>
+          <Button type="button" onClick={() => void setup.refetch()}>
             Retry
-          </button>
+          </Button>
         </div>
       )}
       {setup.data?.store.created_now && step < 2 && (

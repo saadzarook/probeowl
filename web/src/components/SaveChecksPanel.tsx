@@ -1,5 +1,8 @@
 // Author: @SaadZarook
+import { Badge, type BadgeTone, Button } from "../ui";
 import type { SaveCheckReport } from "../api/client";
+
+const CHECK_TONE: Record<"pass" | "warn" | "fail", BadgeTone> = { pass: "found", warn: "waiting", fail: "missing" };
 
 interface SaveChecksPanelProps {
   report: SaveCheckReport | undefined;
@@ -21,16 +24,16 @@ export function SaveChecksPanel({ report, loading, error, onCheck }: SaveChecksP
             {report.passed} passed · {report.warnings} {report.warnings === 1 ? "warning" : "warnings"} · {report.failed} failed
           </span>
         )}
-        <button className="btn secondary" type="button" onClick={onCheck} disabled={loading}>
+        <Button variant="outline" type="button" onClick={onCheck} disabled={loading}>
           {loading ? "Checking…" : "Check"}
-        </button>
+        </Button>
       </header>
       {error && (
         <div className="error-state" role="alert">
           <p>{error}</p>
-          <button className="btn" type="button" onClick={onCheck}>
+          <Button type="button" onClick={onCheck}>
             Retry
-          </button>
+          </Button>
         </div>
       )}
       {report && !report.can_save && <p className="form-error">Fix the failed checks to save</p>}
@@ -40,9 +43,9 @@ export function SaveChecksPanel({ report, loading, error, onCheck }: SaveChecksP
         <ul className="checks">
           {report.checks.map((c, i) => (
             <li key={`${c.check}-${c.location ?? ""}-${c.environment ?? ""}-${i}`}>
-              <span className="check-chip" data-status={c.status}>
+              <Badge tone={CHECK_TONE[c.status]} data-status={c.status}>
                 {STATUS_LABELS[c.status]}
-              </span>
+              </Badge>
               <div>
                 <strong>{c.check}</strong>
                 {c.location && <span className="hint"> · {c.location}</span>}

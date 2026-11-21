@@ -1,4 +1,5 @@
 // Author: @SaadZarook
+import { Button } from "../ui";
 import { useEffect, useRef, useState } from "react";
 import { SaveError, type ProbeChange } from "../api/client";
 import { useSaveProbe } from "../api/useProbes";
@@ -133,18 +134,18 @@ export function SaveProbeDialog({ application, probeName, probe, entity, environ
         </>
       )}
       <div className="dialog-actions">
-        <button className="btn secondary" type="button" disabled={save.isPending} onClick={() => ref.current?.close()}>
+        <Button variant="outline" type="button" disabled={save.isPending} onClick={() => ref.current?.close()}>
           {done ? "Close" : "Cancel"}
-        </button>
+        </Button>
         {!done && (conflict || retryable) && (
-          <button className="btn" type="button" disabled={save.isPending} onClick={previewAgain}>
+          <Button type="button" disabled={save.isPending} onClick={previewAgain}>
             {conflict ? "Preview again" : "Retry"}
-          </button>
+          </Button>
         )}
         {!done && preview && !conflict && !retryable && (
-          <button className="btn" type="button" disabled={(needsAcknowledgement && !acknowledged) || save.isPending} onClick={() => confirm(preview.base)}>
+          <Button type="button" disabled={(needsAcknowledgement && !acknowledged) || save.isPending} onClick={() => confirm(preview.base)}>
             {save.isPending ? "Saving…" : "Confirm"}
-          </button>
+          </Button>
         )}
       </div>
     </dialog>

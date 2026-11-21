@@ -1,4 +1,5 @@
 // Author: @SaadZarook
+import { Button } from "../ui";
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { RunbookFilters, RunbookView } from "../api/client";
@@ -91,13 +92,13 @@ function RunbookDetail({ runbook, runId, environmentTitle }: { runbook: RunbookV
       {runId !== undefined && run.isError && (
         <div className="error-state" role="alert">
           <p>{run.error.message}</p>
-          <button className="btn" type="button" onClick={() => void run.refetch()}>Retry</button>
+          <Button type="button" onClick={() => void run.refetch()}>Retry</Button>
         </div>
       )}
       {usedRun && steps.isError && (
         <div className="error-state" role="alert">
           <p>{steps.error.message}</p>
-          <button className="btn" type="button" onClick={() => void steps.refetch()}>Retry</button>
+          <Button type="button" onClick={() => void steps.refetch()}>Retry</Button>
         </div>
       )}
       {runbook.steps.map((step, index) => (
@@ -165,7 +166,7 @@ export function KnowledgeBasePage({ item }: { item: NavItem }) {
     body = (
       <div className="error-state" role="alert">
         <p>{found.error.message}</p>
-        <button className="btn" type="button" onClick={() => void found.refetch()}>Retry</button>
+        <Button type="button" onClick={() => void found.refetch()}>Retry</Button>
       </div>
     );
   } else if (found.isPending) {

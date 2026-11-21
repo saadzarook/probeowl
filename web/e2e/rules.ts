@@ -93,9 +93,10 @@ export async function copyOverCode(page: Page): Promise<string[]> {
 export async function pastTheEdge(page: Page): Promise<string[]> {
   return page.evaluate(() => {
     const width = document.documentElement.clientWidth;
+    // Inside a box marked data-scrolls="x", such as the YAML editor, a long line scrolls on purpose.
     const past = Array.from(document.querySelectorAll<HTMLElement>("main *")).filter((el) => {
       const box = el.getBoundingClientRect();
-      return box.width > 1 && box.height > 1 && box.right > width + 1;
+      return box.width > 1 && box.height > 1 && box.right > width + 1 && el.closest('[data-scrolls="x"]') === null;
     });
     // The outermost only: its children are past the edge because it is.
     return past

@@ -1,6 +1,6 @@
 // Author: @SaadZarook
 import { useQuery } from "@tanstack/react-query";
-import { buttonClass } from "../ui";
+import { Button, buttonClass } from "../ui";
 import { Link } from "react-router-dom";
 import { fetchSuggestedRunbooks, type RunbookView } from "../api/client";
 import { useRun } from "../api/useRun";
@@ -36,7 +36,7 @@ function Suggestions({ runId }: { runId: string }) {
     return (
       <div className="error-state" role="alert">
         <p>{found.error.message}</p>
-        <button className="btn" type="button" onClick={() => void found.refetch()}>Retry</button>
+        <Button type="button" onClick={() => void found.refetch()}>Retry</Button>
       </div>
     );
   }

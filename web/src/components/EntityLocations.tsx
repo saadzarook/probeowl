@@ -1,4 +1,5 @@
 // Author: @SaadZarook
+import { Button, Field, FormGrid, Input, Select } from "../ui";
 import { useState } from "react";
 import type { CatalogTable } from "../api/client";
 import { DEFAULT_MAX_ROWS, type DraftLocation } from "../entityDraft";
@@ -64,33 +65,31 @@ export function EntityLocations({ application, locations, rootKey, tables, catal
                     {location.keyFrom ? ` from ${location.keyFrom.location}.${location.keyFrom.field}` : index === 0 ? " (the root key)" : ` = ${rootKey}`}
                   </span>
                   {index > 0 && (
-                    <button
-                      className="btn btn-outline"
+                    <Button
+                      variant="outline"
                       type="button"
                       disabled={dependants.length > 0}
                       title={dependants.length > 0 ? `${dependants.join(", ")} is keyed from it` : undefined}
                       onClick={() => onChange(locations.filter((l) => l.name !== location.name))}
                     >
                       Remove {location.name}
-                    </button>
+                    </Button>
                   )}
                 </header>
                 {index > 0 && (
-                  <div className="wizard-row">
-                    <label>
-                      Records per subject
-                      <select value={location.cardinality} onChange={(e) => update(location.name, e.target.value === "many" ? { cardinality: "many", maxRows: Math.min(DEFAULT_MAX_ROWS, ceiling ?? DEFAULT_MAX_ROWS) } : { cardinality: "one", maxRows: undefined })}>
+                  <FormGrid className="xl:grid-cols-2">
+                    <Field id={`${location.name}-cardinality`} label="Records per subject">
+                      <Select value={location.cardinality} onChange={(e) => update(location.name, e.target.value === "many" ? { cardinality: "many", maxRows: Math.min(DEFAULT_MAX_ROWS, ceiling ?? DEFAULT_MAX_ROWS) } : { cardinality: "one", maxRows: undefined })}>
                         <option value="one">One</option>
                         <option value="many">Many</option>
-                      </select>
-                    </label>
+                      </Select>
+                    </Field>
                     {location.cardinality === "many" && (
-                      <label>
-                        Most rows (max_rows{ceiling ? `, at most ${ceiling}` : ""})
-                        <input type="number" min={1} max={ceiling} value={location.maxRows ?? DEFAULT_MAX_ROWS} onChange={(e) => update(location.name, { maxRows: Number(e.target.value) || DEFAULT_MAX_ROWS })} />
-                      </label>
+                      <Field id={`${location.name}-max-rows`} label={`Most rows (max_rows${ceiling ? `, at most ${ceiling}` : ""})`}>
+                        <Input type="number" min={1} max={ceiling} value={location.maxRows ?? DEFAULT_MAX_ROWS} onChange={(e) => update(location.name, { maxRows: Number(e.target.value) || DEFAULT_MAX_ROWS })} />
+                      </Field>
                     )}
-                  </div>
+                  </FormGrid>
                 )}
                 <LocationFailures
                   application={application}
@@ -102,7 +101,7 @@ export function EntityLocations({ application, locations, rootKey, tables, catal
                   onMaskPii={() => update(location.name, { columns: masked(location, catalog, tables).columns })}
                 />
                 <fieldset className="wizard-columns">
-                  <legend>Columns to select</legend>
+                  <legend className="mb-1 p-0 text-sm font-medium text-foreground">Columns to select</legend>
                   {location.columns.map((c) => {
                     const locked = c.column === location.keyColumn || used.has(c.field);
                     return (
@@ -147,9 +146,9 @@ export function EntityLocations({ application, locations, rootKey, tables, catal
                   </code>{" "}
                   <span className="hint">({reasonText(s.reason)})</span>
                 </span>
-                <button className="btn btn-outline" type="button" onClick={() => add(s)}>
+                <Button variant="outline" type="button" onClick={() => add(s)}>
                   Add {s.to.table}
-                </button>
+                </Button>
               </li>
             ))}
           </ul>
@@ -166,9 +165,9 @@ function ChecksStatus({ checks }: { checks: ChecksState }) {
     return (
       <div className="error-state" role="alert">
         <p>The save checks could not run: {checks.error}</p>
-        <button className="btn" type="button" onClick={checks.onRetry}>
+        <Button type="button" onClick={checks.onRetry}>
           Retry
-        </button>
+        </Button>
       </div>
     );
   }
@@ -210,9 +209,9 @@ function LinkByColumns({ locations, tables, onLink }: { locations: DraftLocation
 
   if (!open) {
     return (
-      <button className="btn secondary" type="button" onClick={() => setOpen(true)}>
+      <Button variant="outline" type="button" onClick={() => setOpen(true)}>
         Link by columns…
-      </button>
+      </Button>
     );
   }
   return (
@@ -258,8 +257,7 @@ function LinkByColumns({ locations, tables, onLink }: { locations: DraftLocation
           ))}
         </select>
       </label>
-      <button
-        className="btn"
+      <Button
         type="button"
         disabled={!ready}
         onClick={() => {
@@ -272,7 +270,7 @@ function LinkByColumns({ locations, tables, onLink }: { locations: DraftLocation
         }}
       >
         Add the location
-      </button>
+      </Button>
     </fieldset>
   );
 }
