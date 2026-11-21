@@ -2,8 +2,9 @@
 
 All notable changes to ProbeOwl are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
-[Semantic Versioning](https://semver.org/spec/v2.0.0.html). Before 1.0, a minor version may change
-behaviour or the config format.
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html). Before 1.0, minor versions follow the
+roadmap milestones; patch versions may add features that don't break existing configs, APIs or
+scripts.
 
 ## [Unreleased]
 
@@ -11,6 +12,44 @@ behaviour or the config format.
 v0.2 phase (a) first-run setup and Add connection, v0.3 phase (b) the entity graph builder,
 v0.4 phase (c) blocks and probe by example, v0.5 phase (d) templates and New runbook.
 See docs/implementation-plan.md, Releases. -->
+
+## [0.2.2] - 2026-11-21
+
+A patch release on phase (a): a new look on every screen, layouts for narrow screens, dark mode,
+and a stricter style policy in `owl serve`. Configs, the API and the CLI are unchanged.
+
+### Added
+
+- A new look across every screen, built on one set of components: one field height, one button,
+  one status chip in every table and card, IBM Plex Sans for the interface and Plex Mono only for
+  code, IDs and commands.
+- Layouts for narrow screens. Below 1024 px the sidebar becomes a **Menu** button that opens it as
+  a sheet, and the top bar takes at most two rows. Below 768 px tables show their rows as cards.
+  No screen scrolls sideways at 320 px or wider; the YAML editor scrolls sideways inside itself,
+  and on a phone it says editing is designed for a wider screen.
+- Dark mode, following the system setting. Production stays red in both themes, and every text,
+  chip and status colour meets WCAG AA contrast in both.
+
+### Changed
+
+- **A stricter style policy.** `owl serve` sends `style-src 'self' 'nonce-…'` with a nonce made
+  fresh for each page (128 bits, from `secrets`), and no longer allows `'unsafe-inline'` styles.
+  Pages that carry a nonce are never cached (`no-store`); the web app's bundles keep their long
+  caching. The guide's pages are served with `style-src 'self'`.
+- The newcomer path, measured on the new UI: 50 actions and 264 characters, the same as 0.2.1
+  (docs/v0.2.md, "Measured for 0.2.2").
+
+### Fixed
+
+- Buttons, and Production's environment select, keep their semibold weight. A reset in the old
+  stylesheet had overridden it.
+- Narrow screens: Audit's table, run start times, Save's "To save: …" reason and long application
+  names in Setup no longer run past the edge of the screen; they wrap, or show as cards.
+- Production's environment stays in view, red, in the folded top bar at 390 and 320 px.
+- Validate's **Find by** is a field of its own, so the form's row is one field high, and Inspect's
+  Reference and Inspect button no longer share a row.
+- On Validate and Inspect, a disabled run button's reason lists the reference only in Production,
+  where it's mandatory, and names a missing probe when the entity has none.
 
 ## [0.2.1] - 2026-11-15
 
