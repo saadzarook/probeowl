@@ -1,4 +1,5 @@
 // Author: @SaadZarook
+import { Button, Field, FormGrid, Input, ListOrTable, Select, type Column } from "../ui";
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import type { AuditEvent, AuditFilters } from "../api/client";
@@ -16,23 +17,15 @@ function detailsText(details: AuditEvent["details"]): string {
     .join(" ");
 }
 
-function EventRow({ event }: { event: AuditEvent }) {
-  const where = [event.application, event.environment].filter(Boolean).join(" / ");
-  return (
-    <tr>
-      <td className="nowrap">{event.occurred_at ? formatTime(event.occurred_at) : "—"}</td>
-      <td>{event.actor.name}</td>
-      <td>
-        <code>{event.action}</code>
-      </td>
-      <td>{where || "—"}</td>
-      <td>{event.run_id ? <Link to={`/runs?run=${encodeURIComponent(event.run_id)}`}>Open run</Link> : "—"}</td>
-      <td className="audit-details">
-        <code>{detailsText(event.details)}</code>
-      </td>
-    </tr>
-  );
-}
+/** The event's columns: a table from 768 px, cards below (rule 6). */
+const EVENT_COLUMNS: Column<AuditEvent>[] = [
+  { header: "When", cell: (event) => (event.occurred_at ? formatTime(event.occurred_at) : "—") },
+  { header: "Actor", cell: (event) => event.actor.name },
+  { header: "Action", cell: (event) => <code className="font-mono">{event.action}</code> },
+  { header: "Where", cell: (event) => [event.application, event.environment].filter(Boolean).join(" / ") || "—" },
+  { header: "Run", cell: (event) => (event.run_id ? <Link to={`/runs?run=${encodeURIComponent(event.run_id)}`}>Open run</Link> : "—") },
+  { header: "Details", cell: (event) => <code className="font-mono text-xs wrap-anywhere">{detailsText(event.details)}</code> },
+];
 
 /** The filters, applied when the form is sent: each one given narrows the list. */
 function Filters({ onApply }: { onApply: (filters: AuditFilters) => void }) {
@@ -49,18 +42,15 @@ function Filters({ onApply }: { onApply: (filters: AuditFilters) => void }) {
   };
   return (
     <form className="card audit-filters" onSubmit={apply} aria-label="Filter the audit">
-      <div className="form-row">
-        <label>
-          Actor
-          <input value={actor} onChange={(e) => setActor(e.target.value)} placeholder="Who acted, or for whom" />
-        </label>
-        <label>
-          Action
-          <input value={action} onChange={(e) => setAction(e.target.value)} placeholder="Such as run_started" />
-        </label>
-        <label>
-          Application
-          <select
+      <FormGrid>
+        <Field id="audit-actor" label="Actor">
+          <Input value={actor} onChange={(e) => setActor(e.target.value)} placeholder="Who acted, or for whom" />
+        </Field>
+        <Field id="audit-action" label="Action">
+          <Input value={action} onChange={(e) => setAction(e.target.value)} placeholder="Such as run_started" />
+        </Field>
+        <Field id="audit-application" label="Application">
+          <Select
             value={application}
             onChange={(e) => {
               setApplication(e.target.value);
@@ -73,23 +63,22 @@ function Filters({ onApply }: { onApply: (filters: AuditFilters) => void }) {
                 {a.title}
               </option>
             ))}
-          </select>
-        </label>
-        <label>
-          Environment
-          <select value={environment} onChange={(e) => setEnvironment(e.target.value)} disabled={application === ""}>
+          </Select>
+        </Field>
+        <Field id="audit-environment" label="Environment">
+          <Select value={environment} onChange={(e) => setEnvironment(e.target.value)} disabled={application === ""}>
             <option value="">All environments</option>
             {environments.map((e) => (
               <option key={e.name} value={e.name}>
                 {e.title}
               </option>
             ))}
-          </select>
-        </label>
-      </div>
-      <button className="btn" type="submit">
+          </Select>
+        </Field>
+      </FormGrid>
+      <Button type="submit">
         Show
-      </button>
+      </Button>
     </form>
   );
 }
@@ -101,9 +90,9 @@ function EventList({ filters }: { filters: AuditFilters }) {
     return (
       <div className="error-state" role="alert">
         <p>{audit.error.message}</p>
-        <button className="btn" type="button" onClick={() => void audit.refetch()}>
+        <Button type="button" onClick={() => void audit.refetch()}>
           Retry
-        </button>
+        </Button>
       </div>
     );
   }
@@ -119,30 +108,11 @@ function EventList({ filters }: { filters: AuditFilters }) {
   }
   return (
     <section className="card" aria-label="Audit events">
-      <div className="table-scroll">
-        <table className="run-list audit-list">
-          <thead>
-            <tr>
-              <th scope="col">When</th>
-              <th scope="col">Actor</th>
-              <th scope="col">Action</th>
-              <th scope="col">Where</th>
-              <th scope="col">Run</th>
-              <th scope="col">Details</th>
-            </tr>
-          </thead>
-          <tbody>
-            {events.map((event, index) => (
-              // Every stored event has an id; the contract lists it as defaulted, hence the fallback.
-              <EventRow key={event.id ?? index} event={event} />
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <ListOrTable label="Audit events" rows={events} columns={EVENT_COLUMNS} rowKey={(event) => event.id ?? `${event.occurred_at}-${event.action}`} empty="No events." />
       {audit.hasNextPage && (
-        <button className="btn btn-outline" type="button" disabled={audit.isFetchingNextPage} onClick={() => void audit.fetchNextPage()}>
+        <Button variant="outline" type="button" disabled={audit.isFetchingNextPage} onClick={() => void audit.fetchNextPage()}>
           {audit.isFetchingNextPage ? "Loading…" : "Show older"}
-        </button>
+        </Button>
       )}
     </section>
   );

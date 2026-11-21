@@ -1,4 +1,5 @@
 // Author: @SaadZarook
+import { Button } from "../ui";
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useCatalog, useCatalogReview, useSchemas } from "../api/useCatalog";
@@ -51,7 +52,7 @@ export function TablesPage({ item }: { item: NavItem }) {
     body = (
       <div className="error-state" role="alert">
         <p>{catalog.error?.message ?? review.error?.message}</p>
-        <button className="btn" type="button" onClick={() => void Promise.all([catalog.refetch(), review.refetch()])}>Retry</button>
+        <Button type="button" onClick={() => void Promise.all([catalog.refetch(), review.refetch()])}>Retry</Button>
       </div>
     );
   } else if (rows.length === 0) {
@@ -61,7 +62,7 @@ export function TablesPage({ item }: { item: NavItem }) {
         title={`No tables yet in ${application.title}`}
         message="Import a SQL connector's schema to list its tables, each with a suggested label. Confirming a label writes it to the application's catalog.yaml."
       >
-        <button className="btn" type="button" onClick={() => setImporting(true)}>Import from replica</button>
+        <Button type="button" onClick={() => setImporting(true)}>Import from replica</Button>
       </EmptyState>
     );
   } else {
@@ -102,7 +103,7 @@ export function TablesPage({ item }: { item: NavItem }) {
       <div className="page-header">
         <h1>{item.label}</h1>
         {application && environment && catalog.isSuccess && rows.length > 0 && (
-          <button className="btn secondary" type="button" onClick={() => setImporting(true)}>Import from replica</button>
+          <Button variant="outline" type="button" onClick={() => setImporting(true)}>Import from replica</Button>
         )}
       </div>
       {body}

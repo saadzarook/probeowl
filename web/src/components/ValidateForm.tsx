@@ -72,9 +72,9 @@ export function ValidateForm({ onStarted }: ValidateFormProps) {
     return (
       <div className="error-state" role="alert">
         <p>{entities.error.message}</p>
-        <button className="btn" type="button" onClick={() => void entities.refetch()}>
+        <Button type="button" onClick={() => void entities.refetch()}>
           Retry
-        </button>
+        </Button>
       </div>
     );
   }

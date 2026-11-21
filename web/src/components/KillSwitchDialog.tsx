@@ -1,4 +1,5 @@
 // Author: @SaadZarook
+import { Button } from "../ui";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { KillTarget } from "../api/client";
 import { useSetKillSwitch } from "../api/useKillSwitches";
@@ -60,12 +61,12 @@ export function KillSwitchDialog({ target, on, onClose }: KillSwitchDialogProps)
           </p>
         )}
         <div className="dialog-actions">
-          <button className="btn secondary" type="button" disabled={set.isPending} onClick={() => ref.current?.close()}>
+          <Button variant="outline" type="button" disabled={set.isPending} onClick={() => ref.current?.close()}>
             Cancel
-          </button>
-          <button className="btn" type="submit" disabled={reason.trim() === "" || set.isPending}>
+          </Button>
+          <Button type="submit" disabled={reason.trim() === "" || set.isPending}>
             {set.isPending ? "Saving…" : title}
-          </button>
+          </Button>
         </div>
       </form>
     </dialog>

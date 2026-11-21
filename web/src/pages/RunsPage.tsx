@@ -1,4 +1,5 @@
 // Author: @SaadZarook
+import { Badge, Button, type Column, ListOrTable } from "../ui";
 import { RunStatusChip } from "../components/RunStatusChip";
 import { useMutation } from "@tanstack/react-query";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -22,33 +23,49 @@ export function listedStatus(run: Pick<RunSummary, "status" | "stop_reason">): {
   return { label: titleCase(run.status), key: run.status };
 }
 
-function RunRow({ run }: { run: RunSummary }) {
-  const status = listedStatus(run);
-  const why = run.stop_reason ?? run.skip_reason;
-  return (
-    <tr>
-      <td>
-        <RunStatusChip status={status.key} caveat={Boolean(run.caveat)}>
-          {withCaveat(status.label, run.caveat)}
-        </RunStatusChip>
-        {why && <span className="hint block">{why}</span>}
-      </td>
-      <td>
+/** A run's columns: a table from 768 px, cards below (rule 6). */
+const RUN_COLUMNS: Column<RunSummary>[] = [
+  {
+    header: "Status",
+    cell: (run) => {
+      const status = listedStatus(run);
+      const why = run.stop_reason ?? run.skip_reason;
+      return (
+        <>
+          <RunStatusChip status={status.key} caveat={Boolean(run.caveat)}>
+            {withCaveat(status.label, run.caveat)}
+          </RunStatusChip>
+          {why && <span className="mt-1 block max-w-80 text-sm text-muted">{why}</span>}
+        </>
+      );
+    },
+  },
+  {
+    header: "Probe",
+    cell: (run) => (
+      <>
         <Link to={`/runs?run=${encodeURIComponent(run.id)}`}>{run.probe_title}</Link>
-        {run.draft && <span className="draft-tag">Draft</span>}
-      </td>
-      <td>
-        <code>{run.subject ?? run.identifier_value}</code>
-      </td>
-      <td>
+        {run.draft && (
+          <Badge className="ml-2" tone="neutral">
+            Draft
+          </Badge>
+        )}
+      </>
+    ),
+  },
+  { header: "Subject", cell: (run) => <code className="font-mono wrap-anywhere">{run.subject ?? run.identifier_value}</code> },
+  {
+    header: "Reason · reference",
+    cell: (run) => (
+      <>
         {run.reason ? REASON_LABELS[run.reason] : "—"}
-        {run.reference && <span className="hint"> · {run.reference}</span>}
-      </td>
-      <td className="nowrap">{formatTime(run.started_at)}</td>
-      <td>{run.actor}</td>
-    </tr>
-  );
-}
+        {run.reference && <span className="text-muted"> · {run.reference}</span>}
+      </>
+    ),
+  },
+  { header: "Started", cell: (run) => formatTime(run.started_at) },
+  { header: "By", cell: (run) => run.actor },
+];
 
 function RunList() {
   const { application, environment } = useSelection();
@@ -61,9 +78,9 @@ function RunList() {
     return (
       <div className="error-state" role="alert">
         <p>{runs.error.message}</p>
-        <button className="btn" type="button" onClick={() => void runs.refetch()}>
+        <Button type="button" onClick={() => void runs.refetch()}>
           Retry
-        </button>
+        </Button>
       </div>
     );
   }
@@ -78,29 +95,11 @@ function RunList() {
   }
   return (
     <section className="card">
-      <div className="table-scroll">
-        <table className="run-list">
-          <thead>
-            <tr>
-              <th scope="col">Status</th>
-              <th scope="col">Probe</th>
-              <th scope="col">Subject</th>
-              <th scope="col">Reason · reference</th>
-              <th scope="col">Started</th>
-              <th scope="col">By</th>
-            </tr>
-          </thead>
-          <tbody>
-            {listed.map((run) => (
-              <RunRow key={run.id} run={run} />
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <ListOrTable label="Runs" rows={listed} columns={RUN_COLUMNS} rowKey={(run) => run.id} empty="No runs yet." />
       {runs.hasNextPage && (
-        <button className="btn btn-outline" type="button" disabled={runs.isFetchingNextPage} onClick={() => void runs.fetchNextPage()}>
+        <Button variant="outline" type="button" disabled={runs.isFetchingNextPage} onClick={() => void runs.fetchNextPage()}>
           {runs.isFetchingNextPage ? "Loading…" : "Show older"}
-        </button>
+        </Button>
       )}
     </section>
   );

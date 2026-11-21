@@ -5,7 +5,7 @@ import { useHealthyComparison, useStartHealthyComparison } from "../api/useHealt
 import { useRun } from "../api/useRun";
 import { nothingHighlighted, partDifferences, RESULT_TITLES, shownValue, subtitle } from "../healthyComparison";
 import { titleCase } from "../runFormat";
-import { Badge, Button, Field, Input, ListOrTable, type BadgeTone, type Column } from "../ui";
+import { Badge, type BadgeTone, Button, type Column, Field, Input, ListOrTable } from "../ui";
 
 const RESULT_TONE: Record<ComparedField["result"], BadgeTone> = { different: "missing", same: "found", expected_to_vary: "neutral", not_compared: "blocked" };
 
@@ -63,9 +63,9 @@ function Comparison({ runId, production }: { runId: string; production: boolean 
     return (
       <div className="error-state" role="alert">
         <p>{query.error.message}</p>
-        <button className="btn" type="button" onClick={() => void query.refetch()}>
+        <Button type="button" onClick={() => void query.refetch()}>
           Retry
-        </button>
+        </Button>
       </div>
     );
   }

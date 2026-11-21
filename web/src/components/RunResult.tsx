@@ -1,4 +1,5 @@
 // Author: @SaadZarook
+import { Button } from "../ui";
 import { RunStatusChip } from "./RunStatusChip";
 import { useState } from "react";
 import type { ExpectationEvaluation, LocationResult, Run } from "../api/client";
@@ -52,9 +53,9 @@ export function RunResult({ runId }: { runId: string }) {
     return (
       <div className="error-state" role="alert">
         <p>{query.error.message}</p>
-        <button className="btn" type="button" onClick={() => void query.refetch()}>
+        <Button type="button" onClick={() => void query.refetch()}>
           Retry
-        </button>
+        </Button>
       </div>
     );
   }

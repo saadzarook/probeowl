@@ -4,11 +4,9 @@ import { expect, test, type Page } from "@playwright/test";
 import { expectNoOverflow } from "./overflow";
 import { copyOverCode, monoHeadings, pastTheEdge, shellAt, unequalControlRows, unevenChips } from "./rules";
 
-// Every screen against the UI foundation's rules (#105). A screen that breaks a rule today is
-// marked with the PR that moves it onto web/src/ui: the test is expected to fail until then, and
-// fails the run the moment it passes, so the mark is taken off in the PR that fixes it.
-// The rules for chips, code blocks and disabled buttons are tested on each screen as it moves;
-// web/src/ui holds them already (ui-rules.spec.ts).
+// Every screen against the UI foundation's rules (#105). Since PR 5 (#146) every screen is on
+// web/src/ui and none breaks a rule, so each test here is a plain one: a screen that breaks a rule
+// fails the run. The components hold the rules on their own in ui-rules.spec.ts.
 
 type Screen = { name: string; path: string; ready?: (page: Page) => Promise<void> };
 
@@ -54,11 +52,27 @@ const SCREENS: Screen[] = [
   },
   { name: "Health", path: "/health" },
   { name: "Probes", path: "/probes" },
+  {
+    name: "an open probe",
+    path: "/probes",
+    ready: async (page) => {
+      await page.getByLabel("Open probe").selectOption("topup_completed");
+      await page.getByRole("button", { name: "Save", exact: true }).waitFor();
+    },
+  },
   { name: "Knowledge base", path: "/knowledge-base" },
   { name: "Tables", path: "/tables" },
   { name: "Connectors", path: "/connectors" },
   { name: "Add connection", path: "/connectors/new" },
   { name: "Runs", path: "/runs" },
+  {
+    name: "Runs in UAT",
+    path: "/runs",
+    ready: async (page) => {
+      await page.getByRole("main").getByLabel("Environment").or(page.getByLabel("Environment").first()).first().selectOption("uat");
+      await page.getByText("Top-up completed").first().waitFor();
+    },
+  },
   { name: "Audit", path: "/audit" },
   { name: "New entity", path: "/probes/new-entity" },
   { name: "Setup", path: "/setup" },
@@ -66,13 +80,6 @@ const SCREENS: Screen[] = [
 
 const VALIDATE: Screen = { name: "Validate", path: "/validate" };
 
-// Which rule each screen breaks today, and the PR of the phase plan that moves it (#105).
-// The numbers are the audit's items in #105.
-const EDITORS = "PR 5, the editors and the rest";
-const UNTIL: Record<string, Partial<Record<"overflow" | "heights" | "mono", string>>> = {
-  Probes: { mono: EDITORS }, // 15: the probe editor's h1
-  Audit: { overflow: EDITORS }, // 4
-};
 
 async function open(page: Page, screen: Screen, width: number): Promise<void> {
   await page.setViewportSize({ width, height: 900 });
@@ -87,8 +94,6 @@ async function open(page: Page, screen: Screen, width: number): Promise<void> {
 for (const screen of SCREENS) {
   test.describe(screen.name, () => {
     test("rule 6: nothing scrolls sideways at 320, 390, 768 and 1024", async ({ page }) => {
-      const until = UNTIL[screen.name]?.overflow;
-      test.fail(until !== undefined, `until ${until}`);
       for (const width of [320, 390, 768, 1024]) {
         await open(page, screen, width);
         await expectNoOverflow(page, `${screen.name} at ${width}`);
@@ -97,8 +102,6 @@ for (const screen of SCREENS) {
     });
 
     test("rule 2: every control in a form row has the same height", async ({ page }) => {
-      const until = UNTIL[screen.name]?.heights;
-      test.fail(until !== undefined, `until ${until}`);
       for (const width of [1440, 1024, 390]) {
         await open(page, screen, width);
         expect(await unequalControlRows(page), `${screen.name} at ${width}`).toEqual([]);
@@ -106,8 +109,6 @@ for (const screen of SCREENS) {
     });
 
     test("rule 4: no heading or table header is in Plex Mono", async ({ page }) => {
-      const until = UNTIL[screen.name]?.mono;
-      test.fail(until !== undefined, `until ${until}`);
       await open(page, screen, 1440);
       expect(await monoHeadings(page), screen.name).toEqual([]);
     });
@@ -249,7 +250,7 @@ test("rule 8: the disabled reason asks for a reference only in Production", asyn
 });
 
 // Setup and connections moved in PR 4 (#141), with one chip everywhere: rule 9 on the screens that show chips.
-for (const name of ["Connectors", "Tables", "a Validate run", "an Inspect run", "a healthy comparison"]) {
+for (const name of ["Connectors", "Tables", "Runs in UAT", "a Validate run", "an Inspect run", "a healthy comparison"]) {
   test(`rule 9: on ${name}, every chip is 24 px and shows all its text, at 1440 and 390 px`, async ({ page }) => {
     const screen = SCREENS.find((s) => s.name === name);
     if (screen === undefined) throw new Error(`${name} is not in SCREENS`);
@@ -260,3 +261,37 @@ for (const name of ["Connectors", "Tables", "a Validate run", "an Inspect run", 
     }
   });
 }
+
+// The probe editor moved in PR 5 (#146). On a phone the YAML reads and scrolls; writing it is for a
+// wider screen, and the screen says so. #96's indent fix still holds there.
+test("at 390 px the YAML editor says it's for a wider screen, scrolls inside itself, and keeps #96's indent", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 900 });
+  await page.goto("/probes?new=validate&entity=topup");
+  const form = page.getByRole("form", { name: "New probe" });
+  await form.getByLabel("Probe id").fill("topup_narrow");
+  await form.getByLabel("Title").fill("Narrow");
+  await form.getByRole("button", { name: "Start the draft" }).click();
+  await expect(page.getByRole("note").filter({ hasText: "Editing is designed for a wider screen" })).toBeVisible();
+  const yaml = page.getByLabel("Probe YAML");
+  await yaml.getByText("- expect: count(record) >= 1").click();
+  await page.keyboard.press("End");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("- expect: count(ledger where direction == 'credit') == count(ledger where direction == 'debit')");
+  const lines = (await yaml.innerText()).split(String.fromCharCode(10));
+  expect(lines).toContain("  - expect: count(record) >= 1");
+  expect(lines.some((l) => l.startsWith("  - expect: count(ledger where direction"))).toBe(true);
+  // The long line scrolls inside the editor; the page itself never does.
+  const scroller = page.locator(".cm-scroller").first();
+  expect(await scroller.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
+  await expectNoOverflow(page, "the probe editor at 390");
+  expect(await pastTheEdge(page)).toEqual([]);
+  // Scrolled to, its line numbers stand level with its lines.
+  await yaml.scrollIntoViewIfNeeded();
+  const level = await page.evaluate(() => {
+    const tops = (selector: string) => Array.from(document.querySelectorAll(selector)).slice(0, 5).map((el) => Math.round(el.getBoundingClientRect().top));
+    return { lines: tops(".cm-line"), numbers: tops(".cm-lineNumbers .cm-gutterElement:not(:first-child)") };
+  });
+  expect(level.numbers).toEqual(level.lines);
+  await page.setViewportSize({ width: 1024, height: 900 });
+  await expect(page.getByRole("note").filter({ hasText: "Editing is designed for a wider screen" })).toBeHidden();
+});

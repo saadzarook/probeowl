@@ -1,4 +1,5 @@
 // Author: @SaadZarook
+import { Button } from "../ui";
 import { useEffect, useRef, useState } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { isToolPath } from "../plugins";
@@ -50,17 +51,17 @@ export function Shell() {
         {notice && (
           <div className="switch-notice" role="status">
             <p>{notice}</p>
-            <button className="btn-outline" type="button" onClick={() => setNotice(undefined)}>
+            <Button variant="outline" type="button" onClick={() => setNotice(undefined)}>
               Dismiss
-            </button>
+            </Button>
           </div>
         )}
         {restoreNotice && (
           <div className="switch-notice" role="status">
             <p>{restoreNotice}</p>
-            <button className="btn-outline" type="button" onClick={dismissRestoreNotice}>
+            <Button variant="outline" type="button" onClick={dismissRestoreNotice}>
               Dismiss
-            </button>
+            </Button>
           </div>
         )}
         {application && environment?.production && !isToolPath(location.pathname) && <ProductionBanner applicationName={application.title} />}
@@ -70,9 +71,9 @@ export function Shell() {
           {error ? (
             <div className="error-state" role="alert">
               <p>{error}</p>
-              <button className="btn" type="button" onClick={retry}>
+              <Button type="button" onClick={retry}>
                 Retry
-              </button>
+              </Button>
             </div>
           ) : loading ? (
             <p aria-busy="true">Loading applications…</p>
