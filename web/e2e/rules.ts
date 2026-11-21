@@ -104,3 +104,13 @@ export async function pastTheEdge(page: Page): Promise<string[]> {
       .map((el) => `${el.tagName.toLowerCase()} "${el.innerText.trim().slice(0, 40)}" to ${Math.round(el.getBoundingClientRect().right)}px`);
   });
 }
+
+/** Rule 9: every status chip on the page is 24 px (±1) and shows all of its text. */
+export async function unevenChips(page: Page): Promise<string[]> {
+  return page.evaluate(() =>
+    Array.from(document.querySelectorAll<HTMLElement>("main [data-outcome], main [data-health], main [data-status], main .label-chip"))
+      .filter((chip) => chip.getBoundingClientRect().height > 0)
+      .filter((chip) => Math.abs(chip.getBoundingClientRect().height - 24) > 1 || chip.scrollWidth > chip.clientWidth)
+      .map((chip) => `"${chip.innerText}" ${Math.round(chip.getBoundingClientRect().height)}px`),
+  );
+}

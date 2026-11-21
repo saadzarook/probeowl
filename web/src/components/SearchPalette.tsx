@@ -1,4 +1,5 @@
 // Author: @SaadZarook
+import { Badge } from "../ui";
 import * as Dialog from "@radix-ui/react-dialog";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useEffect, useId, useState, type KeyboardEvent } from "react";
@@ -281,9 +282,9 @@ function PaletteBody({ close, onNotice, returnFocus }: { close: () => void; onNo
                   <span>{option.label}</span>
                   {option.detail && <span className="hint"> {option.detail}</span>}
                   {(option.labels ?? []).map((label) => (
-                    <span key={label} className="chip">
+                    <Badge key={label} className="ml-2">
                       {label}
-                    </span>
+                    </Badge>
                   ))}
                 </div>
               );

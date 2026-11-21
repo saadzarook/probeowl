@@ -1,4 +1,5 @@
 // Author: @SaadZarook
+import { Button, buttonClass, Field, FormGrid, Input, Select } from "../ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { Link as RouterLink, useSearchParams } from "react-router-dom";
@@ -250,19 +251,19 @@ export function AddConnectionPage() {
                 <strong>A password is already saved for {saved.connector} in {env?.title ?? saved.environment}</strong>, perhaps by another application's connector of the same id. Overwrite it?
               </p>
               <div className="wizard-nav">
-                <button className="btn" type="button" onClick={() => void secret.mutateAsync({ binding: saved, replace: true }).then(() => tested.mutate())}>
+                <Button onClick={() => void secret.mutateAsync({ binding: saved, replace: true }).then(() => tested.mutate())}>
                   Overwrite it
-                </button>
-                <button className="btn btn-outline" type="button" onClick={() => { setPasswordState("kept"); tested.mutate(); }}>
+                </Button>
+                <Button variant="outline" onClick={() => { setPasswordState("kept"); tested.mutate(); }}>
                   Keep the saved one
-                </button>
+                </Button>
               </div>
             </div>
           )}
           {secret.isError && !(secret.error instanceof SecretExistsError) && (
             <div role="alert" className="error-state">
               <p>{secret.error.message}</p>
-              <button className="btn" type="button" onClick={() => secret.mutate({ binding: saved, replace: false })}>Retry</button>
+              <Button onClick={() => secret.mutate({ binding: saved, replace: false })}>Retry</Button>
             </div>
           )}
           {tested.isPending && <p role="status">Testing the connection with the saved password…</p>}
@@ -270,7 +271,7 @@ export function AddConnectionPage() {
           {tested.isError && <p role="alert" className="form-error">{tested.error.message}</p>}
           {saved.sql && tested.data?.reachable && env && <ConfirmSuggested application={application} connector={saved.connector} environment={env} />}
           <div className="wizard-nav">
-            <RouterLink className="btn btn-outline" to="/connectors">Back to Connectors</RouterLink>
+            <RouterLink className={buttonClass({ variant: "outline" })} to="/connectors">Back to Connectors</RouterLink>
           </div>
         </section>
       ) : (
@@ -291,10 +292,13 @@ export function AddConnectionPage() {
               </button>
             ))}
           </div>
-          <label>
-            Paste a connection string (optional)
-            <input
-              className="mono"
+          <Field
+            id="connection-paste"
+            label="Paste a connection string (optional)"
+            help="Paste or type a JDBC, ODBC or URL connection string, then press Enter. It's read in this browser into the fields below, and never sent or stored; a password in it moves to the password field."
+          >
+            <Input
+              className="font-mono"
               value={paste}
               placeholder="jdbc:…, Server=…;Database=…, or mariadb://…"
               autoComplete="off"
@@ -304,8 +308,7 @@ export function AddConnectionPage() {
               // Typed, not pasted: leaving the field fills the form too (#97).
               onBlur={() => { if (paste.trim() !== "" && paste !== shown) fill(paste); }}
             />
-          </label>
-          <p className="hint">Paste or type a JDBC, ODBC or URL connection string, then press Enter. It's read in this browser into the fields below, and never sent or stored; a password in it moves to the password field.</p>
+          </Field>
           {(pasted || paste !== "") && (
             <p role="status" className="hint">
               {pasted}{" "}
@@ -317,65 +320,60 @@ export function AddConnectionPage() {
           <p className="hint">
             For <strong>{env?.title ?? "no environment"}</strong>, the environment in the top bar: choose another there.
           </p>
-          <div className="form-grid">
-            <label>
-              Connector id
-              <input
-                className="mono"
+          <FormGrid className="xl:grid-cols-3">
+            <Field id="connection-id" label="Connector id">
+              <Input
+                className="font-mono"
                 value={connector}
                 disabled={existing !== undefined}
                 aria-invalid={connector !== "" && !ID.test(connector) ? true : undefined}
                 onChange={(e) => setConnectorId(e.target.value.trim())}
               />
-            </label>
-          </div>
+            </Field>
+          </FormGrid>
           {type === "rest" ? (
             <>
-              <label>
-                Base URL
-                <input className="mono" data-filled={lit("baseUrl")} value={fields.baseUrl} placeholder="https://api.example.com/v1" onChange={(e) => update({ baseUrl: e.target.value })} />
-              </label>
+              <FormGrid className="xl:grid-cols-3">
+                <Field id="connection-base-url" label="Base URL">
+                  <Input className="font-mono" data-filled={lit("baseUrl")} value={fields.baseUrl} placeholder="https://api.example.com/v1" onChange={(e) => update({ baseUrl: e.target.value })} />
+                </Field>
+              </FormGrid>
               <label className="check">
                 <input type="checkbox" checked={fields.needsToken} onChange={(e) => update({ needsToken: e.target.checked })} />
                 It needs a token
               </label>
               {fields.needsToken && (
-                <label>
-                  Token
-                  <input type="password" value={password} autoComplete="new-password" placeholder="saved to this machine's keychain" onChange={(e) => setPassword(e.target.value)} />
-                </label>
+                <FormGrid className="xl:grid-cols-3">
+                  <Field id="connection-token" label="Token">
+                    <Input type="password" value={password} autoComplete="new-password" placeholder="saved to this machine's keychain" onChange={(e) => setPassword(e.target.value)} />
+                  </Field>
+                </FormGrid>
               )}
             </>
           ) : type ? (
             <>
-              <div className="form-grid">
-                <label>
-                  Host
-                  <input className="mono" data-filled={lit("host")} value={fields.host} placeholder="db.example.internal" onChange={(e) => update({ host: e.target.value })} />
-                </label>
-                <label>
-                  Port
-                  <input className="mono" data-filled={lit("port")} inputMode="numeric" value={fields.port} placeholder={String(DEFAULT_PORTS[type])} onChange={(e) => update({ port: e.target.value.replace(/\D/g, "") })} />
-                </label>
-                <label>
-                  {type === "oracle" ? "Service name" : "Database"}
-                  <input className="mono" data-filled={lit("database")} value={fields.database} onChange={(e) => update({ database: e.target.value })} />
-                </label>
+              <FormGrid className="xl:grid-cols-3">
+                <Field id="connection-host" label="Host">
+                  <Input className="font-mono" data-filled={lit("host")} value={fields.host} placeholder="db.example.internal" onChange={(e) => update({ host: e.target.value })} />
+                </Field>
+                <Field id="connection-port" label="Port">
+                  <Input className="font-mono" data-filled={lit("port")} inputMode="numeric" value={fields.port} placeholder={String(DEFAULT_PORTS[type])} onChange={(e) => update({ port: e.target.value.replace(/\D/g, "") })} />
+                </Field>
+                <Field id="connection-database" label={type === "oracle" ? "Service name" : "Database"}>
+                  <Input className="font-mono" data-filled={lit("database")} value={fields.database} onChange={(e) => update({ database: e.target.value })} />
+                </Field>
                 {type === "oracle" && (
-                  <label>
-                    Schema (optional)
-                    <input className="mono" value={fields.schema} onChange={(e) => update({ schema: e.target.value })} />
-                  </label>
+                  <Field id="connection-schema" label="Schema (optional)">
+                    <Input className="font-mono" value={fields.schema} onChange={(e) => update({ schema: e.target.value })} />
+                  </Field>
                 )}
-                <label>
-                  Read-only login
-                  <input className="mono" data-filled={lit("user")} value={fields.user} autoComplete="off" onChange={(e) => update({ user: e.target.value })} />
-                </label>
-                <label>
-                  Password
-                  <input type="password" value={password} autoComplete="new-password" placeholder="saved to this machine's keychain" onChange={(e) => setPassword(e.target.value)} />
-                </label>
-              </div>
+                <Field id="connection-user" label="Read-only login">
+                  <Input className="font-mono" data-filled={lit("user")} value={fields.user} autoComplete="off" onChange={(e) => update({ user: e.target.value })} />
+                </Field>
+                <Field id="connection-password" label="Password">
+                  <Input type="password" value={password} autoComplete="new-password" placeholder="saved to this machine's keychain" onChange={(e) => setPassword(e.target.value)} />
+                </Field>
+              </FormGrid>
               <label className="check" data-production={env?.production || undefined}>
                 <input type="checkbox" checked={fields.replica} onChange={(e) => update({ replica: e.target.checked })} />
                 This is a read replica, readable secondary or Active Data Guard standby
@@ -385,39 +383,38 @@ export function AddConnectionPage() {
                   {env?.title}: {NOT_A_REPLICA}
                 </p>
               )}
-              <div className="form-grid">
-                <label>
-                  TLS
-                  <select value={fields.tls} onChange={(e) => update({ tls: e.target.value as Tls })}>
+              <FormGrid className="xl:grid-cols-3">
+                <Field id="connection-tls" label="TLS">
+                  <Select value={fields.tls} onChange={(e) => update({ tls: e.target.value as Tls })}>
                     <option value="verify">Verify the certificate</option>
                     <option value="trust">Trust this server's certificate</option>
                     {type !== "sqlserver" && <option value="none">No TLS</option>}
-                  </select>
-                </label>
+                  </Select>
+                </Field>
                 {fields.tls !== "verify" && (
-                  <label>
-                    {fields.tls === "trust" ? "Why trust it" : "Why no TLS"}
-                    <input value={fields.reason} placeholder={fields.tls === "trust" ? "such as an internal CA" : "such as a local test server"} onChange={(e) => update({ reason: e.target.value })} />
-                  </label>
+                  <Field
+                    id="connection-tls-reason"
+                    label={fields.tls === "trust" ? "Why trust it" : "Why no TLS"}
+                    help={reasonMissing ? "Say why: it's written beside the binding, and Production requires it." : undefined}
+                  >
+                    <Input value={fields.reason} placeholder={fields.tls === "trust" ? "such as an internal CA" : "such as a local test server"} onChange={(e) => update({ reason: e.target.value })} />
+                  </Field>
                 )}
-              </div>
-              {reasonMissing && <p className="hint">Say why: it's written beside the binding, and Production requires it.</p>}
+              </FormGrid>
             </>
           ) : (
             <p className="hint">Choose a type, or paste a connection string.</p>
           )}
-          <div className="wizard-nav">
-            <button className="btn secondary" type="button" disabled={!complete || (needsPassword && password === "") || test.isPending} onClick={() => test.mutate()}>
+          <div className="flex flex-wrap items-start gap-2">
+            <Button variant="outline" disabled={!complete || (needsPassword && password === "") || test.isPending} onClick={() => test.mutate()}>
               {test.isPending ? "Testing…" : "Test connection"}
-            </button>
-            <button className="btn secondary" type="button" disabled={!complete || !body || save.isPending} onClick={() => body && void save.mutateAsync({ body }).then((change) => setPreview({ change, sent }))}>
+            </Button>
+            <Button variant="outline" disabled={!complete || !body || save.isPending} onClick={() => body && void save.mutateAsync({ body }).then((change) => setPreview({ change, sent }))}>
               Preview
-            </button>
-            <button
-              className="btn"
-              type="button"
+            </Button>
+            <Button
               disabled={!complete || !body || save.isPending}
-              aria-describedby={missing.length > 0 ? "save-needs" : undefined}
+              disabledReason={missing.length > 0 ? `To save: ${missing.join(", ")}.` : undefined}
               onClick={() => {
                 // As the probe editor saves: the preview in a dialog, then exactly that is written.
                 setConfirming(true);
@@ -425,12 +422,7 @@ export function AddConnectionPage() {
               }}
             >
               Save {connector || "connection"}
-            </button>
-            {missing.length > 0 && (
-              <span className="hint" id="save-needs">
-                To save: {missing.join(", ")}.
-              </span>
-            )}
+            </Button>
           </div>
           <dialog ref={dialog} className="import-dialog save-dialog" aria-labelledby="save-connection-title" onClose={() => setConfirming(false)}>
             <h2 id="save-connection-title">Save {connector}</h2>
@@ -441,20 +433,19 @@ export function AddConnectionPage() {
             )}
             {confirming && save.isError && <p role="alert" className="form-error">{save.error.message}</p>}
             <div className="dialog-actions">
-              <button
-                className="btn"
-                type="button"
+              <Button
                 disabled={!preview || stale || save.isPending}
+                disabledReason={save.isPending ? undefined : !preview || stale ? "Waiting for the preview" : undefined}
                 onClick={() => {
                   setConfirming(false);
                   void write();
                 }}
               >
                 Write {connector}
-              </button>
-              <button className="btn btn-outline" type="button" onClick={() => setConfirming(false)}>
+              </Button>
+              <Button variant="outline" onClick={() => setConfirming(false)}>
                 Cancel
-              </button>
+              </Button>
             </div>
           </dialog>
           {test.data && <TestResult result={test.data} />}

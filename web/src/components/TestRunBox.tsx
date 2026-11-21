@@ -1,4 +1,5 @@
 // Author: @SaadZarook
+import { RunStatusChip } from "./RunStatusChip";
 import { useMutation } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
@@ -35,9 +36,9 @@ function Finished({ runId }: { runId: string }) {
   const passed = expectations.filter((e) => e.result === "pass").length;
   return (
     <div className="test-run-result" aria-live="polite">
-      <span className="status" data-status={run.status} data-caveat={run.caveat ? true : undefined}>
+      <RunStatusChip status={run.status} caveat={Boolean(run.caveat)}>
         {withCaveat(titleCase(run.status), run.caveat)}
-      </span>
+      </RunStatusChip>
       <span>
         {passed} of {expectations.length} expectations
       </span>

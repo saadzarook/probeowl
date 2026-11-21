@@ -1,4 +1,5 @@
 // Author: @SaadZarook
+import { Button } from "../ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import type { ConnectorStatus, DraftConnection, KillTarget } from "../api/client";
@@ -119,9 +120,9 @@ export function ConnectorDetail({ status, application }: { status: ConnectorStat
         {broader && <p className="hint">Also stopped by the switch on {targetText(broader)}: turning this one off will not resume it.</p>}
       </div>
       <div className="connector-test">
-        <button className="btn btn-outline" type="button" disabled={!canTestConnection(status) || test.isPending} onClick={() => test.mutate()}>
+        <Button variant="outline" disabled={!canTestConnection(status) || test.isPending} onClick={() => test.mutate()}>
           {test.isPending ? "Testing…" : "Test connection"}
-        </button>
+        </Button>
         {test.isError && (
           <p className="connector-test-result" role="alert" data-reachable="false">
             {test.error.message}
@@ -133,9 +134,9 @@ export function ConnectorDetail({ status, application }: { status: ConnectorStat
           </p>
         )}
         {status.secret === "saved" && !changingPassword && (
-          <button className="btn btn-outline" type="button" onClick={() => setChangingPassword(true)}>
+          <Button variant="outline" onClick={() => setChangingPassword(true)}>
             Change password
-          </button>
+          </Button>
         )}
       </div>
       {changingPassword && draftType && (

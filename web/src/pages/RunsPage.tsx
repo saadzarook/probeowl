@@ -1,4 +1,5 @@
 // Author: @SaadZarook
+import { RunStatusChip } from "../components/RunStatusChip";
 import { useMutation } from "@tanstack/react-query";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { pickMatches, type RunSummary } from "../api/client";
@@ -27,9 +28,9 @@ function RunRow({ run }: { run: RunSummary }) {
   return (
     <tr>
       <td>
-        <span className="status" data-status={status.key} data-caveat={run.caveat ? true : undefined}>
+        <RunStatusChip status={status.key} caveat={Boolean(run.caveat)}>
           {withCaveat(status.label, run.caveat)}
-        </span>
+        </RunStatusChip>
         {why && <span className="hint block">{why}</span>}
       </td>
       <td>

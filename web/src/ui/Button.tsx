@@ -5,8 +5,9 @@ import { cn } from "./cn";
 
 /** Button's classes, for a link that acts as a button: <Link className={buttonClass()}> (rule 8). */
 export const buttonClass = cva(
-  "m-0 box-border inline-flex h-10 shrink-0 cursor-pointer items-center justify-center gap-2 whitespace-nowrap " +
-    "rounded-md border border-transparent px-4 text-sm font-semibold no-underline " +
+  // 40 px on one line; a long label, such as a new application's name, wraps instead of running off the screen.
+  "m-0 box-border inline-flex min-h-10 max-w-full shrink-0 cursor-pointer items-center justify-center gap-2 " +
+    "rounded-md border border-transparent px-4 py-2 text-center text-sm font-semibold no-underline " +
     "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring " +
     "disabled:cursor-not-allowed disabled:opacity-50",
   {
@@ -17,7 +18,7 @@ export const buttonClass = cva(
         ghost: "bg-transparent text-foreground hover:bg-background",
       },
       // Small only for toolbars and Copy (rule 2).
-      size: { default: "", sm: "h-8 px-3 text-xs" },
+      size: { default: "", sm: "min-h-8 px-3 py-1 text-xs" },
     },
     defaultVariants: { variant: "primary", size: "default" },
   },

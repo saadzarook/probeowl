@@ -157,7 +157,7 @@ test("a Missing on a replica whose lag is unknown never looks clean", async ({ p
   await expect(result.getByText("Fail - reads a Missing record that may not have arrived yet: replica lag unknown")).toBeVisible();
   await expect(result.getByText("First failed expectation: count(ledger) == 2: got 0 - reads a Missing record that may not have arrived yet: replica lag unknown")).toBeVisible();
   // The clean Missing chip is not shown for it.
-  await expect(result.locator('.locations .chip[data-outcome="missing"]:not([data-caveat])')).toHaveCount(0);
+  await expect(result.locator('.locations [data-outcome="missing"]:not([data-caveat])')).toHaveCount(0);
   const axe = await new AxeBuilder({ page }).include(".run-result").analyze();
   expect(axe.violations).toEqual([]);
 });

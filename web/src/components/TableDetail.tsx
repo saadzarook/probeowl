@@ -1,4 +1,5 @@
 // Author: @SaadZarook
+import { Button, Field, Input, Select } from "../ui";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ConfirmError, type ApplicationSummary, type ColumnRole, type SchemaResult, type TableLabel } from "../api/client";
@@ -72,24 +73,24 @@ export function TableDetail({ row, application, schema, environmentTitle, enviro
         <h2><code>{name}</code></h2>
         <span className="hint">{dialect ? `${row.connector} · ${dialect}` : row.connector}</span>
       </header>
-      <div className="facts">
-        <label>
-          Label
-          <select value={draft.label} onChange={(e) => edit({ label: e.target.value as TableLabel | "" })}>
+      {/* One column in a narrow panel or screen, two from 640 px (rule 3). */}
+      <div className="grid grid-cols-1 gap-x-4 px-6 pt-4 sm:grid-cols-2">
+        <Field id="table-label" label="Label">
+          <Select value={draft.label} onChange={(e) => edit({ label: e.target.value as TableLabel | "" })}>
             {draft.label === "" && <option value="">Choose a label</option>}
             {LABELS.map((l) => <option key={l.label} value={l.label}>{l.title}</option>)}
-          </select>
-        </label>
-        <label>
-          Owner
-          <input value={draft.owner} onChange={(e) => edit({ owner: e.target.value })} />
-        </label>
-        <label className="wide">
-          Description
-          <input value={draft.description} onChange={(e) => edit({ description: e.target.value })} />
-        </label>
+          </Select>
+        </Field>
+        <Field id="table-owner" label="Owner">
+          <Input value={draft.owner} onChange={(e) => edit({ owner: e.target.value })} />
+        </Field>
+        <div className="sm:col-span-2">
+          <Field id="table-description" label="Description">
+            <Input value={draft.description} onChange={(e) => edit({ description: e.target.value })} />
+          </Field>
+        </div>
         {row.suggestion && row.suggestion.reasons.length > 0 && (
-          <p className="hint wide">
+          <p className="m-0 mb-4 text-sm text-muted sm:col-span-2">
             {row.confirmed ? "Suggested" : "Suggested because"}: {row.suggestion.reasons.join("; ")}
           </p>
         )}
@@ -111,7 +112,7 @@ export function TableDetail({ row, application, schema, environmentTitle, enviro
               <code>{importCommand(application.name, row.connector, environment)}</code>
               <CopyButton text={importCommand(application.name, row.connector, environment)} label="Copy command" />
             </span>
-            <button className="btn secondary" type="button" onClick={onImport}>Import from replica</button>
+            <Button variant="outline" onClick={onImport}>Import from replica</Button>
           </EmptyState>
         </div>
       )}
@@ -163,22 +164,16 @@ export function TableDetail({ row, application, schema, environmentTitle, enviro
       </ul>
       <div className="confirm">
         <div className="confirm-actions">
-          <button
-            className="btn secondary"
-            type="button"
-            disabled={entry === undefined || change.isPending}
-            onClick={() => entry && change.mutate({ entry })}
-          >
+          <Button variant="outline" disabled={entry === undefined || change.isPending} onClick={() => entry && change.mutate({ entry })}>
             Preview
-          </button>
-          <button
-            className="btn"
-            type="button"
+          </Button>
+          <Button
             disabled={preview === undefined || stale || change.isPending}
+            disabledReason={!change.isPending && (preview === undefined || stale) ? "Preview the change first" : undefined}
             onClick={() => preview && change.variables && change.mutate({ entry: change.variables.entry, base: preview.base })}
           >
             Confirm
-          </button>
+          </Button>
         </div>
         {entry === undefined && <p className="hint">Choose a label to preview the change.</p>}
         {change.isPending && <p role="status">Working…</p>}
