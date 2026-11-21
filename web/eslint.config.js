@@ -21,7 +21,7 @@ const classRules = (pattern, message) =>
   ].map((selector) => ({ selector, message }));
 
 export default tseslint.config(
-  { ignores: ["src/api/schema.d.ts", "public/mockServiceWorker.js", "dist", "dist-e2e", "node_modules", "playwright-report", "test-results"] },
+  { ignores: ["src/api/schema.d.ts", "public/mockServiceWorker.js", "dist", "dist-e2e", "dist-csp", "node_modules", "playwright-report", "test-results"] },
   js.configs.recommended,
   ...tseslint.configs.strict,
   {
@@ -43,7 +43,7 @@ export default tseslint.config(
     },
   },
   {
-    // Arbitrary values ("gap-[…]") and properties ("[overflow-wrap:…]") only inside web/src/ui, where the components are made.
+    // Arbitrary values ("gap-[â€¦]") and properties ("[overflow-wrap:â€¦]") only inside web/src/ui, where the components are made.
     files: ["src/**/*.tsx", "mocks/**/*.tsx", "plugins/**/*.tsx"],
     ignores: ["src/ui/**"],
     rules: {

@@ -9,13 +9,15 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "lint": "eslint . && cd .. && node web/node_modules/eslint/bin/eslint.js --config web/eslint.config.js plugins",
+    "lint": "tsx scripts/check-colours.ts && eslint . && cd .. && node web/node_modules/eslint/bin/eslint.js --config web/eslint.config.js plugins",
     "typecheck": "tsc --noEmit",
     "test:e2e": "playwright test",
     "test:e2e:live": "playwright test -c playwright.live.config.ts",
     "generate:api": "openapi-typescript ../contracts/openapi.yaml -o src/api/schema.d.ts",
     "check:api": "npm run generate:api && git diff --exit-code -- src/api/schema.d.ts",
-    "check:mocks": "tsx scripts/check-mocks.ts"
+    "check:mocks": "tsx scripts/check-mocks.ts",
+    "check:colours": "tsx scripts/check-colours.ts",
+    "test:e2e:csp": "playwright test -c playwright.csp.config.ts"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.4",
@@ -33,6 +35,7 @@
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "codemirror": "^6.0.2",
+    "get-nonce": "1.0.1",
     "openapi-fetch": "^0.17.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
