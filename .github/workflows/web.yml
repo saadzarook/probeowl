@@ -37,3 +37,13 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Smoke and axe tests
         run: npm run test:e2e
+      # Every screen under owl serve's own Content-Security-Policy, light and dark (#148): served by
+      # owl serve's mounts (dev/ci/serve_web_app.py), which need the backend and a built guide.
+      - uses: astral-sh/setup-uv@v7
+      - name: Backend for the strict-CSP tests
+        working-directory: backend
+        run: |
+          uv sync --locked
+          uv run python guide_build.py
+      - name: Strict CSP, contrast and dark tests
+        run: npm run test:e2e:csp

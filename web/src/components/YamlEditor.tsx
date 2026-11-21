@@ -9,17 +9,18 @@ import { tags } from "@lezer/highlight";
 import { EditorView, basicSetup } from "codemirror";
 import { keymap } from "@codemirror/view";
 import { useEffect, useRef, useState } from "react";
+import { cspNonce } from "../csp";
 
 // On the editor's dark panel.
 const TOOL = "border-sidebar-muted bg-transparent text-sidebar-foreground hover:bg-sidebar-active";
 
 /** Light-on-ink colours that keep the YAML readable on the dark editor (WCAG AA). */
 const darkHighlight = HighlightStyle.define([
-  { tag: tags.propertyName, color: "#8fb4ff" },
-  { tag: [tags.string, tags.content], color: "#9be3b0" },
-  { tag: [tags.number, tags.bool, tags.null, tags.keyword], color: "#f2c97d" },
-  { tag: tags.comment, color: "#aab2bf" },
-  { tag: [tags.meta, tags.punctuation, tags.separator], color: "#d6dae1" },
+  { tag: tags.propertyName, color: "var(--ui-code-key)" },
+  { tag: [tags.string, tags.content], color: "var(--ui-code-string)" },
+  { tag: [tags.number, tags.bool, tags.null, tags.keyword], color: "var(--ui-code-literal)" },
+  { tag: tags.comment, color: "var(--ui-code-comment)" },
+  { tag: [tags.meta, tags.punctuation, tags.separator], color: "var(--ui-code-punctuation)" },
 ]);
 
 /**
@@ -99,6 +100,8 @@ export function YamlEditor({ value, label, onChange, readOnly = false, completio
         syntaxHighlighting(darkHighlight),
         EditorView.contentAttributes.of({ "aria-label": label }),
         EditorView.editable.of(!readOnly),
+        // CodeMirror's styles go in a <style> that carries the page's nonce (#110).
+        ...(cspNonce ? [EditorView.cspNonce.of(cspNonce)] : []),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) latest.current?.(update.state.doc.toString());
           setDepths({ undo: undoDepth(update.state), redo: redoDepth(update.state) });

@@ -1,31 +1,31 @@
 /* Author: @SaadZarook */
-/* Brand tokens from docs/screens/Brand.png */
+/* The names app.css and plugin stylesheets read, each an alias of a token in web/src/ui/ui.css, so
+   they follow the light and dark themes (#47). Colours themselves are written only there. */
 :root {
-  --color-ink: #14171c;
-  --color-owl-amber: #f2a33a; /* logo only */
-  --color-action-blue: #1f5bd8;
-  --color-night: #232832;
-  --color-surface: #f6f7f9;
-  --color-production: #b42318;
-  --color-production-bg: #fce9e8;
+  --color-ink: var(--ui-sidebar); /* dark panels: the editor, queries, a pressed chip */
+  --color-action-blue: var(--ui-primary);
+  --color-night: var(--ui-sidebar-active);
+  --color-surface: var(--ui-background);
+  --color-production: var(--ui-production); /* fills and borders; red text is --ui-production-text */
+  --color-production-bg: var(--ui-production-bg);
 
-  --color-text: var(--color-ink);
-  --color-text-muted: #5a6270;
-  --color-border: #e2e5ea;
-  --color-card: #ffffff;
+  --color-text: var(--ui-foreground);
+  --color-text-muted: var(--ui-muted);
+  --color-border: var(--ui-border);
+  --color-card: var(--ui-card);
 
-  --chip-found-bg: #e5f3ea;
-  --chip-found-fg: #1a6b3a;
-  --chip-missing-bg: #fce9e8;
-  --chip-missing-fg: #b42318;
-  --chip-waiting-bg: #fdf0dc;
-  --chip-waiting-fg: #8a5200;
-  --chip-blocked-bg: #e8eaee;
-  --chip-blocked-fg: #3b4350;
-  --chip-ambiguous-bg: #ece6f8;
-  --chip-ambiguous-fg: #4f2a9e;
-  --chip-stale-bg: #e6eef6;
-  --chip-stale-fg: #25507c;
+  --chip-found-bg: var(--ui-found-bg);
+  --chip-found-fg: var(--ui-found-fg);
+  --chip-missing-bg: var(--ui-missing-bg);
+  --chip-missing-fg: var(--ui-missing-fg);
+  --chip-waiting-bg: var(--ui-waiting-bg);
+  --chip-waiting-fg: var(--ui-waiting-fg);
+  --chip-blocked-bg: var(--ui-blocked-bg);
+  --chip-blocked-fg: var(--ui-blocked-fg);
+  --chip-ambiguous-bg: var(--ui-ambiguous-bg);
+  --chip-ambiguous-fg: var(--ui-ambiguous-fg);
+  --chip-stale-bg: var(--ui-stale-bg);
+  --chip-stale-fg: var(--ui-stale-fg);
 
   --font-sans: "IBM Plex Sans", system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;

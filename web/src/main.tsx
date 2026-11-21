@@ -8,9 +8,14 @@ import "./styles/tokens.css";
 import "./styles/app.css";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { StrictMode, type ReactNode } from "react";
+import { setNonce } from "get-nonce";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { App } from "./App";
+import { cspNonce } from "./csp";
+
+// The Sheet's scroll lock (Radix, react-remove-scroll) adds a <style>: it carries the page's nonce.
+if (cspNonce) setNonce(cspNonce);
 
 const root = document.getElementById("root");
 if (!root) {
