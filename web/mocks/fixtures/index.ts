@@ -12,6 +12,7 @@ import {
   cardAccessProbes,
   inProduction,
   inactiveVisitorRun,
+  notConfiguredCardRun,
   plantedCardRun,
   skippedCardRun,
   stoppedCardRun,
@@ -28,7 +29,7 @@ export { flaggedRunbook, outboxResult, stepsInRun, topUpNotCredited } from "./ru
 export { walletConnectors, cardAccessConnectors, payoutsConnectors } from "./connectors";
 export { walletCatalog, cardAccessCatalog, schemaSnapshots, truncatedAccessSnapshot, UNIMPORTED, addedConnectorSnapshot } from "./catalog";
 export { walletSuggestions, walletReviewTables, cardAccessReview } from "./review";
-export { draftRun, passingReport, piiReport, timeFilterReport, unboundReport, unreadableReport, TIME_FILTER_MESSAGE } from "./probeChecks";
+export { draftRun, passingReport, piiReport, timeFilterReport, unboundReport, unboundUatReport, unreadableReport, TIME_FILTER_MESSAGE } from "./probeChecks";
 export { runningValidateRun, failedValidateRun, partialValidateRun, unreadableValidateRun, skippedValidateRun, stoppedValidateRun, lateValidateRun, walletRunPages } from "./runs";
 export {
   visitorEntity,
@@ -36,6 +37,7 @@ export {
   runningCardRun,
   plantedCardRun,
   inactiveVisitorRun,
+  notConfiguredCardRun,
   ambiguousEmailRun,
   unknownVisitorRun,
   inProduction,
@@ -74,6 +76,7 @@ const cardRuns = ["visitor_profile_id:VP00012931", "card_id:C204518", "email:a.r
     card("runningCardRun", runningCardRun("run_c", identifier, value)),
     card("plantedCardRun", plantedCardRun("run_d", identifier, value)),
     card("inactiveVisitorRun", inactiveVisitorRun("run_e", identifier, value)),
+    card("notConfiguredCardRun", notConfiguredCardRun("run_q", identifier, value)),
     card("unknownVisitorRun", unknownVisitorRun("run_g", identifier, value)),
     card("skippedCardRun", skippedCardRun("run_h", identifier, value)),
     card("stoppedCardRun", stoppedCardRun("run_k", identifier, value)),

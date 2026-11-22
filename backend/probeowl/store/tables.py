@@ -104,6 +104,7 @@ runs = Table(
     Column("skip_reason", Text),
     Column("stop_reason", Text),
     Column("caveat", Text),
+    Column("not_applicable", JsonText),  # connectors not bound here, and what they left unchecked
     Column("actor_kind", String(16), nullable=False),
     Column("actor_name", String(128), nullable=False),
     Column("actor_on_behalf_of", String(128)),
@@ -160,6 +161,7 @@ expectation_results = Table(
     Column("result", String(8), nullable=False),
     Column("detail", Text),
     Column("caveat", Text),
+    Column("not_applicable", Boolean),  # None on runs stored before 0010: applicable
     ForeignKeyConstraint(["workspace_id", "run_id"], ["runs.workspace_id", "runs.id"]),
 )
 

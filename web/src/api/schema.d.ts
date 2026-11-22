@@ -1787,6 +1787,12 @@ export interface components {
              * @description Why this result may not be final: it read a Missing record that carries a caveat.
              */
             caveat?: string | null;
+            /**
+             * Not Applicable
+             * @description Skipped because it reads a location whose connector has no binding in this environment (Not configured, or Blocked by one). It counts against nothing.
+             * @default false
+             */
+            not_applicable: boolean;
         };
         /**
          * ExpectationResult
@@ -2410,6 +2416,24 @@ export interface components {
             };
         };
         /**
+         * NotApplicable
+         * @description A connector with no binding in the run's environment, and what that left unchecked.
+         */
+        NotApplicable: {
+            /** Connector */
+            connector: string;
+            /**
+             * Locations
+             * @description Its locations in this run, all Not configured.
+             */
+            locations: string[];
+            /**
+             * Checks
+             * @description The expectations skipped as not applicable.
+             */
+            checks: number;
+        };
+        /**
          * Outcome
          * @description What one location returned.
          * @enum {string}
@@ -2772,6 +2796,11 @@ export interface components {
              * @description Why the status may not be final, counting the Missing records that carry a caveat. The status itself is unchanged.
              */
             caveat?: string | null;
+            /**
+             * Not Applicable
+             * @description Connectors with no binding in this environment, outside Production: their locations are Not configured, and the expectations that read them are not applicable. A run with nothing else wrong stays Passed; owl's --strict exits 2.
+             */
+            not_applicable?: components["schemas"]["NotApplicable"][];
         };
         /**
          * RunList

@@ -193,6 +193,21 @@ class ExpectationEvaluation(ProbeOwlModel):
             "Why this result may not be final: it read a Missing record that carries a caveat."
         ),
     )
+    not_applicable: bool = Field(
+        default=False,
+        description=(
+            "Skipped because it reads a location whose connector has no binding in this "
+            "environment (Not configured, or Blocked by one). It counts against nothing."
+        ),
+    )
+
+
+class NotApplicable(ProbeOwlModel):
+    """A connector with no binding in the run's environment, and what that left unchecked."""
+
+    connector: Name
+    locations: list[str] = Field(description="Its locations in this run, all Not configured.")
+    checks: int = Field(ge=0, description="The expectations skipped as not applicable.")
 
 
 class Actor(ProbeOwlModel):
@@ -298,6 +313,14 @@ class Run(ProbeOwlModel):
         description=(
             "Why the status may not be final, counting the Missing records that carry a "
             "caveat. The status itself is unchanged."
+        ),
+    )
+    not_applicable: list[NotApplicable] = Field(
+        default_factory=list,
+        description=(
+            "Connectors with no binding in this environment, outside Production: their "
+            "locations are Not configured, and the expectations that read them are not "
+            "applicable. A run with nothing else wrong stays Passed; owl's --strict exits 2."
         ),
     )
 

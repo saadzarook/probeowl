@@ -438,7 +438,9 @@ Guardrails for switching:
   and the run stays Passed when nothing else failed or went unchecked, with a note on screen and in
   the CLI: "N checks not applicable in <env>: <connector> has no binding here". With `--strict`,
   `owl validate` and `owl inspect` exit 2 for that instead. `owl check` and the probe editor warn
-  rather than refuse (#25, decided 2026-11-22).
+  rather than refuse. In Production it stays an error: the probe can't be saved, `owl serve`
+  won't load it, and a run is refused, so a Production result never looks complete with a
+  system missing (#25, decided 2026-11-22).
 - Secrets and access are separate per environment: a UAT credential can never reach production.
 
 ## Investigation audit

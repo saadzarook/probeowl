@@ -133,6 +133,8 @@ class _Prepared:
     # When no pattern placed the value: the value as entered, and each identifier to try in
     # order with its lookup (None for the root key). The first to find the subject is the run's.
     tries: tuple[str, list[tuple[str, str | None]]] | None = None
+    # Connectors with no binding in this environment, outside Production: Not configured (#25).
+    unbound: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -492,11 +494,17 @@ class RunService:
         if not stopped:  # a stopped run is skipped before any lookup: no password is needed
             _refuse_missing_passwords(app, used, request.environment, environment.title)
         connectors = self._open(app, entity, request.environment, stopped=bool(stopped))
+        unbound = tuple(sorted(name for name, c in connectors.items() if c is None))
         try:
+            _refuse_unbound(entity, unbound, environment.title, environment.production, identifier)
             check_run(probe, entity, connectors)
         except BaseException:
             _close(c for c in connectors.values() if c is not None)
             raise
+        if tries is not None:
+            # An identifier whose lookup has no binding here is not tried.
+            entered, listed = tries
+            tries = (entered, [t for t in listed if _tried_location(entity, t[0]) not in unbound])
         # Masked if any identifier it may turn out to be is personal data.
         pii = any(entity.identifiers[name].pii for name in possible)
         keys = {
@@ -548,6 +556,7 @@ class RunService:
             environment.production,
             self._generation,
             tries,
+            unbound,
         )
 
     def _remembering(
@@ -962,11 +971,13 @@ class RunService:
                 if run.subject is None:
                     self._finish(run)
                     return
+            connectors: dict[str, OpenConnector | None] = {**prepared.connectors}
+            connectors.update(dict.fromkeys(prepared.unbound))
             result = run_probe(
                 prepared.probe,
                 prepared.entity,
                 run.subject or run.identifier_value,
-                prepared.connectors,
+                connectors,
                 on_location=saved,
                 deadline=time.monotonic() + self._limits.time_limit_s,
                 replica_lag=lags,
@@ -979,6 +990,7 @@ class RunService:
                 stop_reason=RUN_TIME_LIMIT if timed_out else None,
                 locations=result.locations,
                 expectations=result.expectations,
+                not_applicable=result.not_applicable,
             )
         except KillSwitchEngaged as err:
             # Before its first read it is a new run that never started; after, it stopped.
@@ -1188,6 +1200,43 @@ def _picked(ambiguous: Run, subjects: list[str] | None) -> list[str]:
             {"subjects": f"one or more of: {', '.join(sorted(matched))}"},
         )
     return subjects
+
+
+def _tried_location(entity: Entity, identifier: str) -> str:
+    """The connector an identifier is looked up through: its via location's, else the root's."""
+    via = entity.identifiers[identifier].via
+    location = root_location(entity) if via is None else split_field_ref(via)[0]
+    return entity.locations[location].using
+
+
+def _refuse_unbound(
+    entity: Entity, unbound: tuple[str, ...], environment: str, production: bool, identifier: str
+) -> None:
+    """ConfigError where a connector with no binding here can't simply be Not configured (#25).
+
+    In Production a probe never runs with a location missing: its result would look complete.
+    Elsewhere the root and the identifier's own lookup must be bound, or nothing could be found.
+    """
+    if not unbound:
+        return
+    missing = [f"{name} ({using})" for name, using in all_connectors(entity) if using in unbound]
+    if production:
+        raise ConfigError(
+            f"the probe cannot run in {environment}: {', '.join(missing)} has no binding here; "
+            "in Production every location must be bound"
+        )
+    root = entity.locations[root_location(entity)].using
+    if root in unbound:
+        raise ConfigError(
+            f"the probe cannot run in {environment}: its root location uses {root}, "
+            "which has no binding here"
+        )
+    looked_up = _tried_location(entity, identifier)
+    if looked_up in unbound:
+        raise ConfigError(
+            f"{identifier} is looked up through {looked_up}, which has no binding in "
+            f"{environment}: start from another identifier, such as {entity.root_key}"
+        )
 
 
 def _lookup_for(app: LoadedApplication, entity: Entity, name: str) -> str | None:

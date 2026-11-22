@@ -36,16 +36,28 @@ function ErrorBlock({ message, onRetry }: { message: string; onRetry: () => void
   );
 }
 
+/** The connector a location uses: a top-level one, or a fan-out lookup named <parent>.<child>. */
+function connectorOf(entity: Entity | undefined, location: string): string | undefined {
+  const [parent = "", child] = location.split(".");
+  const found = entity?.locations[parent];
+  return child === undefined ? found?.using : found?.each?.[child]?.using;
+}
+
 /**
- * The connectors not bound in each environment, from the failed Environments checks' structured
+ * The connectors not bound in each environment, from the Environments checks' structured
  * fields: each names its environment and location, and the entity says which connector that
  * location uses. Never read from the message (#108).
  */
-function unboundBy(checks: Pick<SaveCheck, "check" | "status" | "location" | "environment">[], entity: Entity | undefined): Map<string, string> {
+function unboundBy(
+  checks: Pick<SaveCheck, "check" | "status" | "location" | "environment">[],
+  entity: Entity | undefined,
+  statuses: SaveCheck["status"][] = ["fail", "warn"],
+): Map<string, string> {
   const unbound = new Map<string, Set<string>>();
   for (const c of checks) {
-    if (c.check !== "Environments" || c.status !== "fail" || !c.environment) continue;
-    const using = c.location ? entity?.locations[c.location]?.using : undefined;
+    // A failure in Production; a warning elsewhere, where the location is Not configured (#25).
+    if (c.check !== "Environments" || !statuses.includes(c.status) || !c.environment) continue;
+    const using = c.location ? connectorOf(entity, c.location) : undefined;
     unbound.set(c.environment, (unbound.get(c.environment) ?? new Set()).add(using ?? "a connector"));
   }
   return new Map([...unbound].map(([environment, connectors]) => [environment, [...connectors].join(", ")]));
@@ -222,6 +234,9 @@ export function ProbeEditorPage({ item }: { item: NavItem }) {
     body = <EmptyState title="Pick a probe or start a new one" message="Open a probe above to edit it, or start a new draft." />;
   } else {
     const unbound = unboundBy(checks.data?.checks ?? [], entity.data);
+    // Refused (Production): never enabled. Warned (elsewhere): left out by default, but it can be ticked (#25).
+    const refused = unboundBy(checks.data?.checks ?? [], entity.data, ["fail"]);
+    const warned = unboundBy(checks.data?.checks ?? [], entity.data, ["warn"]);
     const checked = (env: string) => (fields?.environments ? fields.environments.includes(env) : !unbound.has(env));
     const toggle = (env: string) => {
       const current = application.environments.map((e) => e.name).filter((e) => checked(e));
@@ -257,9 +272,10 @@ export function ProbeEditorPage({ item }: { item: NavItem }) {
             <legend className="mb-1 p-0 text-sm font-medium text-foreground">Enabled in</legend>
             {application.environments.map((env) => (
               <label key={env.name} className="flex items-center gap-2 text-sm text-foreground">
-                <input type="checkbox" checked={checked(env.name) && !unbound.has(env.name)} disabled={!fields || unbound.has(env.name)} onChange={() => toggle(env.name)} />
+                <input type="checkbox" checked={checked(env.name) && !refused.has(env.name)} disabled={!fields || refused.has(env.name)} onChange={() => toggle(env.name)} />
                 {env.title}
-                {unbound.has(env.name) && <span className="text-muted"> · {unbound.get(env.name)} not bound</span>}
+                {refused.has(env.name) && <span className="text-muted"> · {refused.get(env.name)} not bound</span>}
+                {warned.has(env.name) && <span className="text-muted"> · {warned.get(env.name)} not bound: Not configured there</span>}
               </label>
             ))}
           </fieldset>

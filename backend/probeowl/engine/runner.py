@@ -38,6 +38,7 @@ from probeowl.model.run import (
     ExpectationEvaluation,
     ExpectationResult,
     LocationResult,
+    NotApplicable,
     Outcome,
     RunStatus,
 )
@@ -56,6 +57,8 @@ class ProbeResult:
     status: RunStatus
     locations: list[LocationResult]
     expectations: list[ExpectationEvaluation]
+    # Connectors with no binding here, and the checks that left unchecked (#25).
+    not_applicable: list[NotApplicable]
 
 
 @dataclass(frozen=True)
@@ -155,7 +158,9 @@ def run_probe(
     masked = {name: masked_fields(entity, loc) for name, loc in _all_locations(entity)}
     expectations: list[ExpectationEvaluation] = []
     # The data skipped expectations could not use: read and absent, or not readable (#81).
+    # Data from a connector with no binding here is neither: such a check is not applicable.
     unusable: list[Unavailable] = []
+    not_applicable: list[str] = []
     for index, step in enumerate(steps):
         data.read.clear()
         skip_all, cause = _skip_reason(step, data)
@@ -163,20 +168,17 @@ def run_probe(
         for text, node in step.expect:
             if skip_all is not None:
                 caveat = _caveat(by_condition)
-                expectations.append(
-                    _evaluation(index, text, ExpectationResult.SKIP, skip_all, caveat)
-                )
-                if cause is not None:
-                    unusable.append(cause)
+                skipped = _evaluation(index, text, ExpectationResult.SKIP, skip_all, caveat)
+                expectations.append(_counted_against(skipped, cause, unusable, not_applicable))
                 continue
             data.read[:] = by_condition
             try:
                 passed = evaluate(node, data) is True
             except Unavailable as err:
-                unusable.append(err)
-                expectations.append(
-                    _evaluation(index, text, ExpectationResult.SKIP, str(err), _caveat(data.read))
+                skipped = _evaluation(
+                    index, text, ExpectationResult.SKIP, str(err), _caveat(data.read)
                 )
+                expectations.append(_counted_against(skipped, err, unusable, not_applicable))
                 continue
             caveat = _caveat(data.read)
             result = ExpectationResult.PASS if passed else ExpectationResult.FAIL
@@ -187,7 +189,40 @@ def run_probe(
         status=run_status(expectations, locations, unusable),
         locations=locations,
         expectations=expectations,
+        not_applicable=_not_applicable(entity, bound, not_applicable),
     )
+
+
+def _counted_against(
+    skipped: ExpectationEvaluation,
+    cause: Unavailable | None,
+    unusable: list[Unavailable],
+    not_applicable: list[str],
+) -> ExpectationEvaluation:
+    """A skipped expectation, marked not applicable when its cause is a connector not bound."""
+    if cause is None:
+        return skipped
+    if cause.not_configured is None:
+        unusable.append(cause)
+        return skipped
+    not_applicable.append(cause.not_configured)
+    return skipped.model_copy(update={"not_applicable": True})
+
+
+def _not_applicable(
+    entity: Entity, connectors: Mapping[str, Connector | None], checks: list[str]
+) -> list[NotApplicable]:
+    """Per connector with no binding here: its locations, and the checks they left unchecked."""
+    unbound = [name for name, connector in connectors.items() if connector is None]
+    return [
+        NotApplicable(
+            connector=name,
+            locations=[loc for loc, using in all_connectors(entity) if using == name],
+            checks=checks.count(name),
+        )
+        for name in sorted(unbound)
+        if any(using == name for _, using in all_connectors(entity))
+    ]
 
 
 def run_status(
@@ -214,28 +249,17 @@ def run_status(
 
 def check_run(
     probe: Probe, entity: Entity, connectors: Mapping[str, Connector | None]
-) -> dict[str, Connector]:
-    """Everything that can be checked before a run starts; ConfigError if it cannot run."""
+) -> dict[str, Connector | None]:
+    """Everything that can be checked before a run starts; ConfigError if it cannot run.
+
+    A connector given as None has no binding here: its locations will be Not configured (#25).
+    The run service refuses that in Production before it gets here.
+    """
     check_probe(probe, entity)
     for name, using in all_connectors(entity):
         if using not in connectors:
             raise ConfigError(f"location {name} uses connector {using}, which is not loaded")
-    return _bound(entity, connectors)
-
-
-def _bound(entity: Entity, connectors: Mapping[str, Connector | None]) -> dict[str, Connector]:
-    # A run is refused, not partly run, where a location's connector has no binding: its
-    # result would always be incomplete. owl check reports the same thing ahead of time.
-    unbound = [
-        f"{name} ({using})"
-        for name, using in all_connectors(entity)
-        if using in connectors and connectors[using] is None
-    ]
-    if unbound:
-        raise ConfigError(
-            f"the probe cannot run in this environment: {', '.join(unbound)} has no binding here"
-        )
-    return {name: c for name, c in connectors.items() if c is not None}
+    return dict(connectors)
 
 
 def _skip_reason(step: _Step, data: "_Data") -> tuple[str | None, Unavailable | None]:
@@ -299,6 +323,7 @@ class _Data:
                 f"needs {location}, which is {_label(read.outcome)}: if it may be absent, "
                 f"start the step with when: exists({location})",
                 absent=not unreadable(read),
+                not_configured=read.not_configured,
             )
         return _readable(read, location)
 
@@ -327,6 +352,7 @@ class _Data:
                 _label(read.outcome),
                 f"needs {location}, which is {_label(read.outcome)} for {_counted(empty, parent)}",
                 absent=not unreadable(read),
+                not_configured=read.not_configured,
             )
         return _readable(read, location)
 
@@ -345,7 +371,9 @@ def _readable(read: LocationRead, location: str) -> list[dict[str, Any]]:
     if read.outcome in _UNREADABLE:
         label = _label(read.outcome)
         text = f"{label} ({read.reason})" if read.reason else label
-        raise Unavailable(location, text, absent=not unreadable(read))
+        raise Unavailable(
+            location, text, absent=not unreadable(read), not_configured=read.not_configured
+        )
     return read.rows
 
 

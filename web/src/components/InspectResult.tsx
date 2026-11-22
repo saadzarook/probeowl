@@ -3,7 +3,8 @@ import { RunStatusChip } from "./RunStatusChip";
 import type { Entity, ExpectationEvaluation, LocationResult, Run } from "../api/client";
 import { useRun } from "../api/useRun";
 import { REASON_LABELS } from "../reasons";
-import { RESULT_LABELS, formatTime, titleCase, withCaveat } from "../runFormat";
+import { formatTime, titleCase, withCaveat } from "../runFormat";
+import { ResultChip } from "./ResultChip";
 import { useSelection } from "../selection";
 import { AmbiguousMatches, showValue } from "./AmbiguousMatches";
 import { CliCommand } from "./CliCommand";
@@ -11,6 +12,7 @@ import { Button, type Column, ListOrTable } from "../ui";
 import { EvidencePanel } from "./EvidencePanel";
 import { OutcomeChip } from "./OutcomeChip";
 import { NotChecked } from "./NotChecked";
+import { NotApplicableNote } from "./NotApplicableNote";
 import { RunWarnings } from "./RunWarnings";
 import { StopReason } from "./StopReason";
 
@@ -69,8 +71,10 @@ function RecordsTable({ location, followUps, searched }: { location: LocationRes
   const records = rows.map((row, index) => {
     const own = followUps.filter((f) => f.row === index);
     const problem = own.find((f) => f.outcome !== "found");
+    // Not configured is a known gap in this environment, not a fault: shown, never highlighted (#25).
+    const fault = problem !== undefined && problem.outcome !== "not_configured";
     const note = problem?.reason ?? (Object.values(row).some((v) => v === searched) ? "searched record" : undefined);
-    return { row, index, own, problem, note };
+    return { row, index, own, problem, fault, note };
   });
   const tableColumns: Column<(typeof records)[number]>[] = [
     ...columns.map((c) => ({ header: titleCase(c), cell: ({ row }: (typeof records)[number]) => showValue(row[c]) })),
@@ -109,7 +113,7 @@ function RecordsTable({ location, followUps, searched }: { location: LocationRes
           rows={records}
           rowKey={(record) => record.index}
           columns={tableColumns}
-          highlight={(record) => (record.problem !== undefined ? "missing" : undefined)}
+          highlight={(record) => (record.fault ? "missing" : undefined)}
           empty={location.reason ?? "No records."}
         />
       )}
@@ -125,9 +129,7 @@ function Expectations({ expectations, running }: { expectations: ExpectationEval
       <ul className="expectations">
         {expectations.map((e) => (
           <li key={`${e.step}:${e.expectation}`}>
-            <span className="result" data-result={e.result}>
-              {RESULT_LABELS[e.result]}
-            </span>
+            <ResultChip evaluation={e} />
             <div>
               <code>{e.expectation}</code>
               {e.detail && <p className="hint">{e.detail}</p>}
@@ -230,6 +232,7 @@ export function InspectResult({ runId, entity, onInspect, onStarted }: InspectRe
           </div>
         </header>
         <RunWarnings run={run} />
+        <NotApplicableNote run={run} environment={environment?.title ?? run.environment} />
         {run.status === "skipped" && run.skip_reason && <p className="summary">Skipped: {run.skip_reason}</p>}
         <NotChecked run={run} />
         <div className="run-body inspect-body">

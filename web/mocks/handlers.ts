@@ -26,6 +26,7 @@ import {
   draftRun,
   passingReport,
   unboundReport,
+  unboundUatReport,
   piiReport,
   timeFilterReport,
   unreadableReport,
@@ -33,6 +34,7 @@ import {
   failedValidateRun,
   inProduction,
   inactiveVisitorRun,
+  notConfiguredCardRun,
   plantedCardRun,
   runningCardRun,
   runningValidateRun,
@@ -257,6 +259,7 @@ interface DraftBody {
 
 // mock-prod-unbound: Card access's access_db has no Production binding, so a probe enabled there fails (#95).
 const prodUnbound = (application: string) => application === "card_access" && localStorage.getItem("mock-prod-unbound") !== null;
+const uatUnbound = (application: string) => application === "card_access" && localStorage.getItem("mock-uat-unbound") !== null;
 
 /** The probe editor's draft entity that reads topups, a Transaction table, by status (backend case draft-run-time-filter). */
 const TIME_FILTER_DRAFT = /FROM topups WHERE status = :status/;
@@ -277,6 +280,8 @@ function checksOf(body: DraftBody, application = "") {
   }
   // Enabled in Production (named, or by having no list): the backend's answer; otherwise it passes.
   if (prodUnbound(application) && (environments ?? ["prod"]).includes("prod")) return unboundReport(name);
+  // Enabled in UAT (named, or by having no list): the backend's warning (#25).
+  if (uatUnbound(application) && (environments ?? ["uat"]).includes("uat")) return unboundUatReport(name);
   const entity = body.entity ?? "";
   if (TIME_FILTER_DRAFT.test(entity)) return timeFilterReport(name);
   if (/SELECT customer_email/.test(entity)) return piiReport(name);
@@ -297,6 +302,7 @@ function cardRun(id: string, request: StartRun, running: boolean): Run {
   const value = request.value;
   if (identifier === "email") return ambiguousEmailRun(id, identifier);
   if (value === "VP00008807") return inactiveVisitorRun(id, identifier, value);
+  if (value === "VP00031207") return notConfiguredCardRun(id, identifier, value);
   if (value === "VP00000042") return skippedCardRun(id, identifier, value);
   if (value === "VP00000043") return stoppedCardRun(id, identifier, value);
   if (["VP00012931", "C204518", "C198220", "C177031"].includes(value)) {
@@ -908,6 +914,10 @@ export const handlers = [
     }
     const id = `run_${nextRun++}`;
     const environment = applications.find((a) => a.name === body.application)?.environments.find((e) => e.name === body.environment);
+    // In Production a probe never runs with a location unbound (#25), as the backend refuses it.
+    if (environment?.production && body.value === "VP00031207") {
+      return problem(422, "Unprocessable Entity", "the probe cannot run in Production: cards.controller (door_controller_api) has no binding here; in Production every location must be bound");
+    }
     if (environment?.production && !body.investigation.reference) {
       return problem(422, "Unprocessable Content", "A reference is required in Production.");
     }

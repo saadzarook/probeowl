@@ -32,6 +32,7 @@ def validate(
     server_url: Annotated[str | None, typer.Option("--server", help=server.SERVER_HELP)] = None,
     config: server.NoConfig = None,
     timeout: Annotated[float, typer.Option(help="Seconds to follow the run.")] = 120.0,
+    strict: server.Strict = False,
 ) -> None:
     """Validate one subject with its entity's validate probe, through owl serve."""
     with server.connected(server_url) as api:
@@ -40,7 +41,7 @@ def validate(
         run_id = server.start_run(api, app_name, probe_name, env, value, record)
         run = server.follow(api, run_id, timeout)
     server.print_expectations(run)
-    server.finish(run)
+    server.finish(run, strict)
 
 
 def _find_probe(

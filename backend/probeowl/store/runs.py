@@ -16,6 +16,7 @@ from probeowl.model.run import (
     InvestigationRecord,
     LocationResult,
     Match,
+    NotApplicable,
     Run,
     RunSummary,
 )
@@ -79,6 +80,7 @@ def get_run(conn: Connection, workspace_id: str, run_id: str) -> Run:
             result=r.result,
             detail=r.detail,
             caveat=r.caveat,
+            not_applicable=bool(r.not_applicable),
         )
         for r in conn.execute(
             select(expectation_results).filter_by(**child).order_by(expectation_results.c.seq)
@@ -105,6 +107,7 @@ def get_run(conn: Connection, workspace_id: str, run_id: str) -> Run:
         ),
         warnings=row.warnings or [],
         caveat=row.caveat,
+        not_applicable=[NotApplicable(**item) for item in row.not_applicable or []],
         status=row.status,
         skip_reason=row.skip_reason,
         stop_reason=row.stop_reason,
@@ -143,6 +146,7 @@ def _run_row(run: Run) -> dict[str, Any]:
         "skip_reason": run.skip_reason,
         "stop_reason": run.stop_reason,
         "caveat": run.caveat,
+        "not_applicable": [item.model_dump(mode="json") for item in run.not_applicable] or None,
         "actor_kind": run.actor.kind.value,
         "actor_name": run.actor.name,
         "actor_on_behalf_of": run.actor.on_behalf_of,
