@@ -82,7 +82,8 @@ export function UiGallery() {
             <Field id="any-id" label="Any ID" help="Accepts any identifier of a top-up" error={showError ? "Enter an identifier" : undefined}>
               <Input placeholder="a topup_id or another identifier" />
             </Field>
-            <Field id="reference" label="Reference">
+            {/* Help that wraps to two lines at four columns: its row must not push the other fields' controls down. */}
+            <Field id="reference" label="Reference" help="The ticket or case this run is for, recorded with the run in the audit">
               <Input defaultValue="WALLET-482" />
             </Field>
           </FormGrid>

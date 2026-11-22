@@ -26,7 +26,8 @@ export function Field({ id, label, help, error, children }: FieldProps) {
   const invalid = error !== undefined;
   return (
     <FieldContext.Provider value={{ id, helpId, invalid }}>
-      <div className="grid min-w-0 grid-rows-[auto_2.5rem_minmax(1.25rem,auto)] gap-1">
+      {/* content-start: a field stretched to its row's tallest neighbour keeps label and control at the top. */}
+      <div className="grid min-w-0 grid-rows-[auto_2.5rem_minmax(1.25rem,auto)] content-start gap-1">
         <label htmlFor={id} className="text-sm font-medium text-foreground">
           {label}
         </label>
