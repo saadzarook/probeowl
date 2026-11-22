@@ -405,10 +405,32 @@ def test_an_unbound_environment_fails_with_that_environment_named(setup: Setup) 
     report = check_draft(unbound, probe)
     environments = [c for c in report.checks if c.check == "Environments"]
     # One per unbound location, each with its location and environment: the fields an editor reads.
+    # Outside Production a warning (#25): the location is Not configured there.
     assert [(c.status, c.location, c.environment) for c in environments] == [
-        (CheckStatus.FAIL, "ledger", "uat")
+        (CheckStatus.WARN, "ledger", "uat")
     ]
     assert environments[0].message == (
-        "enabled in uat, where ledger (ledger_db) has no binding; "
-        "bind ledger_db in uat or leave uat out of the probe's environments"
+        "enabled in uat, where ledger (ledger_db) has no binding: it is Not configured there, "
+        "and the checks that read it are not applicable; bind ledger_db in uat to check it"
     )
+    assert report.can_save
+
+
+def test_an_environment_unbound_in_production_fails_the_save(setup: Setup) -> None:
+    # #95's rule, kept by #25: in Production a missing binding is a mistake, never Not configured.
+    app = wallet(setup)
+    ledger = app.connectors["ledger_db"]
+    without_prod = ledger.model_copy(
+        update={"environments": {k: v for k, v in ledger.environments.items() if k != "prod"}}
+    )
+    unbound = dataclasses.replace(app, connectors={**app.connectors, "ledger_db": without_prod})
+    report = check_draft(unbound, PROBE.replace("environments: [prod, uat]\n", ""))
+    environments = [c for c in report.checks if c.check == "Environments"]
+    assert [(c.status, c.location, c.environment) for c in environments] == [
+        (CheckStatus.FAIL, "ledger", "prod")
+    ]
+    assert environments[0].message == (
+        "enabled in prod, where ledger (ledger_db) has no binding; "
+        "bind ledger_db in prod or leave prod out of the probe's environments"
+    )
+    assert not report.can_save

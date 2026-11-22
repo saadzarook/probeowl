@@ -101,11 +101,13 @@ def run(
     matches: int = 0,
     locations: tuple[LocationResult, ...] = (),
 ) -> Run:
-    """What finish() reads of a run: its id, status, warnings, reasons and caveat."""
+    """What finish() reads of a run: its id, status, warnings, notes, reasons and caveat."""
     fields = SimpleNamespace(
         id="run_1",
         status=status,
         warnings=[],
+        not_applicable=[],
+        environment="uat",
         stop_reason=stop,
         skip_reason=skip,
         caveat=caveat,
