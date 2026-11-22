@@ -1,0 +1,15 @@
+{
+  "type": "about:blank",
+  "title": "Unprocessable Entity",
+  "status": 422,
+  "detail": "the draft does not pass its save checks: Table Scan of cards: the lookup would read all of cards. Index the column it filters on, or look rows up by a key (planned with placeholder values; the real plan can differ for unusual values)",
+  "instance": "/api/applications/card_access/entities/card_status",
+  "errors": [
+    {
+      "field": "access_db plan \u00b7 MariaDB: cards",
+      "message": "Table Scan of cards: the lookup would read all of cards. Index the column it filters on, or look rows up by a key (planned with placeholder values; the real plan can differ for unusual values)",
+      "check": "access_db plan \u00b7 MariaDB",
+      "location": "cards"
+    }
+  ]
+}

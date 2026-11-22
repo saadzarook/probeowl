@@ -1,0 +1,13 @@
+{
+  "type": "about:blank",
+  "title": "Unprocessable Entity",
+  "status": 422,
+  "detail": "plan checks could not run in prod (index use not checked: wallet_db has no binding in prod); to run without plan check, confirm it: that is recorded in the audit",
+  "instance": "/api/runs/run_noplan/runbooks/topup_not_credited/steps/check-outbox/run",
+  "errors": [
+    {
+      "field": "run_without_plan_check",
+      "message": "plan checks could not run in prod (index use not checked: wallet_db has no binding in prod); to run without plan check, confirm it: that is recorded in the audit"
+    }
+  ]
+}

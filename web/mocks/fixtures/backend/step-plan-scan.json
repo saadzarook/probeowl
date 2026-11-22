@@ -1,0 +1,13 @@
+{
+  "type": "about:blank",
+  "title": "Unprocessable Entity",
+  "status": 422,
+  "detail": "this step cannot run: Table Scan of outbox_events: the lookup would read all of outbox_events. Index the column it filters on, or look rows up by a key (planned with placeholder values; the real plan can differ for unusual values)",
+  "instance": "/api/runs/run_scan/runbooks/topup_not_credited/steps/check-outbox/run",
+  "errors": [
+    {
+      "field": "step",
+      "message": "Table Scan of outbox_events: the lookup would read all of outbox_events. Index the column it filters on, or look rows up by a key (planned with placeholder values; the real plan can differ for unusual values)"
+    }
+  ]
+}

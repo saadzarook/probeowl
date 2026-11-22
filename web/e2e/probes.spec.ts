@@ -1,8 +1,10 @@
 // Author: @SaadZarook
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
+import timeFilter from "../mocks/fixtures/backend/save-checks-time-filter.json" with { type: "json" };
 
-const TIME_FILTER = "topups is a Transaction table: filter on its time column created_at (for example created_at >= :since), or look rows up by a key (a primary key, link or external key column = :parameter)";
+// The backend's own wording, from the answer its test writes (backend/tests/test_mock_answers.py, #108).
+const TIME_FILTER = timeFilter.checks.find((c) => c.check === "Time filter" && c.status === "fail")?.message ?? "";
 
 async function openProbe(page: Page) {
   await page.goto("/probes");
@@ -100,8 +102,9 @@ test("the YAML editor undoes and redoes, by keys and buttons, through a Check an
 test("a draft that passes shows every check Pass", async ({ page }) => {
   await openProbe(page);
   const panel = page.getByRole("region", { name: "Save checks" });
-  await expect(panel.getByText("6 passed · 0 warnings · 0 failed")).toBeVisible();
-  await expect(panel.getByText("Pass", { exact: true })).toHaveCount(6);
+  // The backend's seven checks for topup_completed, from its own answer (#108).
+  await expect(panel.getByText("7 passed · 0 warnings · 0 failed")).toBeVisible();
+  await expect(panel.getByText("Pass", { exact: true })).toHaveCount(7);
   await expect(page.getByText("Uses entity topup · 4 locations")).toBeVisible();
   const axe = await new AxeBuilder({ page }).analyze();
   expect(axe.violations).toEqual([]);

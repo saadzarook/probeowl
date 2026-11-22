@@ -1,0 +1,15 @@
+{
+  "type": "about:blank",
+  "title": "Unprocessable Entity",
+  "status": 422,
+  "detail": "the draft does not pass its save checks: topups is a Transaction table: filter on its time column created_at from a parameter (for example created_at >= :since), or look rows up by a key (a primary key, link or external key column = :parameter, or IN a short list)",
+  "instance": "/api/applications/wallet/entities/wallet_topups",
+  "errors": [
+    {
+      "field": "Time filter: topups",
+      "message": "topups is a Transaction table: filter on its time column created_at from a parameter (for example created_at >= :since), or look rows up by a key (a primary key, link or external key column = :parameter, or IN a short list)",
+      "check": "Time filter",
+      "location": "topups"
+    }
+  ]
+}

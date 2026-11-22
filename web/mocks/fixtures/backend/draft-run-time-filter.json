@@ -1,0 +1,20 @@
+{
+  "type": "about:blank",
+  "title": "Unprocessable Entity",
+  "status": 422,
+  "detail": "the draft does not pass its save checks: 'payment.amount == record.amount' reads payment, not a location of topup; its locations are record",
+  "instance": "/api/applications/wallet/probes/test-runs",
+  "errors": [
+    {
+      "field": "Expectations",
+      "message": "'payment.amount == record.amount' reads payment, not a location of topup; its locations are record",
+      "check": "Expectations"
+    },
+    {
+      "field": "Time filter: record",
+      "message": "topups is a Transaction table: filter on its time column created_at from a parameter (for example created_at >= :since), or look rows up by a key (a primary key, link or external key column = :parameter, or IN a short list)",
+      "check": "Time filter",
+      "location": "record"
+    }
+  ]
+}
