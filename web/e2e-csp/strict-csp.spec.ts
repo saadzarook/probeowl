@@ -69,6 +69,28 @@ for (const theme of THEMES) {
       });
     }
 
+    test(`the entity graph and its Outline: no CSP violation as boxes are laid out and selected, ${theme}`, async ({ page }) => {
+      // The boxes are placed by style properties set through the DOM (#162): never a <style> or a
+      // style attribute, which this policy refuses.
+      const violations = await watch(page);
+      for (const width of [1440, 390]) {
+        await page.setViewportSize({ width, height: 900 });
+        strictPolicy(await page.goto(`/ui-gallery?theme=${theme}`));
+        const graph = page.getByRole("group", { name: "Entity graph of Top-up" });
+        await graph.getByRole("button", { name: "Top-up record Found" }).focus();
+        await page.keyboard.press("ArrowRight");
+        await page.keyboard.press("ArrowDown");
+        await expect(graph.getByRole("button", { name: "Webhook deliveries Missing" })).toBeFocused();
+        // Laid out, not stacked at the corner: the policy did not drop the positions.
+        const boxes = await graph.locator("[data-box]").evaluateAll((all) => all.map((b) => b.getBoundingClientRect().left));
+        expect(new Set(boxes).size, `at ${width}`).toBeGreaterThan(1);
+        await page.getByRole("list", { name: "Outline of Visitor" }).getByRole("button", { name: "Door controller Missing" }).click();
+        expect(await violations(), `the graph at ${width}, ${theme}`).toEqual([]);
+        const contrast = await new AxeBuilder({ page }).include('[aria-labelledby="graph-visitor"]').include('[aria-labelledby="graph-topup"]').withRules(["color-contrast"]).analyze();
+        expect(contrast.violations.flatMap((v) => v.nodes.map((n) => n.target.join(" "))), `at ${width}, ${theme}`).toEqual([]);
+      }
+    });
+
     test(`the probe editor's CodeMirror is styled through the page's nonce, ${theme}`, async ({ page }) => {
       const violations = await watch(page);
       const nonce = strictPolicy(await page.goto("/probes"));
