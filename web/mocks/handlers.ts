@@ -6,7 +6,12 @@ import type { ApplicationSummary, CatalogChange, CatalogReview, CatalogTable, Ta
 import type { CompareRequest } from "../../plugins/compare_files/web/types";
 import { compareFilesManifest, compareFilesResult } from "./fixtures/compareFiles";
 import { auditEvents } from "./fixtures/audit";
-import type { FieldError, HealthyAttempt, HealthyComparison, Run, RunbookView, StepInRun } from "../src/api/client";
+import type { FieldError, HealthyAttempt, HealthyComparison, Run, RunbookView, SaveCheck, StepInRun } from "../src/api/client";
+import draftRunTimeFilter from "./fixtures/backend/draft-run-time-filter.json";
+import entitySavePlanScan from "./fixtures/backend/entity-save-plan-scan.json";
+import entitySaveTimeFilter from "./fixtures/backend/entity-save-time-filter.json";
+import stepPlanNotRun from "./fixtures/backend/step-plan-not-run.json";
+import stepPlanScan from "./fixtures/backend/step-plan-scan.json";
 import { CONFIGURATION_HEADER } from "../src/api/configuration";
 import { mockSearch, type Searchable } from "./search";
 import { detectIdentifier } from "../src/identifiers";
@@ -109,34 +114,23 @@ const catalogOf = (application: string): CatalogTable[] | undefined => {
 const KEY_ROLES = ["primary_key", "link", "external_key"];
 
 /**
- * A new entity's failed save checks, each named "check: location" as the backend names them: a lookup by a
- * column with no index (here: status) fails the index check, and a Transaction, Log or Audit table read by a
- * column the catalog does not call a key fails the time filter, as rules.py's would.
+ * A new entity's refusal, as the backend gives it for the two cases the wizard's specs build: cards
+ * looked up by status, which the plan check finds would read the whole table, and topups (a
+ * Transaction table) read by a column the catalog doesn't call a key. Both answers are the backend's
+ * own (backend/tests/test_mock_answers.py, #108); anything else passes.
  */
-function entityFailures(application: string, text: string): { field: string; message: string }[] {
+function entityRefusal(application: string, text: string): Problem | undefined {
   const entity = parse(text) as { locations?: Record<string, { using?: string; lookup?: string }> };
-  const failures: FieldError[] = [];
-  for (const [name, location] of Object.entries(entity.locations ?? {})) {
+  for (const location of Object.values(entity.locations ?? {})) {
     const read = /FROM (?:\w+\.)?(\w+) WHERE (\w+) = :/.exec(location.lookup ?? "");
     if (!read) continue;
     const [, table = "", column = ""] = read;
-    if (column === "status") {
-      failures.push({ field: `Index check: ${name}`, check: "Index check", location: name, message: `the lookup would read all of ${table}: no index on status` });
-      continue;
-    }
+    if (table === "cards" && column === "status") return entitySavePlanScan as Problem;
+    if (table !== "topups") continue;
     const entry = catalogOf(application)?.find((t) => t.connector === location.using && t.table === table);
-    const time = Object.entries(entry?.columns ?? {}).find(([, c]) => c.roles.includes("time"))?.[0];
-    if (!entry || !["transaction", "log", "audit"].includes(entry.label) || time === undefined) continue;
-    if (entry.columns[column]?.roles.some((role) => KEY_ROLES.includes(role))) continue;
-    const label = entry.label.charAt(0).toUpperCase() + entry.label.slice(1);
-    failures.push({
-      field: `Time filter: ${name}`,
-      check: "Time filter",
-      location: name,
-      message: `${table} is a ${label} table: filter on its time column ${time} from a parameter (for example ${time} >= :since), or look rows up by a key (a primary key, link or external key column = :parameter, or IN a short list)`,
-    });
+    if (entry && !entry.columns[column]?.roles.some((role) => KEY_ROLES.includes(role))) return entitySaveTimeFilter as Problem;
   }
-  return failures;
+  return undefined;
 }
 
 function reviewOf(application: string): CatalogReview | undefined {
@@ -232,6 +226,26 @@ function problem(status: number, title: string, detail: string, errors?: { field
   });
 }
 
+interface Problem {
+  type: string;
+  title: string;
+  status: number;
+  detail: string;
+  instance?: string;
+  errors?: FieldError[];
+}
+
+/** One of the backend's own answers (web/mocks/fixtures/backend), as it is. */
+function answer(found: Problem) {
+  return json(found, { status: found.status, headers: { "Content-Type": "application/problem+json" } });
+}
+
+/** A draft refused for its failed save checks, shaped as the backend's refuse_failures shapes it. */
+function refused(instance: string, failed: SaveCheck[]) {
+  const errors = failed.map((c) => ({ field: c.location ? `${c.check}: ${c.location}` : c.check, message: c.message, check: c.check, ...(c.location ? { location: c.location } : {}) }));
+  return answer({ type: "about:blank", title: "Unprocessable Entity", status: 422, detail: `the draft does not pass its save checks: ${failed[0]?.message ?? ""}`, instance, errors });
+}
+
 /** A draft test run is polled under this probe name. */
 const DRAFT_PREFIX = "draft:";
 
@@ -243,6 +257,9 @@ interface DraftBody {
 
 // mock-prod-unbound: Card access's access_db has no Production binding, so a probe enabled there fails (#95).
 const prodUnbound = (application: string) => application === "card_access" && localStorage.getItem("mock-prod-unbound") !== null;
+
+/** The probe editor's draft entity that reads topups, a Transaction table, by status (backend case draft-run-time-filter). */
+const TIME_FILTER_DRAFT = /FROM topups WHERE status = :status/;
 
 /** The save checks the mocks report for a draft: unreadable YAML, a time filter missing on topups, or an unmasked email. */
 function checksOf(body: DraftBody, application = "") {
@@ -261,7 +278,7 @@ function checksOf(body: DraftBody, application = "") {
   // Enabled in Production (named, or by having no list): the backend's answer; otherwise it passes.
   if (prodUnbound(application) && (environments ?? ["prod"]).includes("prod")) return unboundReport(name);
   const entity = body.entity ?? "";
-  if (/FROM topups WHERE status = :status/.test(entity)) return timeFilterReport(name);
+  if (TIME_FILTER_DRAFT.test(entity)) return timeFilterReport(name);
   if (/SELECT customer_email/.test(entity)) return piiReport(name);
   return passingReport(name);
 }
@@ -499,7 +516,8 @@ export const handlers = [
     if (missing) return passwordMissingProblem(missing.connector, missing.environment);
     const failed = checksOf(body, application).checks.filter((c) => c.status === "fail");
     if (failed.length > 0) {
-      return problem(422, "Unprocessable Content", `${failed[0]?.check ?? "Probe"}: ${failed[0]?.message ?? ""}`, failed.map((c) => ({ field: c.location ? `${c.check}: ${c.location}` : c.check, check: c.check, location: c.location ?? null, message: c.message })));
+      if (application === "wallet" && TIME_FILTER_DRAFT.test(body.entity ?? "")) return answer(draftRunTimeFilter as Problem);
+      return refused(`/api/applications/${application}/probes/test-runs`, failed);
     }
     const production = applications.find((a) => a.name === application)?.environments.find((e) => e.name === body.environment)?.production;
     if (production && !body.investigation.reference) return problem(422, "Unprocessable Content", "A reference is required in Production.");
@@ -518,10 +536,8 @@ export const handlers = [
     if ([topUpEntity.entity, visitorEntity.entity].includes(entity)) {
       return problem(422, "Unprocessable Content", `${application} already has an entity ${entity}: change it with one of its probes in the Probe editor`, [{ field: "entity", message: "choose a new name" }]);
     }
-    const failures = entityFailures(application, body.entity);
-    if (failures.length > 0) {
-      return problem(422, "Unprocessable Content", `the draft does not pass its save checks: ${failures[0]?.message ?? ""}`, failures);
-    }
+    const refusal = entityRefusal(application, body.entity);
+    if (refusal) return answer(refusal);
     const path = `${application.replace(/_/g, "-")}/entities/${entity}.yaml`;
     const report = { ...passingReport(null), entity };
     return json({
@@ -542,9 +558,7 @@ export const handlers = [
     if (!knownEnvironment(application, body.environment)) return problem(404, "Not Found", "No such environment.");
     const report = checksOf(body, application);
     const failed = report.checks.filter((c) => c.status === "fail");
-    if (failed.length > 0) {
-      return problem(422, "Unprocessable Content", `${failed[0]?.check ?? "Probe"}: ${failed[0]?.message ?? ""}`, failed.map((c) => ({ field: c.location ? `${c.check}: ${c.location}` : c.check, check: c.check, location: c.location ?? null, message: c.message })));
-    }
+    if (failed.length > 0) return refused(`/api/applications/${application}/probes/${probe}`, failed);
     const production = applications.find((a) => a.name === application)?.environments.find((e) => e.name === body.environment)?.production === true;
     // As the backend does: a plan that cannot be read only warns in the preview.
     const planNotRun = {
@@ -1064,17 +1078,12 @@ export const handlers = [
       return json({ id: step, run: again, result: null });
     }
     if (step !== "check-outbox") return problem(422, "Unprocessable Content", "this step is copy only: not reviewed yet");
-    if (id === "run_scan") {
-      return problem(422, "Unprocessable Content", "this step cannot run: Table Scan: the lookup would read all of outbox_events. Index the column it filters on, or look rows up by a key");
-    }
+    if (id === "run_scan") return answer(stepPlanScan as Problem);
     let warnings: string[] = [];
     if (id === "run_noplan") {
-      if (!body.run_without_plan_check) {
-        // As the backend refuses it: the field run_without_plan_check is what the web acts on (#108).
-        const why = "plan checks could not run in prod (index use not checked: the connection was refused); to run without plan check, confirm it: that is recorded in the audit";
-        return problem(422, "Unprocessable Content", why, [{ field: "run_without_plan_check", message: why }]);
-      }
-      warnings = ["index use not checked: the connection was refused"];
+      // The backend's refusal: the field run_without_plan_check is what the web acts on (#108).
+      if (!body.run_without_plan_check) return answer(stepPlanNotRun as Problem);
+      warnings = ["index use not checked: wallet_db has no binding in prod"];
     }
     const plain = outboxResult(warnings);
     // As the backend: a PII key, pasted for this step, is masked in what is kept and returned.

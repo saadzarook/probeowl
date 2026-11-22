@@ -1,0 +1,59 @@
+{
+  "probe": "topup_completed",
+  "entity": "topup",
+  "checks": [
+    {
+      "check": "Expectations",
+      "status": "fail",
+      "message": "'payment.amount == record.amount' reads payment, not a location of topup; its locations are record",
+      "location": null,
+      "environment": null,
+      "plan_not_run": false
+    },
+    {
+      "check": "Environments",
+      "status": "pass",
+      "message": "every location is bound in prod, uat",
+      "location": null,
+      "environment": null,
+      "plan_not_run": false
+    },
+    {
+      "check": "Row ceiling",
+      "status": "pass",
+      "message": "every location's max_rows is within its connector's",
+      "location": null,
+      "environment": null,
+      "plan_not_run": false
+    },
+    {
+      "check": "Read-only SQL",
+      "status": "pass",
+      "message": "every SQL lookup is a single SELECT with its keys bound as parameters; every REST lookup is a GET",
+      "location": null,
+      "environment": null,
+      "plan_not_run": false
+    },
+    {
+      "check": "Time filter",
+      "status": "fail",
+      "message": "topups is a Transaction table: filter on its time column created_at from a parameter (for example created_at >= :since), or look rows up by a key (a primary key, link or external key column = :parameter, or IN a short list)",
+      "location": "record",
+      "environment": null,
+      "plan_not_run": false
+    },
+    {
+      "check": "PII masked",
+      "status": "pass",
+      "message": "every PII column a lookup selects is masked",
+      "location": null,
+      "environment": null,
+      "plan_not_run": false
+    }
+  ],
+  "passed": 4,
+  "warnings": 0,
+  "failed": 2,
+  "can_save": false,
+  "plans_not_run": 0
+}

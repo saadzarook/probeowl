@@ -107,7 +107,7 @@ test("a top-up's ledger entries come from another connector, keyed from the top-
   await expect(yaml).toContainText("WHERE txn_id = :ledger_txn_id");
 });
 
-test("Link by columns makes a lookup the save checks still judge: here the index check fails it", async ({ page }) => {
+test("Link by columns makes a lookup the save checks still judge: here the plan check fails it", async ({ page }) => {
   await start(page, /Card access/, "prod");
   await nameAndRoot(page, "card_status", "access_db · visitor_profile");
   await page.getByRole("button", { name: "Link by columns…" }).click();
@@ -117,13 +117,13 @@ test("Link by columns makes a lookup the save checks still judge: here the index
   await page.getByRole("button", { name: "Add the location" }).click();
   await expect(page.getByRole("listitem", { name: "Location cards" })).toContainText("by status from visitor_profile.status");
   // The failure shows on the location it is about, as soon as the location is added; the location stays.
-  await expect(page.getByRole("region", { name: "Save checks failed for cards" })).toContainText("Index check: the lookup would read all of cards: no index on status");
+  await expect(page.getByRole("region", { name: "Save checks failed for cards" })).toContainText("access_db plan · MariaDB: Table Scan of cards: the lookup would read all of cards. Index the column it filters on");
   await next(page, "Identifiers");
   await next(page, "Preview");
   await expect(page.getByRole("alert").filter({ hasText: "cards fails a save check" })).toBeVisible();
   await expect(page.getByLabel("card_status.yaml", { exact: true })).toContainText("cards:");
   await page.getByRole("button", { name: "Check" }).click();
-  await expect(page.getByLabel("Failed save checks")).toContainText("Index check: cards: the lookup would read all of cards: no index on status");
+  await expect(page.getByLabel("Failed save checks")).toContainText("access_db plan · MariaDB: cards: Table Scan of cards: the lookup would read all of cards.");
   await expect(page.getByRole("button", { name: "Create card_status" })).toBeDisabled();
   await page.getByRole("button", { name: "Back to Locations" }).click();
   await expect(page.getByRole("listitem", { name: "Location cards" })).toBeVisible();
