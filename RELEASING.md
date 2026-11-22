@@ -182,7 +182,7 @@ git push origin "v$VERSION"
 gh release create "v$VERSION" "../dist/probeowl-$VERSION-py3-none-any.whl" \
   --title "ProbeOwl $VERSION" --notes-file notes.md --verify-tag --prerelease
 gh release view "v$VERSION" --json assets --jq '.assets[].name'   # lists the wheel
-gh release view "v$VERSION" --json body --jq .body | tail -n 1    # sha256: $SHA
+gh release view "v$VERSION" --json body --jq .body | awk 'NF' | tail -n 1   # sha256: $SHA
 gh api "repos/saadzarook/probeowl/releases/tags/v$VERSION" --jq '.assets[].digest'   # sha256:$SHA
 ```
 
