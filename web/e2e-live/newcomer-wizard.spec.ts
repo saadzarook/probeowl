@@ -56,7 +56,7 @@ async function createAndRead(page: Page) {
   expect(catalog).toContain("links_to");
 }
 
-test("the wizard keeps cards, fixes its catalog link inline, and writes both locations with card_id", async ({ page }) => {
+test("the entity graph keeps cards, fixes its catalog link inline, and writes both locations with card_id", async ({ page }) => {
   test.skip(scenario !== "unmarked", "the unmarked case: newcomer_live.sh without --suggested");
   test.setTimeout(120_000);
   await addCards(page);

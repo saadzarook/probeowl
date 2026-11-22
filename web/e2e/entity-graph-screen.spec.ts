@@ -226,10 +226,21 @@ test("a Transaction table read by a column the catalog does not call a key: the 
   await page.getByRole("region", { name: "Follow a key" }).getByRole("button", { name: "Add topups" }).click();
   const failed = page.getByRole("region", { name: "Save checks failed for topups" });
   await expect(failed).toContainText("Time filter: topups is a Transaction table: filter on its time column created_at");
+  // Looked up before the fix (Production: by hand) ...
+  await page.getByLabel("Sample", { exact: true }).fill("u_88213");
+  await page.getByLabel("Reason", { exact: true }).selectOption("incident");
+  await page.getByLabel("Reference", { exact: true }).fill("WALLET-482");
+  await page.getByRole("button", { name: "Check sample" }).click();
+  await expect(lastCheck(page)).toHaveText("Last check: 2 locations: 2 Found.");
   await failed.getByRole("button", { name: "Mark topups.user_id as a link to wallets.user_id" }).click();
   await expect(failed.getByLabel("Diff of wallet/catalog.yaml")).toContainText("links_to: {connector: wallet_db, table: wallets, column: user_id}");
   await failed.getByRole("button", { name: "Confirm in catalog.yaml" }).click();
   await expect(page.getByText("Every location passes its save checks.")).toBeVisible();
+  // ... is out of date once the catalog changes, though the entity didn't: a refusal for a missing
+  // link is looked up again once the link is confirmed (live outside Production, by hand here).
+  await expect(lastCheck(page)).toHaveText("Last check: Not checked yet.");
+  await page.getByRole("button", { name: "Check sample" }).click();
+  await expect(lastCheck(page)).toHaveText("Last check: 2 locations: 2 Found.");
   await page.getByRole("button", { name: "Create wallet_topups" }).click();
   await page.getByRole("button", { name: "Write wallet/entities/wallet_topups.yaml" }).click();
   await expect(page.getByRole("status", { name: "Entity created" })).toContainText("wallet_topups was created");

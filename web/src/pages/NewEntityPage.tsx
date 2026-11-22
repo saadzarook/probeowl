@@ -147,7 +147,8 @@ export function NewEntityPage() {
     const reason: Reason = production && investigation.reason !== "" ? investigation.reason : "proactive_check";
     const reference = production ? investigation.reference.trim() : undefined;
     return {
-      key: JSON.stringify([yaml, probe, sample.trim(), environment.name]),
+      // The catalog too: a lookup refused for a missing catalog link runs again once it is confirmed.
+      key: JSON.stringify([yaml, probe, sample.trim(), environment.name, catalog.dataUpdatedAt]),
       body: {
         probe,
         entity: yaml,
