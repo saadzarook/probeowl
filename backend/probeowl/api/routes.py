@@ -139,13 +139,14 @@ def get_entity(application: str, entity: str, http: Request) -> Entity:
     responses=_problems(404, 409, 422),
 )
 def save_entity(application: str, entity: str, body: SaveEntity, http: Request) -> EntityChange:
-    """Save a new entity into its own YAML file in the folder owl serve loaded.
+    """Save an entity, new or existing, into its own YAML file in the folder owl serve loaded.
 
     As a probe's save: first without `base`, nothing is written and the response is the change
     and the save checks' report, plans included; then with that `base` to write exactly that
-    change. An entity failing a save check is a 422 and is never written; 409 if the file
-    changed in between. Only a new entity: one that exists is changed with one of its probes,
-    so that they are checked together. Never commits or pushes; audited.
+    change. An entity that exists is checked with each of its probes, each finding naming its
+    probe. An entity failing a save check is a 422 and is never written; 409 if the file
+    changed in between. A new entity gets its own file in its application's entities folder.
+    Never commits or pushes; audited.
     """
     saved = _writes(http).save_entity(
         application, entity, body.entity, body.environment, body.base, body.save_without_plan_check

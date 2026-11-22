@@ -539,17 +539,16 @@ export const handlers = [
     const entity = String(params["entity"]);
     const body = (await request.json()) as SaveEntity;
     if (!applications.some((a) => a.name === application)) return problem(404, "Not Found", "No such application.");
-    if ([topUpEntity.entity, visitorEntity.entity].includes(entity)) {
-      return problem(422, "Unprocessable Content", `${application} already has an entity ${entity}: change it with one of its probes in the Probe editor`, [{ field: "entity", message: "choose a new name" }]);
-    }
     const refusal = entityRefusal(application, body.entity);
     if (refusal) return answer(refusal);
     const path = `${application.replace(/_/g, "-")}/entities/${entity}.yaml`;
     const report = { ...passingReport(null), entity };
+    // As the backend: an entity that exists is previewed against its file's hash (#161).
+    const exists = entitiesOf(application).some((e) => e.entity === entity);
     return json({
       path,
       diff: `--- a/${path}\n+++ b/${path}\n@@ -0,0 +1 @@\n${body.entity.split("\n").map((l) => `+${l}`).join("\n")}`,
-      base: "absent",
+      base: exists ? `sha256:mock-entity-${entity}` : "absent",
       after: "sha256:mock-entity-after",
       written: body.base !== undefined && body.base !== null,
       report,

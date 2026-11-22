@@ -278,7 +278,7 @@ class SaveProbe(ProbeOwlModel):
 
 
 class SaveEntity(ProbeOwlModel):
-    """A new entity to save on its own. Without base: preview it. With it: write it."""
+    """An entity, new or existing, to save alone. Without base: preview it. With it: write it."""
 
     entity: str = Field(min_length=1, description="The entity's YAML.")
     environment: Name = Field(description="Where plans are read for the index checks.")
@@ -300,7 +300,7 @@ class SaveEntity(ProbeOwlModel):
 
 
 class EntityChange(CatalogChange):
-    """A new entity's YAML file, and the save checks it passed."""
+    """An entity's YAML file, new or existing, and the save checks it passed."""
 
     report: SaveCheckReport
 

@@ -97,12 +97,25 @@ def refuse_failures(report: SaveCheckReport) -> None:
     """RequestError naming each failed check, if any failed."""
     failures = [c for c in report.checks if c.status is CheckStatus.FAIL]
     if failures:
+        fields = _fields(failures)
         raise RequestError(
             f"the draft does not pass its save checks: {failures[0].message}",
-            {_field(c): c.message for c in failures},
-            {_field(c): c.location for c in failures if c.location},
-            {_field(c): c.check for c in failures},
+            {f: c.message for f, c in fields},
+            {f: c.location for f, c in fields if c.location},
+            {f: c.check for f, c in fields},
         )
+
+
+def _fields(failures: list[SaveCheck]) -> list[tuple[str, SaveCheck]]:
+    # One field each, even when two share a check and have no location, such as the
+    # Expectations of two probes broken by an entity's change: neither may hide the other.
+    seen: Counter[str] = Counter()
+    found = []
+    for check in failures:
+        field = _field(check)
+        seen[field] += 1
+        found.append((field if seen[field] == 1 else f"{field} ({seen[field]})", check))
+    return found
 
 
 def _report(probe: Probe | None, entity: Entity | None, checks: list[SaveCheck]) -> SaveCheckReport:

@@ -47,7 +47,7 @@ class SavedProbe:
 
 @dataclass(frozen=True)
 class SavedEntity:
-    """A new entity's change to its file, and the checks it passed."""
+    """An entity's change to its file, new or existing, and the checks it passed."""
 
     change: Change
     report: SaveCheckReport
@@ -185,10 +185,10 @@ class ProbeWrites:
         base: str | None,
         without_plan_check: bool = False,
     ) -> SavedEntity:
-        """A new entity, saved on its own: without base, the change; with its preview's, written.
+        """An entity saved on its own: without base, the change; with its preview's, written.
 
-        Under the same rules as a probe's save. An entity that exists is changed with one of its
-        probes instead, so that its probes are checked with it.
+        Under the same rules as a probe's save. An entity that exists is checked with each of its
+        probes, so a change that would break one is refused and never written.
         """
         app = self._saving_into(application, environment)
         plans = KillSwitches(self._store, self._workspace).guarded(application, self._plans)
@@ -201,24 +201,22 @@ class ProbeWrites:
                 f"the YAML is for entity {entity.entity}, not {name}",
                 {"entity": f"name it {name}; an entity cannot be renamed by saving"},
             )
-        if name in app.entities:
-            raise RequestError(
-                f"{application} already has an entity {name}: change it with one of its probes "
-                "in the Probe editor",
-                {"entity": "choose a new name"},
-            )
+        created = name not in app.entity_paths
 
         def audit(changes: list[Change], unchecked: list[str]) -> None:
             change = changes[0]
             details: dict[str, JsonValue] = {
                 "path": change.path,
                 "entity": name,
+                "created": created,
                 "base": change.base,
                 "after": change.after,
             }
             if unchecked:
                 details |= {"saved_without_plan_check": True, "plans_not_run": list(unchecked)}
-            self._append("entity_created", application, environment, details)
+            self._append(
+                "entity_created" if created else "entity_saved", application, environment, details
+            )
 
         with self._folder.lock:
             files = [self._file(app, "entity", name, ENTITIES_FOLDER, app.entity_paths, text)]
