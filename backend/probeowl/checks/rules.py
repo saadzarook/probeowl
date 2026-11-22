@@ -106,16 +106,20 @@ def draft_checks(
         return entity, [_fail("Connectors", f"no connector named {', '.join(unknown)}")]
     checks = [_expectations(probe, entity), *_environments(app, probe, entity)]
     if draft_entity is not None:
-        checks += _other_probes(app, probe, draft_entity)
+        others = _probes_on(app, draft_entity, probe.probe)
+        checks += [c for c in others if c.status is CheckStatus.FAIL]
     return entity, checks + _entity_checks(app, entity)
 
 
 def entity_checks(app: LoadedApplication, entity: Entity) -> list[SaveCheck]:
-    """Every check that needs no database, of an entity saved on its own, with no probe yet."""
+    """Every check that needs no database, of an entity saved on its own, new or changed.
+
+    An entity that exists is checked with each of its probes, as they would read it.
+    """
     unknown = sorted({using for _, using in _locations(entity) if using not in app.connectors})
     if unknown:
         return [_fail("Connectors", f"no connector named {', '.join(unknown)}")]
-    return _entity_checks(app, entity)
+    return _probes_on(app, entity) + _entity_checks(app, entity)
 
 
 def folder_failures(app: LoadedApplication) -> list[str]:
@@ -232,16 +236,21 @@ def _entity_checks(app: LoadedApplication, entity: Entity) -> list[SaveCheck]:
     ]
 
 
-def _other_probes(app: LoadedApplication, probe: Probe, entity: Entity) -> list[SaveCheck]:
+def _probes_on(
+    app: LoadedApplication, entity: Entity, editing: str | None = None
+) -> list[SaveCheck]:
     # An entity is shared: saving it must not break the probes not being edited, which would
-    # stop owl serve from loading at its next start.
+    # stop owl serve from loading at its next start. Each failure or warning names its probe;
+    # editing: the probe saved with the entity, checked on its own. No location or environment:
+    # an editor reads those fields as being about the probe it has open.
     found = []
-    for other in app.probes.values():
-        if other.entity != entity.entity or other.probe == probe.probe:
+    for name, other in sorted(app.probes.items()):
+        if other.entity != entity.entity or name == editing:
             continue
         for check in (_expectations(other, entity), *_environments(app, other, entity)):
-            if check.status is CheckStatus.FAIL:
-                found.append(_fail(check.check, f"probe {other.probe}: {check.message}"))
+            if check.status is not CheckStatus.PASS:
+                message = f"probe {name}: {check.message}"
+                found.append(SaveCheck(check=check.check, status=check.status, message=message))
     return found
 
 

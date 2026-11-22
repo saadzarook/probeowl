@@ -96,6 +96,7 @@ def test_confirming_the_preview_writes_it_loads_it_and_audits_it(wizard: Wizard)
     [event] = wizard.created()
     assert event.actor.name == "s.khan"
     assert event.details["entity"] == "topup_ledger"
+    assert event.details["created"] is True
     assert event.details["path"] == "wallet/entities/topup_ledger.yaml"
 
 
@@ -119,14 +120,6 @@ def test_a_lookup_that_would_scan_its_table_is_refused(tmp_path: Path) -> None:
     assert response.status_code == 422
     assert "would read all of ledger_entries" in response.json()["detail"]
     assert not wizard.target.exists()
-
-
-def test_an_entity_that_exists_is_changed_with_its_probes_instead(wizard: Wizard) -> None:
-    text = ENTITY.replace("entity: topup_ledger", "entity: topup")
-    response = wizard.create(text, url="/api/applications/wallet/entities/topup")
-    assert response.status_code == 422
-    assert "already has an entity topup" in response.json()["detail"]
-    assert [e["field"] for e in response.json()["errors"]] == ["entity"]
 
 
 def test_the_yaml_must_name_the_entity_being_saved(wizard: Wizard) -> None:
