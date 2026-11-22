@@ -147,7 +147,7 @@ plugins.
       v0.2.1 if not ready.
     - **The MCP server**, `owl mcp`, for drafting configuration with an AI assistant, or v0.2.1 if
       not ready.
-  - **v0.3, phase (b).** The entity graph builder.
+  - **v0.3, phase (b).** The entity graph builder, outlined in [v0.3.md](v0.3.md).
   - **v0.4, phase (c).** Blocks, and probe by example.
   - **v0.5, phase (d).** Templates, and the New runbook form.
 

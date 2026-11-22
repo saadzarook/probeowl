@@ -57,6 +57,7 @@ Full glossary: `docs/design.md`, section Glossary.
 - **Identifier**: any value that finds a subject; **root key**: the one lookups start from.
 - **Location**: one place a subject's data lives, with its own key and lookup. **Key graph**: how locations get keys (`key_from`).
 - **Cardinality**: `one`, `optional` or `many`. **Fan-out**: a lookup repeated per row, capped.
+- **Entity graph**: an entity drawn as boxes (locations) and arrows (keys), built against a **sample**: one real subject, not a healthy sample.
 - **Probe kinds**: **Inspect** (current state), **Validate** (a flow executed correctly), **Health** (scheduled, application-wide; phase 2).
 - **Expectation**: one rule in a probe. **Run**: one execution. **Investigation**: a run started by a person, with its **investigation record** (reason and reference mandatory in Production).
 - **Outcomes**: Found, Missing, Waiting, Blocked, Ambiguous, Error, Stale, Not configured.
