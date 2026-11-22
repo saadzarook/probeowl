@@ -140,6 +140,15 @@ def without_uat(path: Path) -> str:
     return kept
 
 
+def without_prod(path: Path) -> str:
+    """The connector's file with its prod binding cut out: bound outside Production only."""
+    text = path.read_text("utf-8").replace("\r\n", "\n")
+    head, rest = text.split("\n  prod:\n")
+    kept = head + "\n  uat:\n" + rest.split("\n  uat:\n")[1]
+    path.write_text(kept, encoding="utf-8", newline="\n")
+    return kept
+
+
 def test_a_missing_environment_is_added_to_an_existing_connector_keeping_its_comments(
     folder: Path, keychain: dict[str, str]
 ) -> None:
@@ -173,10 +182,11 @@ def test_a_missing_environment_is_added_to_an_existing_connector_keeping_its_com
 def test_a_folder_waiting_for_several_bindings_says_which_are_left(
     folder: Path, keychain: dict[str, str]
 ) -> None:
-    # Before: owl check, and so owl serve, refuse the folder for both missing uat bindings.
+    # Before: owl check, and so owl serve, refuse the folder for wallet_db's missing Production
+    # binding; ledger_db's missing uat binding alone would only be a warning (#25).
     without_uat(folder / "wallet" / "connectors" / "ledger_db.yaml")
-    without_uat(folder / "wallet" / "connectors" / "wallet_db.yaml")
-    with pytest.raises(ConfigError, match="has no binding"):
+    without_prod(folder / "wallet" / "connectors" / "wallet_db.yaml")
+    with pytest.raises(ConfigError, match=r"enabled in prod, where location record has no binding"):
         load_applications(folder)
     answers = [
         "ledger_db",

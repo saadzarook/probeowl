@@ -288,7 +288,7 @@ def _check_masking(
 def _check_probe_environments(
     app: _App, path: Path, probe: Probe, entity: Entity, report: CheckReport
 ) -> None:
-    # A run is refused where a location has no binding, so say so before anyone tries.
+    # In Production a run is refused where a location has no binding: say so before anyone tries.
     known = app.application.environments
     for name in probe.environments or []:
         if name not in known:
@@ -299,7 +299,8 @@ def _check_probe_environments(
         for child, fan_out in location.each.items()
     ]
     for environment in probe.environments or list(known):
-        if environment not in known:
+        # Outside Production such a location is Not configured, and owl check warns (#25).
+        if environment not in known or not known[environment].production:
             continue
         for location, connector in locations:
             if connector in app.bound_in and environment not in app.bound_in[connector]:

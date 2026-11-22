@@ -310,15 +310,24 @@ class Unavailable(Exception):
     absent: the data was read and is not there (Missing, an empty link), which is a finding;
     otherwise it could not be read (Error, Stale, a row not looked up). The run status rule
     tells the two apart (#81).
+    not_configured: the connector with no binding in this environment that the missing data
+    comes from (#25); such a check is not applicable, and counts against nothing.
     """
 
     def __init__(
-        self, location: str, outcome: str, message: str | None = None, *, absent: bool = False
+        self,
+        location: str,
+        outcome: str,
+        message: str | None = None,
+        *,
+        absent: bool = False,
+        not_configured: str | None = None,
     ):
         super().__init__(message or f"needs {location}, which is {outcome}")
         self.location = location
         self.outcome = outcome
         self.absent = absent
+        self.not_configured = not_configured
 
 
 class Data(Protocol):

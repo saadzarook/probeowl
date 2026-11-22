@@ -176,6 +176,23 @@ def read_step_problems(app: LoadedApplication, statement: Statement) -> list[str
     return [*_time_problems(statement, tables), *_unmasked(statement, tables)]
 
 
+def unbound_warnings(app: LoadedApplication) -> list[str]:
+    """Probes enabled outside Production where a location has no binding: for owl check.
+
+    Not an error (#25): the location is Not configured there, and the checks that read it are
+    not applicable. In Production the same is an error, refused when loading.
+    """
+    found: list[str] = []
+    for name, probe in sorted(app.probes.items()):
+        entity = app.entities.get(probe.entity)
+        if entity is None:
+            continue
+        for check in _environments(app, probe, entity):
+            if check.status is CheckStatus.WARN:
+                found.append(f"{app.application.application}: probe {name}: {check.message}")
+    return found
+
+
 def pii_key_warnings(app: LoadedApplication) -> list[str]:
     """For owl check: each entity whose key is PII, so its runs show it masked (#66)."""
     return [
@@ -389,18 +406,32 @@ def _environments(app: LoadedApplication, probe: Probe, entity: Entity) -> list[
         ]
     found = []
     for environment in probe.environments or list(known):
+        production = known[environment].production
         for name, using in sorted(set(_locations(entity))):
             if environment in getattr(app.connectors.get(using), "environments", {}):
                 continue
             # One per location, with its location and environment: an editor reads these fields,
-            # never the message, to leave that environment out of the probe.
+            # never the message, to leave that environment out of the probe. In Production it
+            # refuses the save; elsewhere the location is Not configured there, and says so (#25).
+            if production:
+                status = CheckStatus.FAIL
+                message = (
+                    f"enabled in {environment}, where {name} ({using}) has no binding; "
+                    f"bind {using} in {environment} or leave {environment} out of the probe's "
+                    "environments"
+                )
+            else:
+                status = CheckStatus.WARN
+                message = (
+                    f"enabled in {environment}, where {name} ({using}) has no binding: it is "
+                    f"Not configured there, and the checks that read it are not applicable; "
+                    f"bind {using} in {environment} to check it"
+                )
             found.append(
                 SaveCheck(
                     check="Environments",
-                    status=CheckStatus.FAIL,
-                    message=f"enabled in {environment}, where {name} ({using}) has no binding; "
-                    f"bind {using} in {environment} or leave {environment} out of the probe's "
-                    "environments",
+                    status=status,
+                    message=message,
                     location=name,
                     environment=environment,
                 )

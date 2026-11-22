@@ -63,11 +63,11 @@ export function failedValidateRun(id: string): Run {
       },
     ],
     expectations: [
-      { step: 0, expectation: "record.status in ['succeeded', 'failed', 'pending']", result: "pass", detail: "succeeded" },
-      { step: 1, expectation: "payment.amount == record.amount", result: "pass", detail: "500.00 = 500.00" },
-      { step: 2, expectation: "count(webhook) >= 1", result: "pass", detail: "2" },
-      { step: 3, expectation: "count(ledger) == 2", result: "fail", detail: "got 0" },
-      { step: 3, expectation: "sum(ledger.amount where direction == 'credit') == sum(ledger.amount where direction == 'debit')", result: "skip", detail: "no ledger rows to compare" },
+      { step: 0, expectation: "record.status in ['succeeded', 'failed', 'pending']", result: "pass", detail: "succeeded", not_applicable: false },
+      { step: 1, expectation: "payment.amount == record.amount", result: "pass", detail: "500.00 = 500.00", not_applicable: false },
+      { step: 2, expectation: "count(webhook) >= 1", result: "pass", detail: "2", not_applicable: false },
+      { step: 3, expectation: "count(ledger) == 2", result: "fail", detail: "got 0", not_applicable: false },
+      { step: 3, expectation: "sum(ledger.amount where direction == 'credit') == sum(ledger.amount where direction == 'debit')", result: "skip", detail: "no ledger rows to compare", not_applicable: false },
     ],
   };
 }

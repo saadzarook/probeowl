@@ -2,6 +2,7 @@
 import type { Run, SaveCheck, SaveCheckReport } from "../../src/api/client";
 import { failedValidateRun } from "./runs";
 import environmentUnbound from "./backend/save-checks-environment-unbound.json";
+import environmentUnboundUat from "./backend/save-checks-environment-unbound-uat.json";
 import passing from "./backend/save-checks-passing.json";
 import timeFilter from "./backend/save-checks-time-filter.json";
 
@@ -36,6 +37,8 @@ export const piiReport = (probe: string | null) =>
  * backend/tests/test_mock_answers.py, so the mocks can't say anything the backend doesn't (#108).
  */
 export const unboundReport = (probe: string | null): SaveCheckReport => ({ ...(environmentUnbound as SaveCheckReport), probe });
+/** The backend's answer when door_controller_api has no binding in UAT: a warning, not a failure (#25). */
+export const unboundUatReport = (probe: string | null): SaveCheckReport => ({ ...(environmentUnboundUat as SaveCheckReport), probe });
 export const unreadableReport = (reason: string): SaveCheckReport => ({
   probe: null,
   entity: null,

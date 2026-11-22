@@ -37,6 +37,15 @@ NoConfig = Annotated[
     typer.Option("--config", hidden=True, is_eager=True, callback=_no_config, expose_value=False),
 ]
 """A hidden --config on each command that runs through owl serve: it stops with where it goes."""
+
+Strict = Annotated[
+    bool,
+    typer.Option(
+        "--strict",
+        help="Exit 2 when checks were not applicable: a connector has no binding in --env.",
+    ),
+]
+"""--strict on owl validate and owl inspect: a not-applicable check is not good enough (#25)."""
 POLL_S = 0.5
 
 # Exit codes: 0 passed; 1 a finding (Failed); 2 no finding, but not fully checked: Not checked,
@@ -46,6 +55,11 @@ PASSED, FAILED, NOT_RUN = 0, 1, 2
 NOT_FULLY_CHECKED = {RunStatus.NOT_CHECKED, RunStatus.SKIPPED, RunStatus.AMBIGUOUS}
 # Locations whose data a Not checked run could not use.
 _UNREAD = {"error", "stale", "blocked", "not_configured", "waiting"}
+
+
+def counted(n: int, word: str) -> str:
+    """'1 application', '2 applications'."""
+    return f"{n} {word}" if n == 1 else f"{n} {word}s"
 
 
 def client(server: str) -> httpx.Client:
@@ -139,18 +153,36 @@ def print_expectations(run: Run) -> None:
     for e in run.expectations:
         detail = f"  ({e.detail})" if e.detail else ""
         caveat = f"  - {e.caveat}" if e.caveat else ""
-        typer.echo(f"  {e.result.value:<4} {e.expectation}{detail}{caveat}")
+        result = "n/a" if e.not_applicable else e.result.value
+        typer.echo(f"  {result:<4} {e.expectation}{detail}{caveat}")
 
 
-def finish(run: Run) -> None:
-    """Print the run's warnings and status, and exit with its code."""
+def not_applicable_notes(run: Run) -> list[str]:
+    """'2 checks not applicable in uat: door_controller_api has no binding here', per connector."""
+    return [
+        f"{counted(item.checks, 'check')} not applicable in {run.environment}: "
+        f"{item.connector} has no binding here"
+        for item in run.not_applicable
+    ]
+
+
+def finish(run: Run, strict: bool = False) -> None:
+    """Print the run's warnings, notes and status, and exit with its code.
+
+    strict: a run that passed with checks not applicable exits 2, not 0 (#25).
+    """
     for warning in run.warnings:
         typer.echo(f"warning: {warning}")
+    for note in not_applicable_notes(run):
+        typer.echo(f"note: {note}")
     why = run.stop_reason or run.skip_reason or _why_not_fully_checked(run)
     caveat = f" - {run.caveat}" if run.caveat else ""
+    unchecked = sum(item.checks for item in run.not_applicable)
+    if strict and run.status is RunStatus.PASSED and unchecked:
+        why = f"--strict: {counted(unchecked, 'check')} not applicable"
     typer.echo(f"Run {run.id}: {run.status.value}{caveat}" + (f" ({why})" if why else ""))
     if run.status is RunStatus.PASSED:
-        raise typer.Exit(PASSED)
+        raise typer.Exit(NOT_RUN if strict and unchecked else PASSED)
     raise typer.Exit(NOT_RUN if run.status in NOT_FULLY_CHECKED else FAILED)
 
 

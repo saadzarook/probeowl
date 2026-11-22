@@ -7,16 +7,23 @@ import { useEntity } from "../api/useEntities";
 import { useRun } from "../api/useRun";
 import { REASON_LABELS } from "../reasons";
 import { RESULT_LABELS, formatTime, keyLine, locationName, titleCase, withCaveat } from "../runFormat";
+import { ResultChip } from "./ResultChip";
 import { useSelection } from "../selection";
 import { CliCommand } from "./CliCommand";
 import { EvidencePanel } from "./EvidencePanel";
 import { NotChecked } from "./NotChecked";
 import { OutcomeChip } from "./OutcomeChip";
+import { NotApplicableNote } from "./NotApplicableNote";
 import { RunWarnings } from "./RunWarnings";
 import { StopReason } from "./StopReason";
 
 function countOf(run: Run, result: ExpectationEvaluation["result"]): number {
-  return (run.expectations ?? []).filter((e) => e.result === result).length;
+  // A check not applicable here is counted on its own, not among the skipped (#25).
+  return (run.expectations ?? []).filter((e) => e.result === result && e.not_applicable !== true).length;
+}
+
+function notApplicableCount(run: Run): number {
+  return (run.expectations ?? []).filter((e) => e.not_applicable === true).length;
 }
 
 // Locations whose data could not be read: listed apart from what failed (#82).
@@ -94,7 +101,7 @@ export function RunResult({ runId }: { runId: string }) {
           <CliCommand run={run} />
           <p className="hint">
             Run {run.id} · {formatTime(run.started_at)} ·{" "}
-            {running ? "running…" : `${countOf(run, "fail")} failed, ${countOf(run, "pass")} passed, ${countOf(run, "skip")} skipped`}
+            {running ? "running…" : `${countOf(run, "fail")} failed, ${countOf(run, "pass")} passed, ${countOf(run, "skip")} skipped${notApplicableCount(run) > 0 ? `, ${notApplicableCount(run)} not applicable` : ""}`}
           </p>
           {record && (
             <p className="hint">
@@ -107,6 +114,7 @@ export function RunResult({ runId }: { runId: string }) {
       </header>
 
       <RunWarnings run={run} />
+      <NotApplicableNote run={run} environment={environment?.title ?? run.environment} />
       {run.status === "skipped" && run.skip_reason && <p className="summary">Skipped: {run.skip_reason}</p>}
       {failure.failed && <p className="summary failure">First failed expectation: {failure.failed}</p>}
       {unread.length > 0 && (
@@ -150,9 +158,7 @@ export function RunResult({ runId }: { runId: string }) {
           <ul className="expectations">
             {expectations.map((e) => (
               <li key={`${e.step}:${e.expectation}`}>
-                <span className="result" data-result={e.result}>
-                  {RESULT_LABELS[e.result]}
-                </span>
+                <ResultChip evaluation={e} />
                 <code>{e.expectation}</code>
                 {e.detail && <span className="hint">{e.detail}</span>}
                 {e.caveat && <span className="hint caveat">{withCaveat(RESULT_LABELS[e.result], e.caveat)}</span>}

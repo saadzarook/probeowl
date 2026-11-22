@@ -39,6 +39,7 @@ def inspect(
     server_url: Annotated[str | None, typer.Option("--server", help=server.SERVER_HELP)] = None,
     config: server.NoConfig = None,
     timeout: Annotated[float, typer.Option(help="Seconds to follow the run.")] = 120.0,
+    strict: server.Strict = False,
 ) -> None:
     """Inspect a subject with an inspect probe, through owl serve.
 
@@ -54,7 +55,7 @@ def inspect(
         run = server.follow(api, run_id, timeout)
     _print_resolution(run, root_key)
     server.print_expectations(run)
-    server.finish(run)
+    server.finish(run, strict)
 
 
 def _find_probe(

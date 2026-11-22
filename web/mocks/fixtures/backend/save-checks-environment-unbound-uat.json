@@ -1,0 +1,67 @@
+{
+  "probe": "visitor_cards",
+  "entity": "visitor",
+  "checks": [
+    {
+      "check": "Expectations",
+      "status": "pass",
+      "message": "3 expectations read locations of visitor",
+      "location": null,
+      "environment": null,
+      "plan_not_run": false
+    },
+    {
+      "check": "Environments",
+      "status": "warn",
+      "message": "enabled in uat, where cards.controller (door_controller_api) has no binding: it is Not configured there, and the checks that read it are not applicable; bind door_controller_api in uat to check it",
+      "location": "cards.controller",
+      "environment": "uat",
+      "plan_not_run": false
+    },
+    {
+      "check": "Row ceiling",
+      "status": "pass",
+      "message": "every location's max_rows is within its connector's",
+      "location": null,
+      "environment": null,
+      "plan_not_run": false
+    },
+    {
+      "check": "Healthy sample",
+      "status": "pass",
+      "message": "it selects visitor_profile_id, with each parameter's source",
+      "location": null,
+      "environment": null,
+      "plan_not_run": false
+    },
+    {
+      "check": "Read-only SQL",
+      "status": "pass",
+      "message": "every SQL lookup is a single SELECT with its keys bound as parameters; every REST lookup is a GET",
+      "location": null,
+      "environment": null,
+      "plan_not_run": false
+    },
+    {
+      "check": "Time filter",
+      "status": "pass",
+      "message": "every lookup on a Transaction, Log or Audit table is keyed or time-bounded",
+      "location": null,
+      "environment": null,
+      "plan_not_run": false
+    },
+    {
+      "check": "PII masked",
+      "status": "pass",
+      "message": "every PII column a lookup selects is masked",
+      "location": null,
+      "environment": null,
+      "plan_not_run": false
+    }
+  ],
+  "passed": 6,
+  "warnings": 1,
+  "failed": 0,
+  "can_save": true,
+  "plans_not_run": 0
+}

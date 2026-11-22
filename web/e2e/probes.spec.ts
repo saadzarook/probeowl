@@ -380,6 +380,33 @@ test("environments the person lists in a new probe are kept as they are", async 
   await expect(yaml).toContainText("environments: []");
 });
 
+test("outside Production a missing binding is a warning, and a new probe still leaves that environment out (#25, #95)", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("mock-uat-unbound", "1"));
+  await page.goto("/probes");
+  await page.getByRole("button", { name: "Application" }).click();
+  await page.getByRole("button", { name: /Card access/ }).last().click();
+  await page.getByRole("button", { name: "New probe" }).click();
+  const form = page.getByRole("form", { name: "New probe" });
+  await form.getByLabel("Probe id").fill("visitor_badges");
+  await form.getByLabel("Title").fill("Draft visitor_badges");
+  await form.getByRole("button", { name: "Start the draft" }).click();
+  const yaml = page.getByLabel("Probe YAML");
+  // door_controller_api isn't bound in UAT: the default is Production only, as #95 wants.
+  await expect(yaml).toContainText("environments: [prod]");
+  const enabled = page.getByRole("group", { name: "Enabled in" });
+  await expect(enabled.getByLabel("Production")).toBeChecked();
+  await expect(enabled.getByLabel("UAT")).not.toBeChecked();
+  // Ticking it still works, and says what that means there; the probe can still be saved.
+  await enabled.getByLabel("UAT").check();
+  await expect(yaml).toContainText("environments: [prod, uat]");
+  await expect(enabled.getByLabel("UAT")).toBeChecked();
+  await expect(enabled).toContainText("door_controller_api not bound: Not configured there");
+  const panel = page.getByRole("region", { name: "Save checks" });
+  await expect(panel).toContainText("it is Not configured there");
+  await expect(page.getByRole("button", { name: "Save", exact: true })).toBeEnabled();
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+});
+
 test("an opened probe keeps its own environments", async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("mock-prod-unbound", "1"));
   await page.goto("/probes");

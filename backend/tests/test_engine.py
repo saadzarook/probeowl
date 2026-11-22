@@ -167,13 +167,24 @@ def test_more_than_one_record_for_a_one_location_is_ambiguous() -> None:
     assert outcomes(result)["record"] is Outcome.AMBIGUOUS
 
 
-def test_a_run_where_a_location_has_no_binding_is_refused_before_any_lookup() -> None:
+def test_a_location_with_no_binding_is_not_configured_and_its_checks_not_applicable() -> None:
+    # The engine's part of #25; the run service refuses this in Production before it gets here.
     fakes = connectors(checkout_api=None)
-    with pytest.raises(
-        ConfigError, match=r"cannot run in this environment: payment \(checkout_api\)"
-    ):
-        run_probe(PROBE, ENTITY, "tp_91f2b9", fakes)
-    assert all(isinstance(f, Fake) and not f.calls for f in fakes.values() if f is not None)
+    result = run_probe(PROBE, ENTITY, "tp_91f2b9", fakes)
+    payment = next(r for r in result.locations if r.location == "payment")
+    assert (payment.outcome, payment.reason, payment.evidence) == (
+        Outcome.NOT_CONFIGURED,
+        "checkout_api has no binding here",
+        None,
+    )
+    reading = [e for e in result.expectations if "payment." in e.expectation]
+    assert reading and all(e.result is ExpectationResult.SKIP for e in reading)
+    # Read by a condition that doesn't hold, a check is skipped for that, not as not applicable.
+    assert [e.not_applicable for e in reading] == ["when" not in (e.detail or "") for e in reading]
+    assert [(n.connector, n.locations) for n in result.not_applicable] == [
+        ("checkout_api", ["payment"])
+    ]
+    assert result.not_applicable[0].checks == sum(e.not_applicable for e in result.expectations)
 
 
 def test_each_location_is_reported_as_it_is_read() -> None:

@@ -89,9 +89,9 @@ const controllerLookups: LocationResult[] = plantedCards.map((card, row) => ({
 }));
 
 const expectations: ExpectationEvaluation[] = [
-  { step: 0, expectation: "count(cards where status == 'active') <= 1", result: "fail", detail: "got 2" },
-  { step: 1, expectation: "all(cards where status == 'active', valid_to > now())", result: "fail", detail: "C198220 expired" },
-  { step: 2, expectation: "all(cards, controller.status == status)", result: "fail", detail: "C177031 differs" },
+  { step: 0, expectation: "count(cards where status == 'active') <= 1", result: "fail", detail: "got 2", not_applicable: false },
+  { step: 1, expectation: "all(cards where status == 'active', valid_to > now())", result: "fail", detail: "C198220 expired", not_applicable: false },
+  { step: 2, expectation: "all(cards, controller.status == status)", result: "fail", detail: "C177031 differs", not_applicable: false },
 ];
 
 const contractorMatch = { subject: "VP00012931", fields: { type: "contractor", status: "active", created_at: "2024-03-02" } };
@@ -153,6 +153,44 @@ export function plantedCardRun(id: string, identifier: string, value: string): R
   };
 }
 
+/**
+ * VP00031207 in UAT, where door_controller_api has no binding (#25): its one card is fine, the
+ * controller is Not configured, and the check that reads it is not applicable. Passed, with a note.
+ */
+export function notConfiguredCardRun(id: string, identifier: string, value: string): Run {
+  const card = { card_id: "C210447", status: "active", valid_from: "2026-10-01", valid_to: "2027-03-31", access_group: "HQ-L2" };
+  return {
+    ...base,
+    id,
+    identifier,
+    identifier_value: value,
+    subject: "VP00031207",
+    status: "passed",
+    finished_at: "2026-01-01T10:00:02Z",
+    locations: [
+      profileLocation({ visitor_profile_id: "VP00031207", name: "J••• K•••", type: "visitor", employee_no: "E-5120", status: "active" }),
+      {
+        location: "cards", title: "Cards",
+        outcome: "found",
+        evidence: evidence("access_db", "SELECT card_id, status, valid_from, valid_to, access_group FROM cards WHERE visitor_profile_id = :visitor_profile_id", [card]),
+      },
+      { location: "controller", title: "Door controller", parent: "cards", row: 0, outcome: "not_configured", reason: "door_controller_api has no binding here" },
+    ],
+    expectations: [
+      { step: 0, expectation: "count(cards where status == 'active') <= 1", result: "pass", detail: null, not_applicable: false },
+      { step: 1, expectation: "all(cards where status == 'active', valid_to > now())", result: "pass", detail: null, not_applicable: false },
+      {
+        step: 2,
+        expectation: "all(cards, controller.status == status)",
+        result: "skip",
+        detail: "needs controller, which is Not configured (door_controller_api has no binding here)",
+        not_applicable: true,
+      },
+    ],
+    not_applicable: [{ connector: "door_controller_api", locations: ["cards.controller"], checks: 1 }],
+  };
+}
+
 /** VP00008807: an inactive visitor with no cards. */
 export function inactiveVisitorRun(id: string, identifier: string, value: string): Run {
   return {
@@ -168,9 +206,9 @@ export function inactiveVisitorRun(id: string, identifier: string, value: string
       { location: "cards", title: "Cards", outcome: "missing", reason: "0 rows", evidence: evidence("access_db", "SELECT card_id FROM cards WHERE visitor_profile_id = :visitor_profile_id", []) },
     ],
     expectations: [
-      { step: 0, expectation: "count(cards where status == 'active') <= 1", result: "pass", detail: "got 0" },
-      { step: 1, expectation: "all(cards where status == 'active', valid_to > now())", result: "skip", detail: "no cards" },
-      { step: 2, expectation: "all(cards, controller.status == status)", result: "skip", detail: "no cards" },
+      { step: 0, expectation: "count(cards where status == 'active') <= 1", result: "pass", detail: "got 0", not_applicable: false },
+      { step: 1, expectation: "all(cards where status == 'active', valid_to > now())", result: "skip", detail: "no cards", not_applicable: false },
+      { step: 2, expectation: "all(cards, controller.status == status)", result: "skip", detail: "no cards", not_applicable: false },
     ],
   };
 }

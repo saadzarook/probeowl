@@ -340,7 +340,9 @@ def test_pii_on_a_rest_location_and_mask_on_a_sql_location_are_errors(wallet: Pa
     assert "location record is a SQL location: list its columns in pii, not mask" in output
 
 
-def test_a_probe_enabled_where_a_location_has_no_binding_is_an_error(wallet: Path) -> None:
+def test_a_probe_enabled_outside_production_where_a_location_has_no_binding_warns(
+    wallet: Path,
+) -> None:
     app = wallet / "wallet" / "application.yaml"
     app.write_text(app.read_text() + "  dev: { title: Dev }\n")
     # Every connector but ledger_db gets a dev binding.
@@ -350,10 +352,11 @@ def test_a_probe_enabled_where_a_location_has_no_binding_is_an_error(wallet: Pat
         uat = text[text.index("  uat:") :]
         path.write_text(text + uat.replace("  uat:", "  dev:", 1))
     result = owl("check", str(wallet))
-    assert result.exit_code == 1
+    # Not an error outside Production (#25): ledger is Not configured in dev, and owl check says so.
+    assert result.exit_code == 0, result.output
     assert (
-        "probe topup_completed is enabled in dev, where location ledger has no binding (ledger_db)"
-        in result.output
+        "warning: wallet: probe topup_completed: enabled in dev, where ledger (ledger_db) has no "
+        "binding: it is Not configured there" in result.output
     )
     # Leaving dev out of the probe's environments is the way to say so.
     probe = wallet / "wallet" / "probes" / "topup_completed.yaml"

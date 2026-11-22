@@ -73,6 +73,9 @@ class LocationRead:
     # Not configured), False when it starts at data read and absent (Missing, an empty link, a
     # count that is not one). The run status rule tells the two apart (#81).
     unreadable_chain: bool = False
+    # Not configured, or Blocked by a chain that starts at one: the connector with no binding
+    # in this environment. What reads it is not applicable rather than unchecked (#25).
+    not_configured: str | None = None
 
     def result(self) -> LocationResult:
         """The masked result that may be stored and shown."""
@@ -97,13 +100,16 @@ class LocationRead:
 def read_locations(
     entity: Entity,
     subject: str,
-    connectors: Mapping[str, Connector],
+    connectors: Mapping[str, Connector | None],
     on_read: Callable[[LocationResult], None] | None = None,
     deadline: float | None = None,
     replica_lag: Mapping[str, ReplicaLag] | None = None,
     caveat_unknown_lag: bool = False,
 ) -> dict[str, LocationRead]:
     """Read every location of the subject, through the connectors named by `using`.
+
+    A connector given as None has no binding in this environment: its locations are Not
+    configured, with no lookup, and those keyed from them are Blocked (#25).
 
     deadline: a time.monotonic() value; locations not read by then are Error.
     replica_lag: per connector, its replica's lag measured for this run. A Missing record
@@ -148,11 +154,21 @@ def read_locations(
     return {name: done[name] for name in entity.locations}
 
 
+def _not_configured(name: str, connector: str) -> LocationRead:
+    # No lookup and no evidence: there is nothing to read here (#25).
+    return LocationRead(
+        name,
+        Outcome.NOT_CONFIGURED,
+        reason=f"{connector} has no binding here",
+        not_configured=connector,
+    )
+
+
 def _out_of_time(name: str, parent: str | None = None, row: int | None = None) -> LocationRead:
     return LocationRead(name, Outcome.ERROR, reason=RUN_TIME_LIMIT, parent=parent, row=row)
 
 
-def _check(entity: Entity, connectors: Mapping[str, Connector]) -> None:
+def _check(entity: Entity, connectors: Mapping[str, Connector | None]) -> None:
     for name, using in all_connectors(entity):
         if using not in connectors:
             raise ConfigError(f"location {name} uses connector {using}, which is not loaded")
@@ -176,7 +192,7 @@ class _Reader:
         self,
         entity: Entity,
         subject: str,
-        connectors: Mapping[str, Connector],
+        connectors: Mapping[str, Connector | None],
         deadline: float | None,
         replica_lag: Mapping[str, ReplicaLag],
         caveat_unknown_lag: bool,
@@ -203,6 +219,7 @@ class _Reader:
                     Outcome.BLOCKED,
                     reason=f"{source} is {_label(upstream.outcome)}",
                     unreadable_chain=unreadable(upstream),
+                    not_configured=upstream.not_configured,
                 )
             if len(upstream.rows) != 1:
                 return LocationRead(
@@ -214,6 +231,8 @@ class _Reader:
             parameters[key] = value
         if missing_link is not None and location.fallback is None:
             return LocationRead(name, Outcome.BLOCKED, reason=missing_link)
+        if connector is None:
+            return _not_configured(name, location.using)
         try:
             read = self._look_up(name, location, connector, parameters, missing_link)
         except ReadsStopped:
@@ -251,6 +270,10 @@ class _Reader:
         # The child's lookup uses this row's fields, and the root key.
         parameters: dict[str, object] = {**row, self._entity.root_key: self._subject}
         connector = self._connectors[spec.using]
+        if connector is None:
+            read = _not_configured(child, spec.using)
+            read.parent, read.row = parent, index
+            return read
         try:
             read = self._look_up(child, spec, connector, parameters, None, parent=parent)
         except ReadsStopped:

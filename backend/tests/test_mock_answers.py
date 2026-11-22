@@ -113,6 +113,13 @@ def save_checks_environment_unbound(tmp_path: Path, request: pytest.FixtureReque
     return check_draft(app, probe).model_dump(mode="json")
 
 
+def save_checks_environment_unbound_uat(tmp_path: Path, request: pytest.FixtureRequest) -> Any:
+    """visitor_cards in Card access, door_controller_api unbound in UAT: a warning (#25)."""
+    app = _unbound(load_applications(EXAMPLES)["card_access"], "door_controller_api", "uat")
+    probe = (EXAMPLES / "card-access" / "probes" / "visitor_cards.yaml").read_text(encoding="utf-8")
+    return check_draft(app, probe).model_dump(mode="json")
+
+
 def save_checks_passing(tmp_path: Path, request: pytest.FixtureRequest) -> Any:
     """The probe editor's Save checks panel for topup_completed as it is: every check passes."""
     app = load_applications(EXAMPLES)["wallet"]
@@ -180,6 +187,7 @@ def step_plan_not_run(tmp_path: Path, request: pytest.FixtureRequest) -> Any:
 Case = Callable[[Path, pytest.FixtureRequest], Any]
 CASES: dict[str, Case] = {
     "save-checks-environment-unbound": save_checks_environment_unbound,
+    "save-checks-environment-unbound-uat": save_checks_environment_unbound_uat,
     "save-checks-passing": save_checks_passing,
     "save-checks-time-filter": save_checks_time_filter,
     "draft-run-time-filter": draft_run_time_filter,
