@@ -4,7 +4,7 @@
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import Connection, and_, delete, insert, or_, select, update
+from sqlalchemy import Connection, and_, delete, insert, not_, or_, select, update
 
 from probeowl.errors import NotFoundError
 from probeowl.model.run import (
@@ -213,11 +213,14 @@ def list_runs(
     environment: str,
     before: tuple[datetime, str] | None,
     limit: int,
+    *,
+    drafts: bool = True,
 ) -> list[RunSummary]:
     """Runs in one application and environment, newest first, starting after before.
 
     Healthy-comparison candidates are left out: each is shown on the run it was compared with.
     before is (started_at, id) of the last run already listed; the id breaks ties.
+    drafts: False leaves out drafts' test runs, here so that a page is full and its cursor right.
     """
     query = select(runs).where(
         runs.c.workspace_id == workspace_id,
@@ -225,6 +228,8 @@ def list_runs(
         runs.c.environment == environment,
         runs.c.healthy_for.is_(None),
     )
+    if not drafts:
+        query = query.where(not_(runs.c.probe_version.startswith(DRAFT_VERSION_PREFIX)))
     if before is not None:
         at, run_id = before
         query = query.where(

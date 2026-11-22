@@ -51,7 +51,7 @@ def paths(config: Path, runs: list[str]) -> list[str]:
             found += [
                 f"{base}/connectors?environment={environment}",
                 f"{base}/probes?environment={environment}",
-                f"/api/runs?application={name}&environment={environment}",
+                f"/api/runs?application={name}&environment={environment}&drafts=true",
             ]
     return found
 

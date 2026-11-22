@@ -996,7 +996,9 @@ export const handlers = [
     const query = new URL(request.url).searchParams;
     const wallet = query.get("application") === "wallet" && query.get("environment") === "uat";
     const page = query.get("before") === "page-2" ? 1 : 0;
-    const runs = wallet ? (walletRunPages[page] ?? []) : [];
+    // As the server: drafts' test runs only when asked for (#164).
+    const drafts = query.get("drafts") === "true";
+    const runs = (wallet ? (walletRunPages[page] ?? []) : []).filter((run) => drafts || !run.draft);
     return json({ runs, next: wallet && page === 0 ? "page-2" : null });
   }),
 

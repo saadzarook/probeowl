@@ -68,15 +68,49 @@ def test_runs_are_listed_newest_first_with_what_the_list_shows(setup: Setup) -> 
     )
 
 
-def test_a_drafts_test_run_is_marked_and_healthy_candidates_are_left_out(setup: Setup) -> None:
+def test_drafts_test_runs_are_left_out_unless_asked_for_and_then_marked(setup: Setup) -> None:
     stored(setup, "failing", 0)
     stored(setup, "candidate", 1, status="passed", healthy_for="failing")
     stored(setup, "draft", 2, probe_version="draft:sha256:123")
-    page = listed(setup)
+    assert [run["id"] for run in listed(setup)["runs"]] == ["failing"]
+    assert [run["id"] for run in listed(setup, drafts="false")["runs"]] == ["failing"]
+    page = listed(setup, drafts="true")
     assert [(run["id"], run["draft"]) for run in page["runs"]] == [
         ("draft", True),
         ("failing", False),
     ]
+
+
+def test_drafts_are_left_out_by_the_store_so_pages_stay_full_and_the_cursor_right(
+    setup: Setup, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Newest first: five drafts, then three runs. Filtered after fetching, the first page of two
+    # would be empty, with a cursor pointing into the drafts.
+    monkeypatch.setattr(run_service, "RUNS_PER_PAGE", 2)
+    for minute in range(3):
+        stored(setup, f"run-{minute}", minute)
+    for minute in range(3, 8):
+        stored(setup, f"draft-{minute}", minute, probe_version="draft:sha256:123")
+
+    def every(**params: str) -> list[list[str]]:
+        pages: list[list[str]] = []
+        cursor: str | None = None
+        while True:
+            page = listed(setup, **params, **({"before": cursor} if cursor else {}))
+            pages.append([run["id"] for run in page["runs"]])
+            cursor = page["next"]
+            if cursor is None:
+                return pages
+
+    assert every() == [["run-2", "run-1"], ["run-0"]]
+    shown = every(drafts="true")
+    assert [run for page in shown for run in page] == [
+        *(f"draft-{m}" for m in range(7, 2, -1)),
+        "run-2",
+        "run-1",
+        "run-0",
+    ]
+    assert all(len(page) == 2 for page in shown[:-1])
 
 
 def test_a_stopped_run_carries_its_reason_and_a_caveat_is_kept(setup: Setup) -> None:

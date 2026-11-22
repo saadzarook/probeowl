@@ -410,12 +410,25 @@ class RunService:
             return get_run(conn, self._workspace, run_id)
 
     def recent(
-        self, application: str, environment: str, before: tuple[datetime, str] | None = None
+        self,
+        application: str,
+        environment: str,
+        before: tuple[datetime, str] | None = None,
+        drafts: bool = False,
     ) -> tuple[list[RunSummary], tuple[datetime, str] | None]:
-        """A page of runs, newest first, and where the next older page starts (None: no more)."""
+        """A page of runs, newest first, and where the next older page starts (None: no more).
+
+        drafts: include drafts' test runs, which are left out unless asked for (#164).
+        """
         with self._store.connect() as conn:
             found = list_runs(
-                conn, self._workspace, application, environment, before, RUNS_PER_PAGE + 1
+                conn,
+                self._workspace,
+                application,
+                environment,
+                before,
+                RUNS_PER_PAGE + 1,
+                drafts=drafts,
             )
         page = found[:RUNS_PER_PAGE]
         more = len(found) > RUNS_PER_PAGE

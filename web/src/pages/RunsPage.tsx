@@ -67,12 +67,39 @@ const RUN_COLUMNS: Column<RunSummary>[] = [
   { header: "By", cell: (run) => run.actor },
 ];
 
+// Drafts' test runs (the Probe editor's Test run, the entity graph's lookups) are left out by the
+// server unless asked for, so that each page is full and Show older is right (#164). In the URL, so
+// that a reload or a link keeps it.
+const SHOW_DRAFTS = "drafts";
+
+function DraftsFilter({ shown, onChange }: { shown: boolean; onChange: (shown: boolean) => void }) {
+  return (
+    <label className="mb-3 flex items-center gap-2 text-sm text-foreground">
+      <input type="checkbox" checked={shown} onChange={(event) => onChange(event.target.checked)} />
+      Show draft runs
+    </label>
+  );
+}
+
 function RunList() {
   const { application, environment } = useSelection();
-  const runs = useRuns(application?.name, environment?.name);
+  const [query, setQuery] = useSearchParams();
+  const drafts = query.get(SHOW_DRAFTS) === "show";
+  const runs = useRuns(application?.name, environment?.name, drafts);
+  const showDrafts = (shown: boolean) =>
+    setQuery(
+      (current) => {
+        const next = new URLSearchParams(current);
+        if (shown) next.set(SHOW_DRAFTS, "show");
+        else next.delete(SHOW_DRAFTS);
+        return next;
+      },
+      { replace: true },
+    );
   if (application === undefined || environment === undefined) {
     return <EmptyState title="Choose an application" message="Runs are listed for one application and environment." />;
   }
+  const filter = <DraftsFilter shown={drafts} onChange={showDrafts} />;
   if (runs.isPending) return <p aria-busy="true">Loading runs…</p>;
   if (runs.isError) {
     return (
@@ -87,14 +114,21 @@ function RunList() {
   const listed = runs.data.pages.flatMap((page) => page.runs);
   if (listed.length === 0) {
     return (
-      <EmptyState title={`No runs yet in ${application.title} ${environment.title}`} message="A run appears here once someone inspects or validates a subject.">
-        <Link to="/validate">Validate</Link>
-        <Link to="/inspect">Inspect</Link>
-      </EmptyState>
+      <>
+        {filter}
+        <EmptyState
+          title={`No runs yet in ${application.title} ${environment.title}`}
+          message={drafts ? "A run appears here once someone inspects or validates a subject." : "A run appears here once someone inspects or validates a subject. Draft runs are hidden."}
+        >
+          <Link to="/validate">Validate</Link>
+          <Link to="/inspect">Inspect</Link>
+        </EmptyState>
+      </>
     );
   }
   return (
     <section className="card">
+      {filter}
       <ListOrTable label="Runs" rows={listed} columns={RUN_COLUMNS} rowKey={(run) => run.id} empty="No runs yet." />
       {runs.hasNextPage && (
         <Button variant="outline" type="button" disabled={runs.isFetchingNextPage} onClick={() => void runs.fetchNextPage()}>

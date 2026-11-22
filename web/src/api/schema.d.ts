@@ -397,9 +397,11 @@ export interface paths {
          * List Recent Runs
          * @description Runs in one application and environment, newest first, 50 at a time.
          *
-         *     Each opens with GET /api/runs/{id}. A draft's test run is marked draft. A healthy
+         *     Each opens with GET /api/runs/{id}. Drafts' test runs are left out unless drafts is true;
+         *     then each is marked draft. Every draft run is still stored and audited. A healthy
          *     comparison's candidates are left out: they show on the run they were compared with.
-         *     Identifiers that are PII stay masked. before: the next value of the previous page.
+         *     Identifiers that are PII stay masked. before: the next value of the previous page, asked
+         *     for with the same drafts.
          */
         get: operations["list_recent_runs"];
         put?: never;
@@ -4911,6 +4913,7 @@ export interface operations {
                 application: string;
                 environment: string;
                 before?: string | null;
+                drafts?: boolean;
             };
             header?: never;
             path?: never;
