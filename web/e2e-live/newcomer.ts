@@ -84,16 +84,14 @@ export async function entityProbeAndValidate(page: Page, count: Counter, connect
   count.start("New entity: visitor and cards");
   await count.click(page.getByRole("link", { name: "Probes" }));
   await count.click(page.getByRole("link", { name: "New entity", exact: true }));
-  await count.fill(page.getByLabel("Entity id"), "visitor_profile");
-  await count.click(page.getByRole("button", { name: "Next: Root table" }));
+  // The entity graph (#163): the id comes from the root table; the sample is looked up as it is built.
   await count.select(page.getByRole("combobox", { name: "Root table" }), { label: `${connector} · visitor_profile` });
-  await count.click(page.getByRole("button", { name: "Next: Locations" }));
+  await count.fill(page.getByLabel("Sample", { exact: true }), "VP00012931");
   await count.click(page.getByRole("region", { name: "Follow a key" }).getByRole("button", { name: "Add cards" }));
   await expect(page.getByText("Every location passes its save checks.")).toBeVisible({ timeout: 60_000 });
-  await count.click(page.getByRole("button", { name: "Next: Identifiers" }));
-  await count.click(page.getByRole("button", { name: "Next: Preview" }));
-  await count.click(page.getByRole("button", { name: "Check" }));
+  await expect(page.getByRole("status", { name: "Last check" })).toHaveText("Last check: 2 locations: 2 Found.", { timeout: 60_000 });
   await count.click(page.getByRole("button", { name: "Create visitor_profile" }));
+  await count.click(page.getByRole("button", { name: /^Write .*visitor_profile\.yaml$/ }));
   await expect(page.getByRole("status", { name: "Entity created" })).toContainText("visitor_profile was created", { timeout: 60_000 });
   count.end();
 

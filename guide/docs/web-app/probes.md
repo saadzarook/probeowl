@@ -22,13 +22,25 @@ comments.
 ## New entity
 
 A probe checks one entity, so the first probe of a new subject type starts with **New entity…**.
-It builds the entity from the tables imported in the environment chosen in the top bar, on any SQL
-connector of the application, and reads no data. Import a connector's schema first, with
-**Import from replica** on the [Tables](tables.md) screen.
+It opens the **entity graph**: the entity drawn as boxes (its locations) and arrows (the keys
+between them), built from the tables imported in the environment chosen in the top bar, on any SQL
+connector of the application. Import a connector's schema first, with **Import from replica** on
+the [Tables](tables.md) screen. The graph opens in the application's first environment that isn't
+Production.
 
-1. **Name**: the entity's id, title and owning team.
-2. **Root table**: the table one subject is a row of. Its primary key becomes the root key, which
-   you can rename. A key named just `id` becomes `<entity>_id`.
+1. **Root table**: the table one subject is a row of. The entity's id comes from its name, and its
+   primary key becomes the root key; you can change either. A key named just `id` becomes
+   `<entity>_id`.
+2. **Sample**: one real subject's ID, usually its root key, though any identifier works. Every box
+   shows its outcome on the sample, Found, Missing or Blocked with the reason, so a location that
+   doesn't find the subject shows before any probe is written. **Last check** sums the boxes up.
+
+    Outside Production the sample is looked up again a second after each change, one lookup at a
+    time. In Production it's looked up only when you press **Check sample**, with a reason and a
+    reference, asked once per browser session. Each lookup is a draft test run: it goes through
+    every guard, kill switches and circuit breakers included, masks what it reads, and is stored and
+    audited. The **Runs** screen hides draft runs unless **Show draft runs** is ticked.
+
 3. **Locations**: the other places the subject's data lives. **Follow a key** offers the tables,
    on any connector, that share a key with a location you've added:
     - a column the catalog links to another table (`links_to`), in either direction;
@@ -42,7 +54,7 @@ connector of the application, and reads no data. Import a connector's schema fir
     that's lower. You choose the columns each location selects.
 
     Every location runs the save checks as soon as it's added, and a failure shows on that
-    location, with its fix where the wizard knows one. The usual one: a Transaction, Log or Audit
+    location, with its fix where one is known. The usual one: a Transaction, Log or Audit
     table may only be read by a key or within a time window, so `cards` read by
     `visitor_profile_id` fails until the catalog calls that column a link. **Mark
     cards.visitor_profile_id as a link to visitor_profile.id** previews that change to
@@ -53,9 +65,12 @@ connector of the application, and reads no data. Import a connector's schema fir
    marks as PII, such as an email, is offered but not ticked; if you tick it, it's marked PII, so
    it stays masked. A pattern is optional. Only locations keyed by the root key are offered, since
    a value found there leads to its subject.
-5. **Preview**: the YAML, then **Check** runs every save check on it, the index check included,
-   and shows the new file as a diff. **Create** writes it.
+5. **Create**: runs every save check on the entity, the index check included, and shows the new
+   file as a diff. **Write** writes it.
 
-The wizard only creates entities. To change one, open one of its probes and edit its **Entity
+Below 1024 px, and for screen readers at any width, the graph is an outline: the same boxes as
+nested lists in key order. In the graph, the arrow keys follow the keys between boxes.
+
+New entity only creates entities. To change one, open one of its probes and edit its **Entity
 YAML**, so the probes are checked with it. REST locations are written by hand: see
 [Writing probes](../writing-probes.md#2-locations-where-its-data-lives).

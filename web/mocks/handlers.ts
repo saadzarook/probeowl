@@ -1,5 +1,6 @@
 // Author: @SaadZarook
 import { stringify } from "yaml";
+import { sampleRun } from "./fixtures/sampleRun";
 import { parse } from "yaml";
 import { delay, http, HttpResponse } from "msw";
 import type { ApplicationSummary, CatalogChange, CatalogReview, CatalogTable, TableReview, DraftConnection, KillSwitch, KillTarget, ProbeChange, SaveApplication, SaveConnector, SaveEntity, SaveSecret, SaveProbe, SetKillSwitch, StartRun } from "../src/api/client";
@@ -83,6 +84,8 @@ const written = new Map<string, CatalogTable[]>();
 const versions = new Map<string, number>();
 const baseOf = (application: string) => `sha256:mock-${versions.get(application) ?? 0}`;
 /** A confirm of this table finds catalog.yaml edited by someone else after its preview, once. */
+// A sample whose first lookup hits the run limit, so the graph's Retry can be seen (#163).
+const RUN_LIMIT_ONCE = new Set(["VP00000429"]);
 const CONFLICTS_ONCE = new Set(["user_provider_ids", "topup_conflict"]);
 const FAILS_ONCE = new Set(["visitor_cards"]);
 const killSwitches: KillSwitch[] = [];
@@ -206,7 +209,8 @@ function diffFor(application: string, entry: CatalogTable): string {
   return [`--- a/${path}`, `+++ b/${path}`, `@@ tables @@`, ...removed, ...added].join("\n");
 }
 
-const polls = new Map<string, { seen: number; request: StartRun; fromRun?: string }>();
+// sample: the entity graph's draft entity, for a sample lookup (#163).
+const polls = new Map<string, { seen: number; request: StartRun; fromRun?: string; sample?: string }>();
 const comparisons = new Map<string, { attempt: HealthyAttempt; healthy?: string; seen: number }>();
 const failedOnce = new Set<string>();
 let nextRun = 1;
@@ -528,7 +532,10 @@ export const handlers = [
     const production = applications.find((a) => a.name === application)?.environments.find((e) => e.name === body.environment)?.production;
     if (production && !body.investigation.reference) return problem(422, "Unprocessable Content", "A reference is required in Production.");
     const id = `run_${nextRun++}`;
-    polls.set(id, { seen: 0, request: { application, environment: body.environment, probe: `${DRAFT_PREFIX}draft`, value: body.value, investigation: body.investigation } });
+    // The entity graph's lookup: its generated Inspect probe, answered from the draft entity sent.
+    const sample = /^kind: inspect$/m.test(body.probe) && /^probe: \S+_sample$/m.test(body.probe) && body.entity ? body.entity : undefined;
+    if (sample && RUN_LIMIT_ONCE.delete(body.value)) return problem(429, "Too Many Requests", "Too many runs at once: at most 4 in flight. Try again when one finishes.");
+    polls.set(id, { seen: 0, request: { application, environment: body.environment, probe: `${DRAFT_PREFIX}draft`, value: body.value, investigation: body.investigation }, ...(sample ? { sample } : {}) });
     return json({ id, status: "running" }, { status: 202, headers: { Location: `/api/runs/${id}` } });
   }),
 
@@ -1011,7 +1018,7 @@ export const handlers = [
     polls.set(id, { ...poll, seen: poll.seen + 1 });
     const running = poll.seen < POLLS_BEFORE_FINISHED;
     const { request } = poll;
-    const run = runFor(id, request, running);
+    const run = poll.sample ? sampleRun(id, poll.sample, request.value, running) : runFor(id, request, running);
     const matches = piiKey() ? [...(run.matches ?? [])].sort((a, b) => a.subject.localeCompare(b.subject)).map(masked) : run.matches;
     return json(masked({
       ...run,
