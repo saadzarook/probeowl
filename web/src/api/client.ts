@@ -248,9 +248,12 @@ export async function searchAll(q: string, application: string | undefined, limi
   throw problemError(error, "Search could not be run.");
 }
 
-/** A page of runs in one application and environment, newest first; before is the last page's next. */
-export async function fetchRuns(application: string, environment: string, before: string | undefined): Promise<RunList> {
-  const { data, error } = await api.GET("/api/runs", { params: { query: { application, environment, before } } });
+/**
+ * A page of runs in one application and environment, newest first; before is the last page's next.
+ * drafts: include drafts' test runs, which the server leaves out by default (#164).
+ */
+export async function fetchRuns(application: string, environment: string, before: string | undefined, drafts = false): Promise<RunList> {
+  const { data, error } = await api.GET("/api/runs", { params: { query: { application, environment, before, drafts } } });
   if (data) return data;
   throw problemError(error, "The runs could not be loaded.");
 }

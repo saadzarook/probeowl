@@ -519,18 +519,24 @@ def search_everything(
 
 @router.get("/runs", tags=["runs"], responses=_problems(404, 422))
 def list_recent_runs(
-    application: str, environment: str, http: Request, before: str | None = None
+    application: str,
+    environment: str,
+    http: Request,
+    before: str | None = None,
+    drafts: bool = False,
 ) -> RunList:
     """Runs in one application and environment, newest first, 50 at a time.
 
-    Each opens with GET /api/runs/{id}. A draft's test run is marked draft. A healthy
+    Each opens with GET /api/runs/{id}. Drafts' test runs are left out unless drafts is true;
+    then each is marked draft. Every draft run is still stored and audited. A healthy
     comparison's candidates are left out: they show on the run they were compared with.
-    Identifiers that are PII stay masked. before: the next value of the previous page.
+    Identifiers that are PII stay masked. before: the next value of the previous page, asked
+    for with the same drafts.
     """
     app = _application(http, application)
     if environment not in app.application.environments:
         raise NotFoundError(f"{application} has no environment {environment}")
-    page, more = _runs(http).recent(application, environment, _before(before))
+    page, more = _runs(http).recent(application, environment, _before(before), drafts)
     redactor: Redactor = http.app.state.redactor
     shown = [
         run.model_copy(

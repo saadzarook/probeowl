@@ -1255,14 +1255,19 @@ paths:
         time.
 
 
-        Each opens with GET /api/runs/{id}. A draft''s test run is marked draft. A
+        Each opens with GET /api/runs/{id}. Drafts'' test runs are left out unless
+        drafts is true;
+
+        then each is marked draft. Every draft run is still stored and audited. A
         healthy
 
         comparison''s candidates are left out: they show on the run they were compared
         with.
 
         Identifiers that are PII stay masked. before: the next value of the previous
-        page.'
+        page, asked
+
+        for with the same drafts.'
       operationId: list_recent_runs
       parameters:
       - name: application
@@ -1285,6 +1290,13 @@ paths:
           - type: string
           - type: 'null'
           title: Before
+      - name: drafts
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+          title: Drafts
       responses:
         '200':
           description: Successful Response

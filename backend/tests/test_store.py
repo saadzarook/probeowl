@@ -219,6 +219,10 @@ def test_runs_are_listed_newest_first_page_by_page(engine: Engine) -> None:
     )
     assert draft.started_at == T0 + timedelta(minutes=7)
     assert page((T0 + timedelta(minutes=1), "run-1b")) == ["run-1", "run-0"]
+    # Without drafts (#164), filtered in the query, on every dialect: the page is still full.
+    with engine.connect() as conn:
+        found = list_runs(conn, LOCAL_WORKSPACE, "wallet", "prod", None, 3, drafts=False)
+    assert [r.id for r in found] == ["run-2", "run-1b", "run-1"]
 
 
 def test_naive_timestamps_are_refused(engine: Engine) -> None:
