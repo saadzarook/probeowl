@@ -1,0 +1,214 @@
+/* Author: @SaadZarook */
+/* The UI foundation (#105, #130): Tailwind 4 and the brand tokens, light and dark, beside app.css.
+
+   Tailwind's preflight is left out, and its theme and utilities sit in cascade layers, so app.css,
+   which is unlayered, wins wherever both apply: no screen changes until it moves onto web/src/ui.
+   app.css stays unlayered on purpose: in a layer, CodeMirror's injected styles would beat its
+   .yaml-editor overrides. One consequence: app.css's contextual rules (".validate-form input")
+   still style a ui component placed inside those screens, until that screen moves (PRs 2 to 5).
+
+   This is the token file: the only place a colour is written. Brand colours from
+   docs/screens/brand.png. A static stylesheet, so nothing here needs 'unsafe-inline'. */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+/* A plugin's screens live outside web/ (plugins/<name>/web), where Tailwind would not look. */
+@source "../../../plugins";
+
+/* Light. Dark only where the page asks for it: data-theme="dark", or "system" with a dark system
+   setting. Nothing sets it on the app yet, so it stays light until the shell moves (PR 2, #47). */
+:root {
+  --ui-background: #f6f7f9;
+  --ui-foreground: #14171c;
+  --ui-card: #ffffff;
+  --ui-muted: #5a6270;
+  --ui-border: #e2e5ea;
+  --ui-input: #858d9a; /* 3:1 against the card, as a control's edge needs */
+  --ui-primary: #1f5bd8;
+  --ui-primary-hover: #1a4fbd;
+  --ui-primary-foreground: #ffffff;
+  --ui-avatar-bg: #dbe6fb;
+  --ui-selected-bg: #eef2fb;
+  --ui-production: #b42318; /* fills, in both themes: Production stays red */
+  --ui-production-bg: #fce9e8;
+  --ui-production-text: #b42318;
+  --ui-on-production: #ffffff;
+  --ui-sidebar: #14171c;
+  --ui-sidebar-foreground: #e8eaee;
+  --ui-sidebar-muted: #9aa2b1;
+  --ui-sidebar-active: #232832;
+  --ui-code-bg: #14171c;
+  --ui-code-fg: #e8eaee;
+  --ui-overlay: rgb(20 23 28 / 0.5);
+  --ui-shadow: rgb(20 23 28 / 14%);
+  --ui-blue-bg: #e3ecfc;
+  --ui-blue-fg: #1f4fb4;
+  --ui-teal-bg: #dff3ef;
+  --ui-teal-fg: #0f6b5c;
+  --ui-pink-bg: #fbe4ec;
+  --ui-pink-fg: #a3204f;
+  --ui-olive-bg: #eaf2da;
+  --ui-olive-fg: #3e5a0f;
+  --ui-code-key: #8fb4ff;
+  --ui-code-string: #9be3b0;
+  --ui-code-literal: #f2c97d;
+  --ui-code-comment: #aab2bf;
+  --ui-code-punctuation: #d6dae1;
+  --ui-found-bg: #e5f3ea;
+  --ui-found-fg: #1a6b3a;
+  --ui-missing-bg: #fce9e8;
+  --ui-missing-fg: #b42318;
+  --ui-waiting-bg: #fdf0dc;
+  --ui-waiting-fg: #8a5200;
+  --ui-blocked-bg: #e8eaee;
+  --ui-blocked-fg: #3b4350;
+  --ui-ambiguous-bg: #ece6f8;
+  --ui-ambiguous-fg: #4f2a9e;
+  --ui-stale-bg: #e6eef6;
+  --ui-stale-fg: #25507c;
+}
+
+:root[data-theme="dark"] {
+  --ui-background: #0f1216;
+  --ui-foreground: #e8eaee;
+  --ui-card: #181c22;
+  --ui-muted: #9aa3b2;
+  --ui-border: #2a3039;
+  --ui-input: #6b7482;
+  --ui-primary: #6d97ee;
+  --ui-primary-hover: #86a9f1;
+  --ui-primary-foreground: #0f1216;
+  --ui-avatar-bg: #1d2a45;
+  --ui-selected-bg: #1b2436;
+  --ui-production-bg: #3a1a18;
+  --ui-production-text: #f2948b;
+  --ui-sidebar: #0b0d10;
+  --ui-sidebar-active: #1e232b;
+  --ui-code-bg: #0b0d10;
+  --ui-overlay: rgb(0 0 0 / 0.6);
+  --ui-shadow: rgb(0 0 0 / 50%);
+  --ui-blue-bg: #172a4a;
+  --ui-blue-fg: #9cc0f5;
+  --ui-teal-bg: #10302b;
+  --ui-teal-fg: #7fd6c5;
+  --ui-pink-bg: #3a1626;
+  --ui-pink-fg: #f2a0c0;
+  --ui-olive-bg: #222e12;
+  --ui-olive-fg: #b9d68a;
+  --ui-found-bg: #16301f;
+  --ui-found-fg: #7fd39b;
+  --ui-missing-bg: #3a1a18;
+  --ui-missing-fg: #f2948b;
+  --ui-waiting-bg: #352812;
+  --ui-waiting-fg: #f0c27a;
+  --ui-blocked-bg: #262c35;
+  --ui-blocked-fg: #c3c9d3;
+  --ui-ambiguous-bg: #2a2140;
+  --ui-ambiguous-fg: #c7b5f2;
+  --ui-stale-bg: #16263a;
+  --ui-stale-fg: #9cc0e8;
+  color-scheme: dark;
+}
+
+/* The same values as above, for "system" on a dark system: kept in step by the gallery's tests. */
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="system"] {
+    --ui-background: #0f1216;
+    --ui-foreground: #e8eaee;
+    --ui-card: #181c22;
+    --ui-muted: #9aa3b2;
+    --ui-border: #2a3039;
+    --ui-input: #6b7482;
+    --ui-primary: #6d97ee;
+    --ui-primary-hover: #86a9f1;
+    --ui-primary-foreground: #0f1216;
+    --ui-avatar-bg: #1d2a45;
+    --ui-selected-bg: #1b2436;
+    --ui-production-bg: #3a1a18;
+    --ui-production-text: #f2948b;
+    --ui-sidebar: #0b0d10;
+    --ui-sidebar-active: #1e232b;
+    --ui-code-bg: #0b0d10;
+    --ui-overlay: rgb(0 0 0 / 0.6);
+    --ui-shadow: rgb(0 0 0 / 50%);
+    --ui-blue-bg: #172a4a;
+    --ui-blue-fg: #9cc0f5;
+    --ui-teal-bg: #10302b;
+    --ui-teal-fg: #7fd6c5;
+    --ui-pink-bg: #3a1626;
+    --ui-pink-fg: #f2a0c0;
+    --ui-olive-bg: #222e12;
+    --ui-olive-fg: #b9d68a;
+    --ui-found-bg: #16301f;
+    --ui-found-fg: #7fd39b;
+    --ui-missing-bg: #3a1a18;
+    --ui-missing-fg: #f2948b;
+    --ui-waiting-bg: #352812;
+    --ui-waiting-fg: #f0c27a;
+    --ui-blocked-bg: #262c35;
+    --ui-blocked-fg: #c3c9d3;
+    --ui-ambiguous-bg: #2a2140;
+    --ui-ambiguous-fg: #c7b5f2;
+    --ui-stale-bg: #16263a;
+    --ui-stale-fg: #9cc0e8;
+    color-scheme: dark;
+  }
+}
+
+/* Only these colours exist as utilities: Tailwind's own palette is removed, so a component can't
+   reach for a literal colour (rule 10). Inline, so a utility reads the --ui-* value directly and
+   never tokens.css's --color-* of the same name. */
+@theme inline {
+  --color-*: initial;
+  --color-transparent: transparent;
+  --color-background: var(--ui-background);
+  --color-foreground: var(--ui-foreground);
+  --color-card: var(--ui-card);
+  --color-muted: var(--ui-muted);
+  --color-border: var(--ui-border);
+  --color-input: var(--ui-input);
+  --color-primary: var(--ui-primary);
+  --color-primary-hover: var(--ui-primary-hover);
+  --color-primary-foreground: var(--ui-primary-foreground);
+  --color-avatar-bg: var(--ui-avatar-bg);
+  --color-selected-bg: var(--ui-selected-bg);
+  --color-ring: var(--ui-primary);
+  --color-production: var(--ui-production);
+  --color-production-bg: var(--ui-production-bg);
+  --color-production-text: var(--ui-production-text);
+  --color-on-production: var(--ui-on-production);
+  --color-sidebar: var(--ui-sidebar);
+  --color-sidebar-foreground: var(--ui-sidebar-foreground);
+  --color-sidebar-muted: var(--ui-sidebar-muted);
+  --color-sidebar-active: var(--ui-sidebar-active);
+  --color-code-bg: var(--ui-code-bg);
+  --color-code-fg: var(--ui-code-fg);
+  --color-overlay: var(--ui-overlay);
+  --color-blue-bg: var(--ui-blue-bg);
+  --color-blue-fg: var(--ui-blue-fg);
+  --color-teal-bg: var(--ui-teal-bg);
+  --color-teal-fg: var(--ui-teal-fg);
+  --color-pink-bg: var(--ui-pink-bg);
+  --color-pink-fg: var(--ui-pink-fg);
+  --color-olive-bg: var(--ui-olive-bg);
+  --color-olive-fg: var(--ui-olive-fg);
+  --color-code-key: var(--ui-code-key);
+  --color-code-string: var(--ui-code-string);
+  --color-code-literal: var(--ui-code-literal);
+  --color-code-comment: var(--ui-code-comment);
+  --color-code-punctuation: var(--ui-code-punctuation);
+  --color-found-bg: var(--ui-found-bg);
+  --color-found-fg: var(--ui-found-fg);
+  --color-missing-bg: var(--ui-missing-bg);
+  --color-missing-fg: var(--ui-missing-fg);
+  --color-waiting-bg: var(--ui-waiting-bg);
+  --color-waiting-fg: var(--ui-waiting-fg);
+  --color-blocked-bg: var(--ui-blocked-bg);
+  --color-blocked-fg: var(--ui-blocked-fg);
+  --color-ambiguous-bg: var(--ui-ambiguous-bg);
+  --color-ambiguous-fg: var(--ui-ambiguous-fg);
+  --color-stale-bg: var(--ui-stale-bg);
+  --color-stale-fg: var(--ui-stale-fg);
+  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}

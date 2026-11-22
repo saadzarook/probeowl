@@ -1,4 +1,5 @@
 // Author: @SaadZarook
+import { Button, buttonClass, Field, Input, Select } from "../ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -28,9 +29,9 @@ function ErrorBlock({ message, onRetry }: { message: string; onRetry: () => void
   return (
     <div className="error-state" role="alert">
       <p>{message}</p>
-      <button className="btn" type="button" onClick={onRetry}>
+      <Button onClick={onRetry}>
         Retry
-      </button>
+      </Button>
     </div>
   );
 }
@@ -201,7 +202,7 @@ export function ProbeEditorPage({ item }: { item: NavItem }) {
           </>
         }
       >
-        <Link className="btn" to="/probes/new-entity">
+        <Link className={buttonClass()} to="/probes/new-entity">
           New entity
         </Link>
         <GuideLink page="concepts/">Concepts</GuideLink>
@@ -230,38 +231,35 @@ export function ProbeEditorPage({ item }: { item: NavItem }) {
     body = (
       <div className="editor-grid">
         <section className="card editor-fields" aria-label="Probe settings">
-          <label>
-            Title
-            <input value={fields?.title ?? ""} placeholder="What people read in Runs" onChange={(e) => setProbeYaml(setField(probeYaml, "title", e.target.value))} disabled={!fields} />
-          </label>
-          <label>
-            Entity
-            <select value={fields?.entity ?? ""} onChange={(e) => setProbeYaml(setField(probeYaml, "entity", e.target.value))} disabled={!fields}>
+          <Field id="probe-title" label="Title">
+            <Input value={fields?.title ?? ""} placeholder="What people read in Runs" onChange={(e) => setProbeYaml(setField(probeYaml, "title", e.target.value))} disabled={!fields} />
+          </Field>
+          <Field id="probe-entity" label="Entity">
+            <Select value={fields?.entity ?? ""} onChange={(e) => setProbeYaml(setField(probeYaml, "entity", e.target.value))} disabled={!fields}>
               {entities.data.map((e) => (
                 <option key={e.entity} value={e.entity}>
                   {e.entity}
                 </option>
               ))}
-            </select>
-          </label>
-          <label>
-            Kind
-            <select value={fields?.kind ?? ""} onChange={(e) => setProbeYaml(setField(probeYaml, "kind", e.target.value))} disabled={!fields}>
+            </Select>
+          </Field>
+          <Field id="probe-kind" label="Kind">
+            <Select value={fields?.kind ?? ""} onChange={(e) => setProbeYaml(setField(probeYaml, "kind", e.target.value))} disabled={!fields}>
               <option value="inspect">Inspect · current state</option>
               <option value="validate">Validate · one flow</option>
-            </select>
-          </label>
-          <label>
-            Owner
-            <input value={fields?.owner ?? ""} onChange={(e) => setProbeYaml(setField(probeYaml, "owner", e.target.value))} disabled={!fields} />
-          </label>
-          <fieldset>
-            <legend>Enabled in</legend>
+            </Select>
+          </Field>
+          <Field id="probe-owner" label="Owner">
+            <Input value={fields?.owner ?? ""} onChange={(e) => setProbeYaml(setField(probeYaml, "owner", e.target.value))} disabled={!fields} />
+          </Field>
+          {/* A label like every other field's, not a legend of its own size (audit 14). */}
+          <fieldset className="m-0 flex flex-col gap-2 border-0 p-0">
+            <legend className="mb-1 p-0 text-sm font-medium text-foreground">Enabled in</legend>
             {application.environments.map((env) => (
-              <label key={env.name} className="check-option">
+              <label key={env.name} className="flex items-center gap-2 text-sm text-foreground">
                 <input type="checkbox" checked={checked(env.name) && !unbound.has(env.name)} disabled={!fields || unbound.has(env.name)} onChange={() => toggle(env.name)} />
                 {env.title}
-                {unbound.has(env.name) && <span className="hint"> · {unbound.get(env.name)} not bound</span>}
+                {unbound.has(env.name) && <span className="text-muted"> · {unbound.get(env.name)} not bound</span>}
               </label>
             ))}
           </fieldset>
@@ -280,6 +278,10 @@ export function ProbeEditorPage({ item }: { item: NavItem }) {
               {entityName ? `Uses entity ${entityName} · ${graph.length} ${graph.length === 1 ? "location" : "locations"}` : "No entity"}
             </span>
           </div>
+          {/* On a phone the YAML reads and scrolls; writing it is designed for a wider screen, and says so. */}
+          <p className="m-0 px-3 pb-2 text-sm text-sidebar-muted sm:hidden" role="note">
+            Editing is designed for a wider screen. Here you can read the YAML and scroll it sideways.
+          </p>
           {/* Both editors stay mounted while you switch tabs, so their undo history does too. */}
           <div hidden={tab !== "yaml"}>
             <YamlEditor
@@ -330,29 +332,38 @@ export function ProbeEditorPage({ item }: { item: NavItem }) {
       <div className="page-header editor-header">
         <div>
           <p className="hint">{application?.title ?? ""} / {item.label}</p>
-          <h1>{(probeYaml !== undefined && probeName(probeYaml)) || item.label}</h1>
+          {/* Plex Sans, with the probe's id inside it in Plex Mono (rule 4). */}
+          <h1>
+            {probeYaml !== undefined && probeName(probeYaml) ? (
+              <>
+                Probe <code className="font-mono">{probeName(probeYaml)}</code>
+              </>
+            ) : (
+              item.label
+            )}
+          </h1>
         </div>
         <div className="editor-actions">
-          <Link className="btn btn-outline" to="/probes/new-entity">
+          <Link className={buttonClass({ variant: "outline" })} to="/probes/new-entity">
             New entity…
           </Link>
-          <label>
+          <label className="flex items-center gap-2 text-sm font-medium text-foreground">
             Open probe
-            <select value="" onChange={(e) => void openProbe(e.target.value)} disabled={!probes.data?.length}>
+            <Select className="w-48" value="" onChange={(e) => void openProbe(e.target.value)} disabled={!probes.data?.length}>
               <option value="">Select a probe</option>
               {(probes.data ?? []).map((p) => (
                 <option key={p.name} value={p.name}>
                   {p.name}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
-          <button className="btn btn-outline" type="button" onClick={() => newProbe()} disabled={!entities.data?.length}>
+          <Button variant="outline" onClick={() => newProbe()} disabled={!entities.data?.length} disabledReason="No entity to write a probe for">
             New probe
-          </button>
-          <button className="btn" type="button" disabled={!canSave} onClick={() => setSaving(true)}>
+          </Button>
+          <Button disabled={!canSave} onClick={() => setSaving(true)}>
             Save
-          </button>
+          </Button>
         </div>
       </div>
       {enabled && saveBlocked && <p className="hint" role="status">{saveBlocked}</p>}

@@ -1,4 +1,6 @@
 // Author: @SaadZarook
+import { Button } from "../ui";
+import { RunStatusChip } from "./RunStatusChip";
 import { useState } from "react";
 import type { ExpectationEvaluation, LocationResult, Run } from "../api/client";
 import { useEntity } from "../api/useEntities";
@@ -51,9 +53,9 @@ export function RunResult({ runId }: { runId: string }) {
     return (
       <div className="error-state" role="alert">
         <p>{query.error.message}</p>
-        <button className="btn" type="button" onClick={() => void query.refetch()}>
+        <Button type="button" onClick={() => void query.refetch()}>
           Retry
-        </button>
+        </Button>
       </div>
     );
   }
@@ -73,13 +75,13 @@ export function RunResult({ runId }: { runId: string }) {
   return (
     <section className="card run-result" aria-busy={running} aria-label="Run result">
       <header className="run-header">
-        <span className="status" data-status={run.status} data-caveat={run.caveat ? true : undefined}>
+        <RunStatusChip status={run.status} caveat={Boolean(run.caveat)}>
           {withCaveat(titleCase(run.status), run.caveat)}
-        </span>
+        </RunStatusChip>
         <StopReason run={run} />
         <div>
           <h2>
-            {run.probe_title} on {run.identifier_value}
+            {run.probe_title} on <code className="font-mono">{run.identifier_value}</code>
           </h2>
           <p className="hint">
             Looked up as <code>{run.identifier}</code>

@@ -1,4 +1,5 @@
 // Author: @SaadZarook
+import { Button } from "../ui";
 import { useState } from "react";
 import type { CatalogChange } from "../api/client";
 import { useConfirmTable } from "../api/useCatalog";
@@ -26,14 +27,14 @@ export function LocationFailures({ application, location, failures, linkFix, row
           <li key={`${f.check}: ${f.message}`}>
             <strong>{f.check}</strong>: {f.message}
             {f.check === ROW_CEILING && rowCeiling !== undefined && (
-              <button className="btn btn-outline" type="button" onClick={() => onLowerMaxRows(rowCeiling)}>
+              <Button variant="outline" type="button" onClick={() => onLowerMaxRows(rowCeiling)}>
                 Lower max_rows to {rowCeiling}
-              </button>
+              </Button>
             )}
             {f.check === PII_MASKED && (
-              <button className="btn btn-outline" type="button" onClick={onMaskPii}>
+              <Button variant="outline" type="button" onClick={onMaskPii}>
                 Mask the catalog's PII columns
-              </button>
+              </Button>
             )}
           </li>
         ))}
@@ -64,23 +65,22 @@ function CatalogLinkFix({ application, fix }: { application: string; fix: LinkFi
         The catalog does not call {entry.table}.{column} a key, so a {entry.label} table may not be read by it. The wizard followed it as a link:
       </p>
       {preview === undefined ? (
-        <button
-          className="btn"
+        <Button
           type="button"
           disabled={confirm.isPending}
           onClick={() => confirm.mutate({ entry }, { onSuccess: (change) => setPreview(change) })}
         >
           {text}
-        </button>
+        </Button>
       ) : (
         <>
           <ChangePreview change={preview} stale={false} />
-          <button className="btn" type="button" disabled={confirm.isPending} onClick={() => confirm.mutate({ entry, base: preview.base })}>
+          <Button type="button" disabled={confirm.isPending} onClick={() => confirm.mutate({ entry, base: preview.base })}>
             Confirm in catalog.yaml
-          </button>
-          <button className="btn btn-outline" type="button" onClick={() => setPreview(undefined)}>
+          </Button>
+          <Button variant="outline" type="button" onClick={() => setPreview(undefined)}>
             Cancel
-          </button>
+          </Button>
         </>
       )}
       {failed && (

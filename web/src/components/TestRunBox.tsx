@@ -1,4 +1,6 @@
 // Author: @SaadZarook
+import { Button, Field, Input, Select } from "../ui";
+import { RunStatusChip } from "./RunStatusChip";
 import { useMutation } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
@@ -24,9 +26,9 @@ function Finished({ runId }: { runId: string }) {
     return (
       <div className="error-state" role="alert">
         <p>{query.error.message}</p>
-        <button className="btn" type="button" onClick={() => void query.refetch()}>
+        <Button type="button" onClick={() => void query.refetch()}>
           Retry
-        </button>
+        </Button>
       </div>
     );
   }
@@ -35,9 +37,9 @@ function Finished({ runId }: { runId: string }) {
   const passed = expectations.filter((e) => e.result === "pass").length;
   return (
     <div className="test-run-result" aria-live="polite">
-      <span className="status" data-status={run.status} data-caveat={run.caveat ? true : undefined}>
+      <RunStatusChip status={run.status} caveat={Boolean(run.caveat)}>
         {withCaveat(titleCase(run.status), run.caveat)}
-      </span>
+      </RunStatusChip>
       <span>
         {passed} of {expectations.length} expectations
       </span>
@@ -84,30 +86,34 @@ export function TestRunBox({ probe, entity, rootKey }: TestRunBoxProps) {
   // The prompt is a form of its own, so it sits beside this one: forms never nest.
   return (
     <>
-      <form className="card test-run validate-form" onSubmit={submit} aria-label="Test run">
+      <form className="card test-run flex flex-col gap-2" onSubmit={submit} aria-label="Test run">
         <h2>Test run</h2>
-        <label>
-          ID
-          <input value={value} onChange={(e) => setValue(e.target.value)} placeholder={rootKey ? `a ${rootKey} or another identifier` : ""} />
-        </label>
-        <label>
-          Reason
-          <select value={reason} onChange={(e) => setReason(e.target.value as Reason | "")}>
+        <Field id="test-run-value" label="ID">
+          <Input value={value} onChange={(e) => setValue(e.target.value)} placeholder={rootKey ? `a ${rootKey} or another identifier` : ""} />
+        </Field>
+        <Field id="test-run-reason" label="Reason">
+          <Select value={reason} onChange={(e) => setReason(e.target.value as Reason | "")}>
             <option value="">Select a reason</option>
             {Object.entries(REASON_LABELS).map(([key, label]) => (
               <option key={key} value={key}>
                 {label}
               </option>
             ))}
-          </select>
-        </label>
-        <label>
-          Reference{production ? "" : " (optional)"}
-          <input value={reference} onChange={(e) => setReference(e.target.value)} placeholder={REFERENCE_PLACEHOLDER} />
-        </label>
-        <button className="btn btn-outline" type="submit" disabled={!ready || start.isPending}>
-          {start.isPending ? "Starting…" : "Run draft"}
-        </button>
+          </Select>
+        </Field>
+        <Field id="test-run-reference" label={`Reference${production ? "" : " (optional)"}`}>
+          <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder={REFERENCE_PLACEHOLDER} />
+        </Field>
+        <div>
+          <Button
+            variant="outline"
+            type="submit"
+            disabled={!ready || start.isPending}
+            disabledReason={start.isPending ? undefined : runMissing(value, reason, production && reference.trim() === "")}
+          >
+            {start.isPending ? "Starting…" : "Run draft"}
+          </Button>
+        </div>
         {refused && (
           <div role="alert" className="form-error">
             <p>{refused.message}</p>
@@ -137,4 +143,12 @@ export function TestRunBox({ probe, entity, rootKey }: TestRunBoxProps) {
       )}
     </>
   );
+}
+
+/** Why Run draft can't be pressed yet (rule 8): a reference only in Production. */
+function runMissing(value: string, reason: string, needsReference: boolean): string | undefined {
+  const missing = [value.trim() === "" && "an ID", reason === "" && "a reason", needsReference && "a reference"].filter(
+    (part): part is string => typeof part === "string",
+  );
+  return missing.length > 0 ? `To run: ${missing.join(", ")}.` : undefined;
 }

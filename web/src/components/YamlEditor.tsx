@@ -1,4 +1,5 @@
 // Author: @SaadZarook
+import { Button } from "../ui";
 import type { CompletionContext, CompletionResult } from "@codemirror/autocomplete";
 import { redo, redoDepth, undo, undoDepth } from "@codemirror/commands";
 import { yaml } from "@codemirror/lang-yaml";
@@ -8,14 +9,18 @@ import { tags } from "@lezer/highlight";
 import { EditorView, basicSetup } from "codemirror";
 import { keymap } from "@codemirror/view";
 import { useEffect, useRef, useState } from "react";
+import { cspNonce } from "../csp";
+
+// On the editor's dark panel.
+const TOOL = "border-sidebar-muted bg-transparent text-sidebar-foreground hover:bg-sidebar-active";
 
 /** Light-on-ink colours that keep the YAML readable on the dark editor (WCAG AA). */
 const darkHighlight = HighlightStyle.define([
-  { tag: tags.propertyName, color: "#8fb4ff" },
-  { tag: [tags.string, tags.content], color: "#9be3b0" },
-  { tag: [tags.number, tags.bool, tags.null, tags.keyword], color: "#f2c97d" },
-  { tag: tags.comment, color: "#aab2bf" },
-  { tag: [tags.meta, tags.punctuation, tags.separator], color: "#d6dae1" },
+  { tag: tags.propertyName, color: "var(--ui-code-key)" },
+  { tag: [tags.string, tags.content], color: "var(--ui-code-string)" },
+  { tag: [tags.number, tags.bool, tags.null, tags.keyword], color: "var(--ui-code-literal)" },
+  { tag: tags.comment, color: "var(--ui-code-comment)" },
+  { tag: [tags.meta, tags.punctuation, tags.separator], color: "var(--ui-code-punctuation)" },
 ]);
 
 /**
@@ -95,6 +100,8 @@ export function YamlEditor({ value, label, onChange, readOnly = false, completio
         syntaxHighlighting(darkHighlight),
         EditorView.contentAttributes.of({ "aria-label": label }),
         EditorView.editable.of(!readOnly),
+        // CodeMirror's styles go in a <style> that carries the page's nonce (#110).
+        ...(cspNonce ? [EditorView.cspNonce.of(cspNonce)] : []),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) latest.current?.(update.state.doc.toString());
           setDepths({ undo: undoDepth(update.state), redo: redoDepth(update.state) });
@@ -137,21 +144,23 @@ export function YamlEditor({ value, label, onChange, readOnly = false, completio
   return (
     <div className="yaml-editor-wrap">
       {!readOnly && (
-        <div className="yaml-toolbar" role="toolbar" aria-label="Edit history">
-          <button className="btn btn-outline small" type="button" disabled={depths.undo === 0} onClick={() => run(undo)} title="Ctrl+Z">
+        // Small toolbar buttons, clear of the panel's edge (rule 2, audit 13).
+        <div className="flex flex-wrap justify-end gap-2 px-3 pb-2" role="toolbar" aria-label="Edit history">
+          <Button variant="outline" size="sm" className={TOOL} disabled={depths.undo === 0} onClick={() => run(undo)} title="Ctrl+Z">
             Undo
-          </button>
-          <button className="btn btn-outline small" type="button" disabled={depths.redo === 0} onClick={() => run(redo)} title="Ctrl+Y">
+          </Button>
+          <Button variant="outline" size="sm" className={TOOL} disabled={depths.redo === 0} onClick={() => run(redo)} title="Ctrl+Y">
             Redo
-          </button>
+          </Button>
           {saved !== undefined && (
-            <button className="btn btn-outline small" type="button" disabled={!changed} onClick={revert}>
+            <Button variant="outline" size="sm" className={TOOL} disabled={!changed} onClick={revert}>
               Revert to saved
-            </button>
+            </Button>
           )}
         </div>
       )}
-      <div className="yaml-editor" ref={host} />
+      {/* Long lines scroll inside the editor, never the page: an intended sideways scroll (rule 6). */}
+      <div className="yaml-editor" ref={host} data-scrolls="x" />
     </div>
   );
 }

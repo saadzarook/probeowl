@@ -1,4 +1,5 @@
 // Author: @SaadZarook
+import { buttonClass } from "../ui";
 import { Link } from "react-router-dom";
 import { EmptyState, GuideLink } from "./EmptyState";
 
@@ -14,7 +15,7 @@ export function NoProbes({ kind, application, entity }: { kind: "validate" | "in
   return (
     <div role="status">
       <EmptyState title={`No ${title} probes in ${application}`} message={`${WHAT[kind]} Start one in the Probe editor.`}>
-        <Link className="btn" to={start}>
+        <Link className={buttonClass()} to={start}>
           New probe
         </Link>
         <GuideLink page="writing-probes/">Writing probes</GuideLink>

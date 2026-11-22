@@ -4,7 +4,8 @@ import type { LocationResult, Run, StepInRun } from "../api/client";
 import { copyWrite, runStep } from "../api/client";
 import { useRun } from "../api/useRun";
 import { useRunStep, useTickStep } from "../api/useRunbooks";
-import { copyText, needsPlanAcknowledgement, stepLabel, writeHeader, type RunbookStepView } from "../runbooks";
+import { needsPlanAcknowledgement, stepLabel, writeHeader, type RunbookStepView } from "../runbooks";
+import { Button, copyText } from "../ui";
 import { titleCase } from "../runFormat";
 import { showValue } from "./AmbiguousMatches";
 import { CopyButton } from "./CopyButton";
@@ -80,9 +81,9 @@ function RunRead({ run, runbook, step, result }: { run: Run; runbook: string; st
   return (
     <div className="runbook-run">
       {masked && <PastedSubject value={subject} onChange={setSubject} />}
-      <button className="btn" type="button" disabled={running.isPending || (asks && !acknowledged) || (masked && subject === "")} onClick={() => running.mutate(acknowledged, { onSuccess: () => setAcknowledged(false) })}>
+      <Button type="button" disabled={running.isPending || (asks && !acknowledged) || (masked && subject === "")} onClick={() => running.mutate(acknowledged, { onSuccess: () => setAcknowledged(false) })}>
         {running.isPending ? "Running…" : "Run read-only"}
-      </button>
+      </Button>
       {running.isError && <p className="error-state" role="alert">{running.error.message}</p>}
       {asks && (
         <label className="runbook-acknowledge">
@@ -213,9 +214,9 @@ function ProbeStepBody({ runbook, step, run }: StepProps & { step: Extract<Runbo
       </p>
       {run && step.runnable && masked && <PastedSubject value={subject} onChange={setSubject} />}
       {run && step.runnable ? (
-        <button className="btn" type="button" disabled={(started !== undefined && again.data?.status === "running") || (masked && subject === "")} onClick={() => start(run.id)}>
+        <Button type="button" disabled={(started !== undefined && again.data?.status === "running") || (masked && subject === "")} onClick={() => start(run.id)}>
           {run.kind === "validate" ? "Validate again" : "Inspect again"}
-        </button>
+        </Button>
       ) : (
         <p className="hint">{step.runnable ? "Open this runbook from a run to run this probe again." : `This application has no probe named ${step.probe}.`}</p>
       )}

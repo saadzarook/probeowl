@@ -82,7 +82,7 @@ test("the sidebar shows ProbeOwl's version, as owl --version prints it, and the 
   const pyproject = readFileSync(new URL("../../backend/pyproject.toml", import.meta.url), "utf8");
   const version = /^version = "([^"]+)"$/m.exec(pyproject)?.[1];
   await page.goto("/inspect");
-  await expect(page.locator(".sidebar-footer")).toHaveText(`v${version ?? "?"} · local`);
+  await expect(page.getByRole("complementary").getByText(/ · local$/)).toHaveText(`v${version ?? "?"} · local`);
 });
 
 test("the application and environment survive a reload (#94)", async ({ page }) => {

@@ -1,4 +1,5 @@
 // Author: @SaadZarook
+import { Button } from "../ui";
 import { useEffect, useRef, useState } from "react";
 import { useImportSchema } from "../api/useCatalog";
 
@@ -51,13 +52,13 @@ export function ImportDialog({ application, environment, connectors, onClose }: 
         </div>
       )}
       <div className="dialog-actions">
-        <button className="btn secondary" type="button" disabled={run.isPending} onClick={() => ref.current?.close()}>
+        <Button variant="outline" type="button" disabled={run.isPending} onClick={() => ref.current?.close()}>
           {done ? "Close" : "Cancel"}
-        </button>
+        </Button>
         {connectors.length > 0 && (
-          <button className="btn" type="button" disabled={run.isPending} onClick={() => run.mutate(connector)}>
+          <Button type="button" disabled={run.isPending} onClick={() => run.mutate(connector)}>
             {run.isPending ? "Importing…" : "Import"}
-          </button>
+          </Button>
         )}
       </div>
     </dialog>

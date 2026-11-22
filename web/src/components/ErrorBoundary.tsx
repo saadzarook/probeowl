@@ -1,4 +1,5 @@
 // Author: @SaadZarook
+import { Button } from "../ui";
 import { Component, type ErrorInfo, type ReactNode } from "react";
 
 interface Props {
@@ -26,9 +27,9 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <div className="error-state" role="alert">
           <p>This page could not be shown.</p>
-          <button className="btn" type="button" onClick={() => this.setState({ failed: false })}>
+          <Button type="button" onClick={() => this.setState({ failed: false })}>
             Retry
-          </button>
+          </Button>
         </div>
       );
     }

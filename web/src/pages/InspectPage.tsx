@@ -1,4 +1,5 @@
 // Author: @SaadZarook
+import { Button } from "../ui";
 import { useMutation } from "@tanstack/react-query";
 import { Fragment, useState } from "react";
 import { PasswordMissingError, pickMatches, splitError, startRun } from "../api/client";
@@ -47,13 +48,12 @@ export function InspectPage({ item }: { item: NavItem }) {
       ) : entities.isError ? (
         <div className="error-state" role="alert">
           <p>{entities.error.message}</p>
-          <button
-            className="btn"
+          <Button
             type="button"
             onClick={() => void entities.refetch()}
           >
             Retry
-          </button>
+          </Button>
         </div>
       ) : entity === undefined ? (
         <EmptyState

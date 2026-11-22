@@ -7,6 +7,7 @@ import { useKillSwitches } from "../api/useKillSwitches";
 import { useReloadConfiguration } from "../api/useReloadConfiguration";
 import { ConnectorDetail } from "../components/ConnectorDetail";
 import { CopyButton } from "../components/CopyButton";
+import { Button, buttonClass, ListOrTable } from "../ui";
 import { EmptyState, GuideLink } from "../components/EmptyState";
 import { HealthChip } from "../components/HealthChip";
 import { KillSwitchDialog } from "../components/KillSwitchDialog";
@@ -43,7 +44,7 @@ export function ConnectorsPage({ item }: { item: NavItem }) {
     body = (
       <div className="error-state" role="alert">
         <p>{connectors.error.message}</p>
-        <button className="btn" type="button" onClick={() => void connectors.refetch()}>Retry</button>
+        <Button onClick={() => void connectors.refetch()}>Retry</Button>
       </div>
     );
   } else if (rows.length === 0) {
@@ -59,7 +60,7 @@ export function ConnectorsPage({ item }: { item: NavItem }) {
           </>
         }
       >
-        <RouterLink className="btn" to="/connectors/new">
+        <RouterLink className={buttonClass()} to="/connectors/new">
           Add connection
         </RouterLink>
         <p className="cli-command">
@@ -71,40 +72,38 @@ export function ConnectorsPage({ item }: { item: NavItem }) {
   } else {
     body = (
       <div className="tables-layout connectors-layout">
-        <div className="table-scroll">
-          <table className="connector-list">
-            <thead>
-              <tr>
-                <th scope="col">Connector</th>
-                <th scope="col">Type</th>
-                <th scope="col">Limits</th>
-                <th scope="col">Lag</th>
-                <th scope="col">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => {
-                const isSelected = selected?.connector === row.connector;
+        <ListOrTable
+          label="Connectors"
+          rows={rows}
+          rowKey={(row) => row.connector}
+          highlight={(row) => (needsAttention(row) ? "waiting" : selected?.connector === row.connector ? "selected" : undefined)}
+          empty="No connectors yet."
+          columns={[
+            {
+              header: "Connector",
+              cell: (row) => {
                 const warning = planWarning(row);
                 return (
-                  <tr key={row.connector} data-selected={isSelected} data-attention={needsAttention(row)}>
-                    <td>
-                      <button type="button" className="table-pick" aria-pressed={isSelected} onClick={() => setPick(row.connector)}>
-                        <code>{row.connector}</code>
-                      </button>
-                      {row.role && <p className="connector-role">{row.role}</p>}
-                      {warning && <p className="connector-warning" role="note">{warning}</p>}
-                    </td>
-                    <td>{typeTitle(row.type)}</td>
-                    <td className="connector-limits">{limitsText(row)}</td>
-                    <td className="connector-lag">{lagText(row)}</td>
-                    <td><HealthChip health={row.health} /></td>
-                  </tr>
+                  <>
+                    <button type="button" className="grid cursor-pointer gap-1 border-0 bg-transparent p-0 text-left text-foreground" aria-pressed={selected?.connector === row.connector} onClick={() => setPick(row.connector)}>
+                      <code className="font-mono">{row.connector}</code>
+                    </button>
+                    {row.role && <p className="m-0 mt-1 text-xs text-muted">{row.role}</p>}
+                    {warning && (
+                      <p className="m-0 mt-2 border-0 border-l-4 border-solid border-waiting-fg bg-waiting-bg px-3 py-1 text-sm text-waiting-fg" role="note">
+                        {warning}
+                      </p>
+                    )}
+                  </>
                 );
-              })}
-            </tbody>
-          </table>
-        </div>
+              },
+            },
+            { header: "Type", cell: (row) => typeTitle(row.type) },
+            { header: "Limits", cell: (row) => limitsText(row) },
+            { header: "Lag", cell: (row) => <span className="font-mono">{lagText(row)}</span> },
+            { header: "Status", cell: (row) => <HealthChip health={row.health} /> },
+          ]}
+        />
         {selected && <ConnectorDetail key={`${selected.connector}/${selected.environment}`} status={selected} application={application.name} />}
       </div>
     );
@@ -119,21 +118,21 @@ export function ConnectorsPage({ item }: { item: NavItem }) {
         </div>
         <div className="editor-actions">
           {application && (
-            <RouterLink className="btn" to="/connectors/new">
+            <RouterLink className={buttonClass()} to="/connectors/new">
               Add connection
             </RouterLink>
           )}
-          <button className="btn btn-outline" type="button" disabled={reload.isPending} onClick={() => reload.mutate()}>
+          <Button variant="outline" disabled={reload.isPending} onClick={() => reload.mutate()}>
             {reload.isPending ? "Reloading…" : "Reload configuration"}
-          </button>
+          </Button>
           {application && (
             <>
-              <button className="btn btn-outline" type="button" disabled={switches.isError} onClick={() => setChanging({ target: applicationTarget, on: !applicationOn })}>
+              <Button variant="outline" disabled={switches.isError} onClick={() => setChanging({ target: applicationTarget, on: !applicationOn })}>
                 {applicationOn ? `Resume ${application.title}` : `Stop ${application.title}`}
-              </button>
-              <button className="btn btn-outline" type="button" disabled={switches.isError} onClick={() => setChanging({ target: GLOBAL, on: !globalOn })}>
+              </Button>
+              <Button variant="outline" disabled={switches.isError} onClick={() => setChanging({ target: GLOBAL, on: !globalOn })}>
                 {globalOn ? "Resume everything" : "Stop everything"}
-              </button>
+              </Button>
             </>
           )}
         </div>
@@ -148,7 +147,7 @@ export function ConnectorsPage({ item }: { item: NavItem }) {
       {reload.isError && (
         <div className="error-state" role="alert">
           <p>{reload.error.message}</p>
-          <button className="btn" type="button" onClick={() => reload.mutate()}>Retry</button>
+          <Button onClick={() => reload.mutate()}>Retry</Button>
         </div>
       )}
       {changing && <KillSwitchDialog target={changing.target} on={changing.on} onClose={() => setChanging(undefined)} />}

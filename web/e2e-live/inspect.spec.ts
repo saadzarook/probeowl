@@ -22,7 +22,7 @@ test("C204518 in Production resolves to VP00012931 and fails its three expectati
   await inspect(page, "C204518");
 
   const result = page.getByRole("region", { name: "Inspect result" });
-  await expect(result.locator(".status")).toHaveAttribute("data-status", "failed", { timeout: 60_000 });
+  await expect(result.locator("[data-status]").first()).toHaveAttribute("data-status", "failed", { timeout: 60_000 });
   await expect(page.getByText("Detected")).toContainText("card_id");
   const resolution = page.getByLabel("Resolution");
   await expect(resolution).toContainText("card_id C204518");

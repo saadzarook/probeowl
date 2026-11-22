@@ -1,4 +1,5 @@
 // Author: @SaadZarook
+import { Button } from "../ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { onConfigurationReloaded } from "../api/configuration";
@@ -25,9 +26,9 @@ export function ReloadedBanner() {
   return (
     <div className="reload-banner" role="status">
       <span>owl serve reloaded its configuration. This screen now shows the new one; drafts are kept and checked again.</span>
-      <button className="btn btn-outline" type="button" onClick={() => setReloaded(false)}>
+      <Button variant="outline" type="button" onClick={() => setReloaded(false)}>
         Dismiss
-      </button>
+      </Button>
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { useProbes } from "../api/useProbes";
 import { detectIdentifier } from "../identifiers";
 import { REASON_LABELS, REFERENCE_PLACEHOLDER } from "../reasons";
 import { useSelection } from "../selection";
+import { Button, Card, Field, FormGrid, Input, Select } from "../ui";
 import { NoProbes } from "./NoProbes";
 
 interface InspectFormProps {
@@ -57,115 +58,116 @@ export function InspectForm({ entity, pending, error, valueError, onSubmit }: In
     });
   }
 
+  const hint =
+    value.trim() === "" ? (
+      <>Accepts {others.join(", ")}</>
+    ) : chosen ? (
+      <>
+        Looked up as <strong>{chosen}</strong>
+      </>
+    ) : detected ? (
+      <>
+        Detected <strong>{detected}</strong>
+        {others.length > 0 && <> · also accepts {others.join(", ")}</>}
+      </>
+    ) : (
+      <>No pattern places this value: each identifier is tried, {entity.root_key} first.</>
+    );
+  // Why Inspect can't be pressed yet, next to it (rule 8).
+  const missing = [
+    value.trim() === "" && "an identifier",
+    reason === "" && "a reason",
+    production && reference.trim() === "" && "a reference",
+    probe === undefined && "a probe",
+  ].filter((part): part is string => typeof part === "string");
+
   return (
-    <form className="card validate-form" onSubmit={submit}>
-      <div className="form-row inspect-row">
-        <label>
-          Environment
-          <select
-            className="env-select"
-            data-production={production}
-            value={environment?.name ?? ""}
-            onChange={(e) => selectEnvironment(e.target.value)}
-          >
-            {application?.environments.map((choice) => (
-              <option key={choice.name} value={choice.name}>
-                {choice.title}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className="identifier-field">
-          <label>
-            Identifier
-            <input
+    <Card className="mb-6">
+      <form aria-label="Inspect" onSubmit={submit} className="flex flex-col gap-4">
+        <FormGrid>
+          <Field id="inspect-environment" label="Environment">
+            <Select
+              tone={production ? "production" : undefined}
+              value={environment?.name ?? ""}
+              onChange={(e) => selectEnvironment(e.target.value)}
+            >
+              {application?.environments.map((choice) => (
+                <option key={choice.name} value={choice.name}>
+                  {choice.title}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          {/* The hint follows what is typed, so it is announced as it changes. */}
+          <Field id="inspect-identifier" label="Identifier" help={<span aria-live="polite">{hint}</span>} error={valueError}>
+            <Input
               value={value}
               onChange={(e) => setValue(e.target.value)}
               placeholder={`a ${entity.root_key} or another identifier`}
-              aria-describedby={valueError ? "identifier-error identifier-hint" : "identifier-hint"}
-              aria-invalid={valueError ? true : undefined}
               required
             />
-          </label>
-          <p className="hint" id="identifier-hint" aria-live="polite">
-            {value.trim() === "" ? (
-              <>Accepts {others.join(", ")}</>
-            ) : chosen ? (
-              <>Looked up as <strong>{chosen}</strong></>
-            ) : detected ? (
-              <>
-                Detected <strong>{detected}</strong>
-                {others.length > 0 && <> · also accepts {others.join(", ")}</>}
-              </>
-            ) : (
-              <>No pattern places this value: each identifier is tried, {entity.root_key} first.</>
-            )}
-          </p>
-          <label className="find-by">
-            Find by
-            <select value={chosen} onChange={(e) => setChosen(e.target.value)}>
+          </Field>
+          <Field id="inspect-find-by" label="Find by">
+            <Select value={chosen} onChange={(e) => setChosen(e.target.value)}>
               <option value="">Detect automatically</option>
               {Object.keys(entity.identifiers ?? {}).map((name) => (
                 <option key={name} value={name}>
                   {name}
                 </option>
               ))}
-            </select>
-          </label>
-          {valueError && (
-            <p className="form-error" id="identifier-error" role="alert">
-              {valueError}
-            </p>
-          )}
-        </div>
-        <label>
-          Probe
-          <select value={probe ?? ""} onChange={(e) => setProbeChoice(e.target.value)}>
-            {inspectProbes.map((p) => (
-              <option key={p.name} value={p.name}>
-                {p.title}
-              </option>
-            ))}
-          </select>
+            </Select>
+          </Field>
           {/* The id, as the CLI and the probe's file name it; the select already names the probe. */}
-          {probe && <span className="field-id" aria-hidden="true">{probe}</span>}
-        </label>
-        <label>
-          Reason
-          <select value={reason} onChange={(e) => setReason(e.target.value as Reason | "")} required>
-            <option value="">Select a reason</option>
-            {Object.entries(REASON_LABELS).map(([key, label]) => (
-              <option key={key} value={key}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Reference{production ? "" : " (optional)"}
-          <input value={reference} onChange={(e) => setReference(e.target.value)} placeholder={REFERENCE_PLACEHOLDER} required={production} />
-        </label>
-        <button className="btn" type="submit" disabled={!ready || pending}>
-          {pending ? "Starting…" : "Inspect"}
-        </button>
-      </div>
-      <p className="hint">
-        Reason is always required; Reference is required in Production. Investigator, environment, time and probe version
-        are recorded automatically.
-      </p>
-      {probes.isError && (
-        <p role="alert" className="form-error">
-          {probes.error.message}
+          <Field id="inspect-probe" label="Probe" help={probe && <code aria-hidden="true" className="font-mono">{probe}</code>}>
+            <Select value={probe ?? ""} onChange={(e) => setProbeChoice(e.target.value)}>
+              {inspectProbes.map((p) => (
+                <option key={p.name} value={p.name}>
+                  {p.title}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field id="inspect-reason" label="Reason">
+            <Select value={reason} onChange={(e) => setReason(e.target.value as Reason | "")} required>
+              <option value="">Select a reason</option>
+              {Object.entries(REASON_LABELS).map(([key, label]) => (
+                <option key={key} value={key}>
+                  {label}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field id="inspect-reference" label={`Reference${production ? "" : " (optional)"}`}>
+            <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder={REFERENCE_PLACEHOLDER} required={production} />
+          </Field>
+        </FormGrid>
+        <p className="m-0 text-sm text-muted">
+          Reason is always required; Reference is required in Production. Investigator, environment, time and probe version
+          are recorded automatically.
         </p>
-      )}
-      {inspectProbes.length === 0 && probes.isSuccess && (
-        <NoProbes kind="inspect" application={application?.title ?? "this application"} entity={entity.entity} />
-      )}
-      {error && (
-        <p role="alert" className="form-error">
-          {error}
-        </p>
-      )}
-    </form>
+        {probes.isError && (
+          <p role="alert" className="m-0 text-sm text-production-text">
+            {probes.error.message}
+          </p>
+        )}
+        {inspectProbes.length === 0 && probes.isSuccess && (
+          <NoProbes kind="inspect" application={application?.title ?? "this application"} entity={entity.entity} />
+        )}
+        {error && (
+          <p role="alert" className="m-0 text-sm text-production-text">
+            {error}
+          </p>
+        )}
+        <div>
+          <Button
+            type="submit"
+            disabled={!ready || pending}
+            disabledReason={pending ? undefined : missing.length > 0 ? `To inspect: ${missing.join(", ")}.` : undefined}
+          >
+            {pending ? "Starting…" : "Inspect"}
+          </Button>
+        </div>
+      </form>
+    </Card>
   );
 }

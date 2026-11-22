@@ -6,6 +6,7 @@ index.html, which routes in the browser. A release wheel carries the build in pr
 a source checkout serves web/dist once `npm run build` has made it.
 """
 
+import secrets
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -16,13 +17,18 @@ from probeowl.errors import NotFoundError
 PACKAGED = Path(__file__).resolve().parents[1] / "webapp"
 SOURCE_BUILD = Path(__file__).resolve().parents[3] / "web" / "dist"
 
-# Only the web app's own files: no inline script, no other site, never framed. Styles allow
-# inline because React and CodeMirror set style attributes; scripts never do.
+# Only the web app's own files: no inline script, no other site, never framed, and no inline
+# style but the ones carrying this page's nonce: CodeMirror's and the Sheet's scroll lock, which
+# read it from the page (#110, decided 2026-11-15). React's style props are set through the CSSOM,
+# which a style-src does not govern.
 CONTENT_SECURITY_POLICY = (
-    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+    "default-src 'self'; script-src 'self'; style-src 'self' 'nonce-{nonce}'; "
     "img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; object-src 'none'; "
     "base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
 )
+# What the build writes where the nonce goes (web/vite.config.ts, html.cspNonce): each page
+# served gets a fresh one in its place, and the same one in its policy.
+NONCE_PLACEHOLDER = "PROBEOWL_CSP_NONCE"
 # index.html names the hashed bundles of its build, so it is fetched afresh every time; the
 # bundles themselves never change under their names.
 NO_CACHE = "no-cache, no-store, must-revalidate"
@@ -30,7 +36,7 @@ IMMUTABLE = "public, max-age=31536000, immutable"
 
 NOT_BUILT = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>ProbeOwl</title></head>
-<body style="font-family: system-ui, sans-serif; margin: 3rem; max-width: 40rem">
+<body>
 <h1>The web app is not built</h1>
 <p>owl serve is running, and its API is at <a href="/docs">/docs</a>. To use the web app from
 this source checkout, build it once: <code>cd web &amp;&amp; npm ci &amp;&amp; npm run build</code>,
@@ -57,15 +63,14 @@ def mount_web_app(app: FastAPI, build: Path | None) -> None:
             # An API path no route matched is the API's 404, never the web app.
             raise NotFoundError(f"no API route {request.url.path}")
         if root is None:
-            return HTMLResponse(NOT_BUILT, status_code=404, headers=_page_headers())
+            return HTMLResponse(NOT_BUILT, status_code=404, headers=_page_headers(new_nonce()))
         found = _file(root, path)
-        if found is None:
-            return FileResponse(root / "index.html", headers=_page_headers())
+        if found is None or found.suffix == ".html":
+            return _page(found or root / "index.html")
         cache = IMMUTABLE if found.parent.name == "assets" else NO_CACHE
-        headers = {"Cache-Control": cache, "X-Content-Type-Options": "nosniff"}
-        if found.suffix == ".html":
-            headers |= _page_headers()
-        return FileResponse(found, headers=headers)
+        return FileResponse(
+            found, headers={"Cache-Control": cache, "X-Content-Type-Options": "nosniff"}
+        )
 
 
 def _file(root: Path, path: str) -> Path | None:
@@ -78,9 +83,21 @@ def _file(root: Path, path: str) -> Path | None:
     return candidate
 
 
-def _page_headers() -> dict[str, str]:
+def new_nonce() -> str:
+    """A nonce for one page: 128 bits, base64url, never reused."""
+    return secrets.token_urlsafe(16)
+
+
+def _page(path: Path) -> HTMLResponse:
+    """A page of the build, its nonce written in, under a policy naming the same nonce."""
+    nonce = new_nonce()
+    text = path.read_text(encoding="utf-8").replace(NONCE_PLACEHOLDER, nonce)
+    return HTMLResponse(text, headers=_page_headers(nonce))
+
+
+def _page_headers(nonce: str) -> dict[str, str]:
     return {
-        "Content-Security-Policy": CONTENT_SECURITY_POLICY,
+        "Content-Security-Policy": CONTENT_SECURITY_POLICY.format(nonce=nonce),
         "Cache-Control": NO_CACHE,
         "X-Content-Type-Options": "nosniff",
         "Referrer-Policy": "no-referrer",

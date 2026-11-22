@@ -1,6 +1,7 @@
 // Author: @SaadZarook
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
@@ -19,7 +20,9 @@ const version = /^version = "([^"]+)"$/m.exec(pyproject)?.[1];
 if (version === undefined) throw new Error("version not found in backend/pyproject.toml");
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
+  // owl serve writes a fresh nonce here for each page it serves, and names it in its policy (#110).
+  html: { cspNonce: "PROBEOWL_CSP_NONCE" },
   define: { __PROBEOWL_VERSION__: JSON.stringify(version) },
   resolve: {
     alias: {

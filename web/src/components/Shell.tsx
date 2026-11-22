@@ -1,4 +1,5 @@
 // Author: @SaadZarook
+import { Button } from "../ui";
 import { useEffect, useRef, useState } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { isToolPath } from "../plugins";
@@ -42,25 +43,25 @@ export function Shell() {
   }, []);
 
   return (
-    <div className="shell">
+    <div className="min-h-screen lg:flex">
       <Sidebar />
-      <div className="main">
+      <div className="min-w-0 flex-1 px-4 pb-6 md:px-8 md:pb-8">
         <TopBar onSearch={openSearch} />
         <SearchPalette open={searching} onOpenChange={setSearching} onNotice={setNotice} returnFocus={() => opener.current?.focus()} />
         {notice && (
           <div className="switch-notice" role="status">
             <p>{notice}</p>
-            <button className="btn-outline" type="button" onClick={() => setNotice(undefined)}>
+            <Button variant="outline" type="button" onClick={() => setNotice(undefined)}>
               Dismiss
-            </button>
+            </Button>
           </div>
         )}
         {restoreNotice && (
           <div className="switch-notice" role="status">
             <p>{restoreNotice}</p>
-            <button className="btn-outline" type="button" onClick={dismissRestoreNotice}>
+            <Button variant="outline" type="button" onClick={dismissRestoreNotice}>
               Dismiss
-            </button>
+            </Button>
           </div>
         )}
         {application && environment?.production && !isToolPath(location.pathname) && <ProductionBanner applicationName={application.title} />}
@@ -70,9 +71,9 @@ export function Shell() {
           {error ? (
             <div className="error-state" role="alert">
               <p>{error}</p>
-              <button className="btn" type="button" onClick={retry}>
+              <Button type="button" onClick={retry}>
                 Retry
-              </button>
+              </Button>
             </div>
           ) : loading ? (
             <p aria-busy="true">Loading applications…</p>

@@ -1,4 +1,5 @@
 // Author: @SaadZarook
+import { Button } from "../ui";
 import { useMutation } from "@tanstack/react-query";
 import { useId, useState, type FormEvent } from "react";
 import { saveSecret, SecretExistsError, testDraftConnection, type DraftConnection } from "../api/client";
@@ -85,13 +86,13 @@ export function PasswordPrompt({ application, connector, environment, environmen
         />
       </label>
       <div className="wizard-nav">
-        <button className="btn" type="submit" disabled={password === "" || busy}>
+        <Button type="submit" disabled={password === "" || busy}>
           {label}
-        </button>
+        </Button>
         {onCancel && (
-          <button className="btn btn-outline" type="button" onClick={onCancel}>
+          <Button variant="outline" type="button" onClick={onCancel}>
             Cancel
-          </button>
+          </Button>
         )}
       </div>
       {failed !== undefined && (
@@ -103,17 +104,17 @@ export function PasswordPrompt({ application, connector, environment, environmen
             If the database is down rather than the password wrong, you can save it anyway. Until it's corrected, {connector} stops
             working in {environmentTitle} if this one is wrong.
           </p>
-          <button className="btn btn-outline" type="button" disabled={busy} onClick={() => save.mutate()}>
+          <Button variant="outline" type="button" disabled={busy} onClick={() => save.mutate()}>
             Save anyway
-          </button>
+          </Button>
         </div>
       )}
       {exists && (
         <div role="alert" className="error-state">
           <p>A password was saved for {connector} in {environmentTitle} meanwhile. Nothing was overwritten.</p>
-          <button className="btn" type="button" onClick={onSaved}>
+          <Button type="button" onClick={onSaved}>
             Use the saved one
-          </button>
+          </Button>
         </div>
       )}
       {check.isError && (

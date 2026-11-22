@@ -1,4 +1,5 @@
 // Author: @SaadZarook
+import { Badge, Button } from "../ui";
 import * as Dialog from "@radix-ui/react-dialog";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useEffect, useId, useState, type KeyboardEvent } from "react";
@@ -251,9 +252,9 @@ function PaletteBody({ close, onNotice, returnFocus }: { close: () => void; onNo
       {results.isError && (
         <div role="alert" className="error-state">
           <p>{results.error.message}</p>
-          <button className="btn" type="button" onClick={() => void results.refetch()}>
+          <Button type="button" onClick={() => void results.refetch()}>
             Retry
-          </button>
+          </Button>
         </div>
       )}
       {q !== "" && results.isSuccess && (results.data.groups.length === 0) && <p className="hint">Nothing in ProbeOwl matches "{q}".</p>}
@@ -281,9 +282,9 @@ function PaletteBody({ close, onNotice, returnFocus }: { close: () => void; onNo
                   <span>{option.label}</span>
                   {option.detail && <span className="hint"> {option.detail}</span>}
                   {(option.labels ?? []).map((label) => (
-                    <span key={label} className="chip">
+                    <Badge key={label} className="ml-2">
                       {label}
-                    </span>
+                    </Badge>
                   ))}
                 </div>
               );

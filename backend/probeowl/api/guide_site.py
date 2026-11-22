@@ -24,9 +24,10 @@ PREFIX = "/guide/"
 # Only scripts without src run inline; a JSON block (Material's __config) never runs.
 _INLINE_SCRIPT = re.compile(r"<script(?![^>]*\bsrc=)([^>]*)>(.*?)</script>", re.S | re.I)
 _NOT_RUN = re.compile(r'type="application/json"', re.I)
-# The guide has no form, frame or plugin; its search runs in a worker of its own.
+# The guide has no form, frame or plugin; its search runs in a worker of its own. Its pages carry
+# no inline style, and Material sets styles only through the CSSOM, so style-src is 'self' (#148).
 _POLICY = (
-    "default-src 'self'; script-src 'self'{hashes}; style-src 'self' 'unsafe-inline'; "
+    "default-src 'self'; script-src 'self'{hashes}; style-src 'self'; "
     "img-src 'self' data:; font-src 'self'; connect-src 'self'; worker-src 'self'; "
     "object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'"
 )
@@ -35,7 +36,7 @@ REVALIDATE = "no-cache"
 
 NOT_BUILT = f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>ProbeOwl guide</title></head>
-<body style="font-family: system-ui, sans-serif; margin: 3rem; max-width: 40rem">
+<body>
 <h1>The guide is not built here</h1>
 <p>A release of ProbeOwl serves its guide here. In this source checkout, build it once:
 <code>cd backend &amp;&amp; uv run python guide_build.py</code> (after <code>npm ci</code> in
