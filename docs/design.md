@@ -68,6 +68,8 @@ One word per idea, used the same way in the UI, the YAML and conversation. The f
 | Key graph | How locations get their keys from each other (`key_from`). |
 | Cardinality | How many records a location should return: one, optional, or many. |
 | Fan-out | A lookup repeated for each row of a many location, capped by `max_fanout`. |
+| Entity graph | An entity drawn as boxes (its locations) and arrows (the keys they take), built against a sample. |
+| Sample | One real subject an entity is built against in the entity graph; its ID is the sample ID. Not a healthy sample. |
 
 **Probes**
 
@@ -97,7 +99,7 @@ One word per idea, used the same way in the UI, the YAML and conversation. The f
 | Blocked | Its key could not be resolved because an earlier location failed. |
 | Ambiguous | More records than its cardinality allows, or an identifier matching several subjects. |
 | Stale | Replica lag is longer than the window, so "missing" cannot be trusted. |
-| Not configured | The connector has no binding in this environment. |
+| Not configured | The connector has no binding in this environment. Its expectations are skipped as not applicable, and the run stays Passed with a note; `--strict` makes that exit 2. |
 | Evidence | The exact query, parameters, guards applied and raw result behind an outcome. |
 | Offender | A record a health probe flagged. |
 | Limited follow-up | The cap on how many offenders a scheduled run follows up: 5 per run, 100 per day. |
@@ -432,6 +434,11 @@ Guardrails for switching:
 - The environment is part of every run, run link, audit record and Jira draft.
 - Production is shown on a red banner on every screen; switching environment clears the current result.
 - A location whose connector has no binding in the chosen environment shows `Not configured`, not `Missing`.
+  Locations keyed from it are Blocked. The expectations that read it are skipped as not applicable,
+  and the run stays Passed when nothing else failed or went unchecked, with a note on screen and in
+  the CLI: "N checks not applicable in <env>: <connector> has no binding here". With `--strict`,
+  `owl validate` and `owl inspect` exit 2 for that instead. `owl check` and the probe editor warn
+  rather than refuse (#25, decided 2026-11-22).
 - Secrets and access are separate per environment: a UAT credential can never reach production.
 
 ## Investigation audit
