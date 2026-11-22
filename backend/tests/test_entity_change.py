@@ -1,6 +1,7 @@
 # Author: @SaadZarook
 """An entity that exists, saved on its own (#161): checked with each of its probes, then written."""
 
+import hashlib
 from pathlib import Path
 from typing import Any
 
@@ -166,3 +167,70 @@ def test_a_file_with_other_documents_is_refused(existing: Existing) -> None:
     response = existing.save_entity()
     assert response.status_code == 422
     assert "holds more than entity topup" in response.json()["detail"]
+
+
+def _a_second_probe_on_webhook(existing: Existing) -> None:
+    other = existing.root / "wallet" / "probes" / "topup_webhooked.yaml"
+    text = existing.text.replace("probe: topup_completed", "probe: topup_webhooked")
+    other.write_text(text, encoding="utf-8")
+    existing.applications.clear()
+    existing.applications.update(load_applications(existing.root))
+
+
+def test_the_preview_lists_every_probe_that_would_fail(existing: Existing) -> None:
+    _a_second_probe_on_webhook(existing)
+    # The preview, with no base: refused, each failing probe its own entry.
+    response = existing.save_entity(_without_location(existing.entity_text, "webhook"))
+    assert response.status_code == 422
+    messages = [e["message"] for e in response.json()["errors"]]
+    assert any(m.startswith("probe topup_completed: ") for m in messages), messages
+    assert any(m.startswith("probe topup_webhooked: ") for m in messages), messages
+    assert len({e["field"] for e in response.json()["errors"]}) == len(messages)
+    assert existing.unchanged()
+    assert existing.saved() == []
+
+
+def test_a_probe_fixed_in_the_same_change_lets_the_entity_save(existing: Existing) -> None:
+    entity = _without_location(existing.entity_text, "webhook")
+    # On its own, the change breaks topup_completed, which expects count(webhook) >= 1 ...
+    assert existing.save_entity(entity).status_code == 422
+    # ... saved with that probe fixed, the same change passes, and both files are written.
+    probe = existing.text.replace("count(webhook) >= 1", "count(record) == 1")
+    url = "/api/applications/wallet/probes/topup_completed"
+    body = {"probe": probe, "entity": entity, "environment": "uat"}
+    preview = existing.api.put(url, json=body)
+    assert preview.status_code == 200, preview.text
+    written = existing.api.put(url, json=body | {"base": preview.json()["base"]})
+    assert written.status_code == 200, written.text
+    assert "webhook:" not in existing.entity_path.read_text(encoding="utf-8")
+    assert "count(record) == 1" in existing.path.read_text(encoding="utf-8")
+    assert check_folder(existing.root).findings == []
+
+
+def test_the_base_is_the_files_own_hash_as_for_every_write(existing: Existing) -> None:
+    preview = existing.save_entity().json()
+    assert preview["base"] == hashlib.sha256(existing.entity_path.read_bytes()).hexdigest()
+
+
+def test_the_audit_records_who_where_and_both_hashes_and_no_lookup_or_data(
+    existing: Existing,
+) -> None:
+    preview = existing.save_entity().json()
+    existing.save_entity(base=preview["base"])
+    [event] = existing.saved()
+    assert event.action == "entity_saved"
+    assert event.actor.name == "s.khan"
+    assert event.application == "wallet"
+    assert event.environment == "uat"
+    assert event.run_id is None
+    assert event.details == {
+        "path": "wallet/entities/topup.yaml",
+        "entity": "topup",
+        "created": False,
+        "base": preview["base"],
+        "after": hashlib.sha256(existing.entity_path.read_bytes()).hexdigest(),
+    }
+    # Hashes, never the YAML: no lookup, no title, no diff.
+    recorded = event.model_dump_json()
+    for text in ("SELECT", "FROM topups", "Wallet top-up", "customer_email", "@@"):
+        assert text not in recorded
