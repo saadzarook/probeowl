@@ -7,6 +7,7 @@ export { Card } from "./Card";
 export { copyText } from "./clipboard";
 export { cn, CONTROL as controlClass } from "./cn";
 export { CodeBlock } from "./CodeBlock";
+export { BOX, describeBox, EntityGraph, EntityOutline, layoutGraph, nextBox, type GraphKey, type GraphLocation } from "./EntityGraph";
 export { Field, FormGrid } from "./Field";
 export { Input } from "./Input";
 export { ListOrTable, type Column, type Highlight } from "./ListOrTable";

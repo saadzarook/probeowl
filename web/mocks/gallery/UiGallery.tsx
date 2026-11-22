@@ -15,6 +15,7 @@ import {
   type BadgeTone,
   type Column,
 } from "../../src/ui";
+import { GraphGallery } from "./GraphGallery";
 
 // Every component of web/src/ui on one page, for e2e/ui-rules.spec.ts (#130). Mock builds only:
 // main.tsx renders it at /ui-gallery. ?theme=light, dark or system sets the page's theme.
@@ -156,6 +157,8 @@ export function UiGallery() {
           </nav>
         </Sheet>
       </Card>
+
+      <GraphGallery />
     </main>
   );
 }
