@@ -191,8 +191,15 @@ general use.
 
 The last three commands must list `probeowl-$VERSION-py3-none-any.whl`, end the notes with
 `sha256: $SHA`, and give GitHub's digest of the attached wheel as the same hash. If the notes lack
-the line, add it with `gh release edit "v$VERSION" --notes-file notes.md`, which changes nothing
-else. If the release was created without the wheel, attach it:
+the line, add it to the notes as published, so nothing else in them changes:
+
+```sh
+gh release view "v$VERSION" --json body --jq .body > published.md
+printf '\nsha256: %s\n' "$SHA" >> published.md
+gh release edit "v$VERSION" --notes-file published.md
+```
+
+If the release was created without the wheel, attach it:
 
 ```sh
 gh release upload "v$VERSION" "../dist/probeowl-$VERSION-py3-none-any.whl"
