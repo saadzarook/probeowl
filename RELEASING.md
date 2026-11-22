@@ -162,7 +162,19 @@ token scoped to the `probeowl` project, from your password manager.
 
 ## 5. Tag, and create the GitHub release
 
-On `main`'s merge commit:
+On `main`'s merge commit, from the clone's `backend/` folder, as in step 4. First the notes: the
+CHANGELOG's `$VERSION` section, ending with the wheel's sha256 on a line of its own, so anyone can
+compare what they download:
+
+```sh
+SHA="$(sha256sum "../dist/probeowl-$VERSION-py3-none-any.whl" | cut -d' ' -f1)"
+awk -v head="## [$VERSION]" 'index($0, head) == 1 { on = 1; print; next } on && /^## \[/ { exit } on' \
+  ../CHANGELOG.md > notes.md
+printf '\nsha256: %s\n' "$SHA" >> notes.md
+tail -n 1 notes.md                     # sha256: <the hash PyPI shows for the wheel>
+```
+
+Then the tag and the release:
 
 ```sh
 git tag -a "v$VERSION" -m "ProbeOwl $VERSION"
@@ -170,15 +182,17 @@ git push origin "v$VERSION"
 gh release create "v$VERSION" "../dist/probeowl-$VERSION-py3-none-any.whl" \
   --title "ProbeOwl $VERSION" --notes-file notes.md --verify-tag --prerelease
 gh release view "v$VERSION" --json assets --jq '.assets[].name'   # lists the wheel
+gh release view "v$VERSION" --json body --jq .body | tail -n 1    # sha256: $SHA
+gh api "repos/saadzarook/probeowl/releases/tags/v$VERSION" --jq '.assets[].digest'   # sha256:$SHA
 ```
 
-`notes.md` is the CHANGELOG's `$VERSION` section, with the wheel's sha256 added
-(`sha256sum ../dist/probeowl-$VERSION-py3-none-any.whl`), so anyone can compare what they
-download. `--prerelease` matches "pre-release" on the landing page; leave it off once a release is
-meant for general use.
+`--prerelease` matches "pre-release" on the landing page; leave it off once a release is meant for
+general use.
 
-The last command must list `probeowl-$VERSION-py3-none-any.whl`. If the release was created
-without it, attach it:
+The last three commands must list `probeowl-$VERSION-py3-none-any.whl`, end the notes with
+`sha256: $SHA`, and give GitHub's digest of the attached wheel as the same hash. If the notes lack
+the line, add it with `gh release edit "v$VERSION" --notes-file notes.md`, which changes nothing
+else. If the release was created without the wheel, attach it:
 
 ```sh
 gh release upload "v$VERSION" "../dist/probeowl-$VERSION-py3-none-any.whl"
