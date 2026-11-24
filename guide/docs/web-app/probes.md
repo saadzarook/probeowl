@@ -35,9 +35,11 @@ Production.
    shows its outcome on the sample, Found, Missing or Blocked with the reason, so a location that
    doesn't find the subject shows before any probe is written. **Last check** sums the boxes up.
 
-    Outside Production the sample is looked up again a second after each change, one lookup at a
-    time. In Production it's looked up only when you press **Check sample**, with a reason and a
-    reference, asked once per browser session. Each lookup is a draft test run: it goes through
+    Outside Production the save checks run after each change, and once they pass the sample is
+    looked up again, one lookup at a time. In Production nothing is read as you edit: the save checks,
+    which read query plans, and the lookup run only when you press **Check sample**, with a reason
+    and a reference, asked once per browser session. **Create** runs the save checks too. A draft
+    failing a check is never looked up. Each lookup is a draft test run: it goes through
     every guard, kill switches and circuit breakers included, masks what it reads, and is stored and
     audited. The **Runs** screen hides draft runs unless **Show draft runs** is ticked.
 
@@ -53,7 +55,7 @@ Production.
     one record; otherwise it's `many`, with `max_rows: 100`, or the connector's row ceiling if
     that's lower. You choose the columns each location selects.
 
-    Every location runs the save checks as soon as it's added, and a failure shows on that
+    Outside Production every location runs the save checks as soon as it's added, and a failure shows on that
     location, with its fix where one is known. The usual one: a Transaction, Log or Audit
     table may only be read by a key or within a time window, so `cards` read by
     `visitor_profile_id` fails until the catalog calls that column a link. **Mark

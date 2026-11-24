@@ -137,10 +137,54 @@ test("at 390 px the graph scrolls sideways inside its own frame, never the page"
   expect(sizes.scroll).toBeGreaterThan(sizes.client);
   // A box keeps its full size: the text is not shrunk to fit, as fitView would.
   const ledger = await graph(page, "Top-up").locator("[data-box=ledger]").boundingBox();
-  expect(ledger?.width).toBeCloseTo(248, 0);
+  expect(ledger?.width).toBeCloseTo(244, 0);
   // Focusing a box off the frame's edge scrolls the frame to it.
   await graph(page, "Top-up").getByRole("button", { name: "Top-up record Found" }).focus();
   await page.keyboard.press("ArrowRight");
   await expect(graph(page, "Top-up").getByRole("button", { name: "Provider payment Found" })).toBeInViewport();
   await expectNoOverflow(page, "the gallery at 390, after scrolling the graph");
+});
+
+test("a box shows its outcome's whole reason, at 1440 and in the Outline at 390", async ({ page }) => {
+  for (const width of [1440, 390]) {
+    await gallery(page, width);
+    const cut = await page.locator("[data-box]").evaluateAll((boxes) =>
+      boxes.flatMap((box) => {
+        const detail = box.querySelector<HTMLElement>("[data-detail]");
+        if (!detail) return [];
+        const b = box.getBoundingClientRect();
+        const d = detail.getBoundingClientRect();
+        const whole = detail.scrollWidth <= detail.clientWidth + 1 || getComputedStyle(detail).display === "inline";
+        return whole && d.bottom <= b.bottom && d.right <= b.right && box.scrollHeight <= box.clientHeight + 1 ? [] : [`${box.getAttribute("data-box")}: ${detail.innerText}`];
+      }),
+    );
+    expect(cut, `at ${width}`).toEqual([]);
+    await expect(page.locator("[data-detail]").filter({ hasText: "nothing was read here" }).first()).toBeVisible();
+  }
+});
+
+test("no arrow's label covers an arrow, and no two boxes overlap", async ({ page }) => {
+  await gallery(page);
+  for (const entity of ["Visitor", "Top-up", "Long reasons"]) {
+    const covered = await graph(page, entity).evaluate((group) => {
+      const keys = [...group.querySelectorAll<SVGGElement>("svg g[data-key]")];
+      const labels = keys.map((g) => ({ field: g.dataset["key"], box: (g.querySelector("text") as SVGTextElement).getBBox() }));
+      const found: string[] = [];
+      for (const g of keys) {
+        const path = g.querySelector("path") as SVGPathElement;
+        for (let at = 0; at <= path.getTotalLength(); at += 2) {
+          const p = path.getPointAtLength(at);
+          for (const { field, box } of labels) {
+            if (p.x >= box.x && p.x <= box.x + box.width && p.y >= box.y && p.y <= box.y + box.height) found.push(`${field} over the arrow at ${Math.round(p.x)},${Math.round(p.y)}`);
+          }
+        }
+      }
+      const boxes = [...group.querySelectorAll("[data-box]")].map((b) => b.getBoundingClientRect());
+      boxes.forEach((a, i) => boxes.slice(i + 1).forEach((b) => {
+        if (a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom) found.push("two boxes overlap");
+      }));
+      return [...new Set(found)];
+    });
+    expect(covered, entity).toEqual([]);
+  }
 });

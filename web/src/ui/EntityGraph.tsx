@@ -46,15 +46,37 @@ export interface EntityGraphProps {
   label: string;
 }
 
-/** A box's size, the same for every box so that dagre's columns line up. */
-export const BOX = { width: 248, height: 128 } as const;
+/** A box's width, the same for every box so that dagre's columns line up, and its least height. */
+export const BOX = { width: 244, height: 128 } as const;
+
+// The widest an outcome's character and a key field's character get (text-xs, Plex Sans and Mono),
+// so that a box is never too short for its reason, nor a gap too narrow for its arrow's label.
+const DETAIL_LINE = 28;
+const KEY_CHARACTER_PX = 7.5;
+
+/** A box's height: its outcome's detail is always shown whole, however many lines it wraps to. */
+export function boxHeight(location: GraphLocation): number {
+  const lines = location.detail ? Math.ceil(location.detail.length / DETAIL_LINE) : 0;
+  const detail = lines > 0 ? 4 + 16 * lines : 0;
+  return Math.max(BOX.height, 98 + detail + (location.fix ? 28 : 0));
+}
+
+/** Where a box is drawn: its top left corner and its height. */
+export interface BoxPlace {
+  x: number;
+  y: number;
+  height: number;
+}
 
 /** Box positions, left to right along the keys. */
-export function layoutGraph(locations: GraphLocation[], keys: GraphKey[]): Map<string, { x: number; y: number }> {
+export function layoutGraph(locations: GraphLocation[], keys: GraphKey[]): Map<string, BoxPlace> {
   const graph = new dagre.graphlib.Graph();
-  graph.setGraph({ rankdir: "LR", nodesep: 32, ranksep: 176, marginx: 16, marginy: 16 });
+  // Room for the longest label clear of the arrows that leave the same box.
+  const longest = Math.max(0, ...keys.map((k) => k.field.length)) * KEY_CHARACTER_PX;
+  graph.setGraph({ rankdir: "LR", nodesep: 32, ranksep: Math.max(176, longest + 88), marginx: 16, marginy: 16 });
   graph.setDefaultEdgeLabel(() => ({}));
-  for (const location of locations) graph.setNode(location.id, { width: BOX.width, height: BOX.height });
+  const heights = new Map(locations.map((l) => [l.id, boxHeight(l)]));
+  for (const location of locations) graph.setNode(location.id, { width: BOX.width, height: heights.get(location.id) ?? BOX.height });
   for (const key of keys) graph.setEdge(key.from, key.to);
   dagre.layout(graph);
   // dagre orders a column to cross as few arrows as it can, not in key order. The key graph is a
@@ -65,10 +87,22 @@ export function layoutGraph(locations: GraphLocation[], keys: GraphKey[]): Map<s
     const x = graph.node(id).x;
     columns.set(x, [...(columns.get(x) ?? []), id]);
   }
-  const positions = new Map<string, { x: number; y: number }>();
+  const positions = new Map<string, BoxPlace>();
   for (const [x, ids] of columns) {
-    const slots = ids.map((id) => graph.node(id).y).sort((a, b) => a - b);
-    ids.forEach((id, i) => positions.set(id, { x: x - BOX.width / 2, y: (slots[i] ?? 0) - BOX.height / 2 }));
+    // Boxes differ in height: keep dagre's top and its gaps, and stack the boxes in order between them.
+    const drawn = ids.map((id) => graph.node(id)).sort((a, b) => a.y - b.y);
+    const top = (n: { y: number; height: number }) => n.y - n.height / 2;
+    const gaps = drawn.map((n, i) => {
+      const above = drawn[i - 1];
+      return above ? top(n) - (above.y + above.height / 2) : 0;
+    });
+    let y = drawn[0] ? top(drawn[0]) : 0;
+    ids.forEach((id, i) => {
+      const height = heights.get(id) ?? BOX.height;
+      y += gaps[i] ?? 0;
+      positions.set(id, { x: x - BOX.width / 2, y, height });
+      y += height;
+    });
   }
   return positions;
 }
@@ -133,8 +167,8 @@ interface BoxProps {
   selected: boolean;
   onSelect: () => void;
   descriptionId: string;
-  /** In the graph: a fixed size, one line each; in the Outline: the lines wrap. */
-  fixed?: { left: number; top: number };
+  /** In the graph: a fixed size, the lines cut off except the outcome's; in the Outline: every line wraps. */
+  fixed?: BoxPlace;
   tabIndex?: number;
   onKeyDown?: (event: KeyboardEvent) => void;
   buttonRef?: (element: HTMLButtonElement | null) => void;
@@ -154,7 +188,7 @@ function Box({ location, locations, keys, selected, onSelect, descriptionId, fix
         selected ? "border-primary ring-2 ring-ring" : "border-border",
         fixed && "absolute overflow-hidden",
       )}
-      style={fixed && { left: fixed.left, top: fixed.top, width: BOX.width, height: BOX.height }}
+      style={fixed && { left: fixed.x, top: fixed.y, width: BOX.width, height: fixed.height }}
     >
       <button
         ref={buttonRef}
@@ -174,8 +208,12 @@ function Box({ location, locations, keys, selected, onSelect, descriptionId, fix
       </span>
       <span aria-hidden="true" className={cn("text-xs text-muted", line)}>
         {keyLine(location, into)} · {location.fanOut ? "each row" : location.cardinality}
-        {location.detail ? ` · ${location.detail}` : ""}
       </span>
+      {location.detail && (
+        <span aria-hidden="true" data-detail className="text-xs wrap-anywhere text-foreground">
+          {location.detail}
+        </span>
+      )}
       {location.fix && (
         <span aria-hidden="true" className="mt-auto flex min-w-0 items-center gap-2 text-xs">
           <Badge tone="waiting">Fix</Badge>
@@ -196,7 +234,7 @@ export function EntityGraph({ locations, keys, selected, onSelect, label }: Enti
   const boxes = useRef(new Map<string, HTMLButtonElement>());
   const spots = [...positions.values()];
   const width = Math.max(0, ...spots.map((p) => p.x + BOX.width)) + 16;
-  const height = Math.max(0, ...spots.map((p) => p.y + BOX.height)) + 16;
+  const height = Math.max(0, ...spots.map((p) => p.y + p.height)) + 16;
   // A selection that is not a box (one just removed) leaves the first box as the tab stop.
   const focusable = locations.some((l) => l.id === selected) ? selected : locations[0]?.id;
 
@@ -224,7 +262,7 @@ export function EntityGraph({ locations, keys, selected, onSelect, label }: Enti
             const a = positions.get(key.from);
             const b = positions.get(key.to);
             if (!a || !b) return null;
-            const [x1, y1, x2, y2] = [a.x + BOX.width, a.y + BOX.height / 2, b.x, b.y + BOX.height / 2];
+            const [x1, y1, x2, y2] = [a.x + BOX.width, a.y + a.height / 2, b.x, b.y + b.height / 2];
             const mid = (x1 + x2) / 2;
             return (
               <g key={`${key.from}-${key.to}`} data-key={key.field}>
@@ -234,7 +272,8 @@ export function EntityGraph({ locations, keys, selected, onSelect, label }: Enti
                   strokeWidth="1.5"
                   markerEnd={`url(#${id}-arrow)`}
                 />
-                <text x={x2 - 12} y={y2 - 8} textAnchor="end" className="fill-muted stroke-background font-mono text-xs" paintOrder="stroke" strokeWidth="6">
+                {/* On the side the arrow doesn't come from: below it when it comes down from above. */}
+                <text x={x2 - 12} y={y1 < y2 - 1 ? y2 + 18 : y2 - 8} textAnchor="end" className="fill-muted stroke-background font-mono text-xs" paintOrder="stroke" strokeWidth="6">
                   {key.field}
                 </text>
               </g>
@@ -253,7 +292,7 @@ export function EntityGraph({ locations, keys, selected, onSelect, label }: Enti
               selected={location.id === selected}
               onSelect={() => onSelect(location.id)}
               descriptionId={`${id}-${location.id}`}
-              fixed={{ left: p.x, top: p.y }}
+              fixed={p}
               tabIndex={location.id === focusable ? 0 : -1}
               onKeyDown={(event) => onKeyDown(event, location.id)}
               buttonRef={(element) => {

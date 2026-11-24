@@ -86,6 +86,7 @@ test("a suggested link comes with its target, picked from the imported tables; O
 });
 
 test("imports wallet_db in UAT from the button", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("mock-wallet-uat-unimported", "1"));
   await openTables(page);
   await page.getByLabel("Environment").selectOption("uat");
   const detail = page.getByRole("region", { name: "Table topups" });

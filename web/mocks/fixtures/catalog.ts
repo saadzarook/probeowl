@@ -243,5 +243,5 @@ export const addedConnectorSnapshot = (application: string, connector: string, e
   imported_at: new Date().toISOString(),
 });
 
-/** The wallet_db import in UAT is not there until the button is used. */
+/** With "mock-wallet-uat-unimported" in localStorage, wallet_db's import in UAT is not there until the button is used. */
 export const UNIMPORTED = { application: "wallet", connector: "wallet_db", environment: "uat" };

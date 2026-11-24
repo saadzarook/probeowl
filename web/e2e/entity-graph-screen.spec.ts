@@ -22,6 +22,15 @@ function lookups(page: Page): Request[] {
   return seen;
 }
 
+/** Wallet's webhooks, whose key the catalog doesn't link: the mocks answer them Missing. */
+async function linkWebhooks(page: Page) {
+  await page.getByRole("button", { name: "Link by columns…" }).click();
+  await page.getByLabel("Column of a location").selectOption("topups.provider_payment_id");
+  await page.getByLabel("New table").selectOption({ label: "wallet_db · provider_webhooks" });
+  await page.getByLabel("Its column").selectOption("payment_id");
+  await page.getByRole("button", { name: "Add the location" }).click();
+}
+
 const graph = (page: Page) => page.getByRole("group", { name: /^Entity graph of / });
 const lastCheck = (page: Page) => page.getByRole("status", { name: "Last check" });
 
@@ -47,7 +56,15 @@ test("a visitor built against a sample: each box shows its outcome, and the enti
   expect(body.investigation.notes).toBe("Entity graph: looking up the sample");
 
   // Follow a key: Cards is added, keyed by the root key, and looked up again on its own.
-  await page.getByRole("region", { name: "Follow a key" }).getByRole("button", { name: "Add cards" }).click();
+  const follow = page.getByRole("region", { name: "Follow a key" });
+  await expect(follow).toContainText("visitor_profile.id → access_db.cards.visitor_profile_id (the catalog links these columns)");
+  await expect(follow).not.toContainText(".status");
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await follow.getByRole("button", { name: "Add cards" }).click();
+  const cardsLocation = page.getByRole("listitem", { name: "Location cards" });
+  await expect(cardsLocation.getByLabel("Records per subject")).toHaveValue("many");
+  await expect(cardsLocation.getByLabel(/Most rows/)).toHaveValue("100");
+  await expect(page.getByText("Every location passes its save checks.")).toBeVisible();
   const cards = graph(page).getByRole("button", { name: "Cards Found" });
   await expect(cards).toBeVisible();
   await expect(cards).toHaveAccessibleDescription("access_db, cards; many; key visitor_profile_id from Visitor profile; 2 rows");
@@ -56,9 +73,29 @@ test("a visitor built against a sample: each box shows its outcome, and the enti
   expect(sent).toHaveLength(2);
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
 
+  // card_id is cards' primary key and not personal data: ticked for the person, with the reason.
+  const identifiers = page.getByRole("region", { name: "Identifiers" });
+  await expect(page.getByLabel("Find by cards.card_id")).toBeChecked();
+  await expect(identifiers.getByRole("listitem").filter({ hasText: "cards.card_id" })).toContainText("unique: cards' primary key");
+  await expect(identifiers.getByRole("listitem").filter({ hasText: "cards.card_id" }).getByLabel("Unique")).toBeChecked();
+  // email is personal data: not ticked, under More columns, and marked PII when it is.
+  await page.getByText(/^More columns/).click();
+  await expect(page.getByLabel("Find by visitor_profile.email")).not.toBeChecked();
+  await page.getByLabel("Find by visitor_profile.email").check();
+  await expect(identifiers.getByRole("listitem").filter({ hasText: "visitor_profile.email" }).getByLabel("PII")).toBeChecked();
+
+  // The whole file, before anything is asked of it.
+  const yaml = page.getByLabel("visitor_profile.yaml", { exact: true });
+  await expect(yaml).toContainText("root_key: visitor_profile_id");
+  await expect(yaml).toContainText("max_rows: 100");
+  await expect(yaml).toContainText("via: cards.card_id");
+  await expect(yaml).not.toContainText("key_from"); // cards is keyed by the root key itself
+  await expect(yaml).toContainText("SELECT card_id, visitor_profile_id, status");
+
   // Create previews the file with its save checks; Write writes it.
   await page.getByRole("button", { name: "Create visitor_profile" }).click();
   await expect(page.getByLabel("Diff of card-access/entities/visitor_profile.yaml")).toBeVisible();
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   await page.getByRole("button", { name: "Write card-access/entities/visitor_profile.yaml" }).click();
   const created = page.getByRole("status", { name: "Entity created" });
   await expect(created).toContainText("visitor_profile was created");
@@ -186,8 +223,13 @@ test("Identifiers lists unique and id-like columns first, the rest under More co
   const more = identifiers.locator("details.more-columns");
   await expect(more).not.toHaveAttribute("open", "");
   await more.locator("summary").click();
+  await expect(more.locator("summary")).toContainText("More columns");
   await expect(more.getByLabel("Find by cards.status")).toBeVisible();
   await expect(page.getByLabel("Find by visitor_profile.email")).not.toBeChecked();
+  // A root key under another name: cards exposes its key column by it, so card_id finds a subject.
+  const yaml = page.getByLabel("badge_holder_ids.yaml", { exact: true });
+  await expect(yaml).toContainText("SELECT card_id, visitor_profile_id AS badge_holder_ids_id, status");
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
 });
 
 test("a top-up's ledger entries come from another connector, keyed from the top-up", async ({ page }) => {
@@ -199,11 +241,12 @@ test("a top-up's ledger entries come from another connector, keyed from the top-
   await follow.getByRole("button", { name: "Add ledger_entries" }).click();
   await expect(page.getByRole("listitem", { name: "Location ledger_entries" })).toContainText("ledger_db · ledger_entries · by txn_id from topups.ledger_txn_id");
   await expect(graph(page).getByRole("button", { name: "Ledger entries Not checked" })).toHaveAccessibleDescription(/key ledger_txn_id from Topups/);
+  const yaml = page.getByLabel("topups.yaml", { exact: true });
+  await expect(yaml).toContainText("using: ledger_db");
+  await expect(yaml).toContainText("key_from: topups.ledger_txn_id");
+  await expect(yaml).toContainText("WHERE txn_id = :ledger_txn_id");
   await page.getByRole("button", { name: "Create topups" }).click();
-  const diff = page.getByLabel("Diff of wallet/entities/topups.yaml");
-  await expect(diff).toContainText("using: ledger_db");
-  await expect(diff).toContainText("key_from: topups.ledger_txn_id");
-  await expect(diff).toContainText("WHERE txn_id = :ledger_txn_id");
+  await expect(page.getByLabel("Diff of wallet/entities/topups.yaml")).toContainText("key_from: topups.ledger_txn_id");
 });
 
 test("Link by columns makes a lookup the save checks still judge: here the plan check refuses it", async ({ page }) => {
@@ -217,9 +260,127 @@ test("Link by columns makes a lookup the save checks still judge: here the plan 
   await page.getByRole("button", { name: "Add the location" }).click();
   await expect(page.getByRole("listitem", { name: "Location cards" })).toContainText("by status from visitor_profile.status");
   await expect(page.getByRole("region", { name: "Save checks failed for cards" })).toContainText("access_db plan · MariaDB: Table Scan of cards: the lookup would read all of cards. Index the column it filters on");
+  // The location stays in the file until a person removes it; the entity can't be created meanwhile.
+  await expect(page.getByRole("alert").filter({ hasText: "cards fails a save check" })).toBeVisible();
+  await expect(page.getByLabel("card_status.yaml", { exact: true })).toContainText("cards:");
+  await expect(page.getByRole("button", { name: "Create card_status" })).toBeDisabled();
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await page.getByRole("button", { name: "Remove cards" }).click();
+  await expect(page.getByRole("button", { name: "Create card_status" })).toBeEnabled();
+});
+
+test("in Production nothing is read on an edit: the save checks and the lookup wait for Check sample, or Create", async ({ page }) => {
+  const sent = lookups(page);
+  const checked: string[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "PUT" && request.url().includes("/entities/")) checked.push((request.postDataJSON() as { environment: string }).environment);
+  });
+  await start(page, /Card access/, "prod");
+  await page.getByRole("combobox", { name: "Root table" }).selectOption({ label: "access_db · visitor_profile" });
+  await page.getByRole("region", { name: "Follow a key" }).getByRole("button", { name: "Add cards" }).click();
+  await page.getByLabel("Sample", { exact: true }).fill("VP00012931");
+  await page.getByLabel("Reason", { exact: true }).selectOption("incident");
+  await page.getByLabel("Reference", { exact: true }).fill("ACCESS-311");
+  await page.getByRole("listitem", { name: "Location cards" }).getByLabel(/Most rows/).fill("50");
+  await page.getByLabel("Title").fill("Visitor");
+  await page.evaluate(() => window.dispatchEvent(new Event("visibilitychange")));
+  await page.waitForTimeout(3000); // longer than the checks' and the lookup's waits together
+  expect(checked).toEqual([]);
+  expect(sent).toHaveLength(0);
+  await expect(page.getByText(/run only when you press Check sample or Create/)).toBeVisible();
+  await expect(page.getByText("Every location passes its save checks.")).toHaveCount(0);
+
+  // Check sample: the checks once, then the lookup.
+  await page.getByRole("button", { name: "Check sample" }).click();
+  await expect(lastCheck(page)).toHaveText("Last check: 2 locations: 2 Found.");
+  expect(checked).toEqual(["prod"]);
+  expect(sent).toHaveLength(1);
+  await expect(page.getByText("Every location passes its save checks.")).toBeVisible();
+
+  // An edit makes both out of date, and starts neither; Create runs the checks, not a lookup.
+  await page.getByRole("listitem", { name: "Location cards" }).getByLabel(/Most rows/).fill("60");
+  await page.waitForTimeout(3000);
+  expect(checked).toEqual(["prod"]);
+  await page.getByRole("button", { name: "Create visitor_profile" }).click();
+  await expect(page.getByLabel("Diff of card-access/entities/visitor_profile.yaml")).toBeVisible();
+  expect(checked).toEqual(["prod", "prod"]);
+  expect(sent).toHaveLength(1);
+  await expect(page.getByText("Every location passes its save checks.")).toBeVisible();
+});
+
+test("in Production a failing check stops Check sample's lookup, and Create says why", async ({ page }) => {
+  const sent = lookups(page);
+  await start(page, /Card access/, "prod");
+  await page.getByLabel("Entity id").fill("card_status");
+  await page.getByRole("combobox", { name: "Root table" }).selectOption({ label: "access_db · visitor_profile" });
+  await page.getByRole("button", { name: "Link by columns…" }).click();
+  await page.getByLabel("Column of a location").selectOption("visitor_profile.status");
+  await page.getByLabel("New table").selectOption({ label: "access_db · cards" });
+  await page.getByLabel("Its column").selectOption("status");
+  await page.getByRole("button", { name: "Add the location" }).click();
+  await page.getByLabel("Sample", { exact: true }).fill("VP00012931");
+  await page.getByLabel("Reason", { exact: true }).selectOption("incident");
+  await page.getByLabel("Reference", { exact: true }).fill("ACCESS-311");
+  await page.getByRole("button", { name: "Check sample" }).click();
+  await expect(lastCheck(page)).toHaveText("Last check: not looked up: a save check fails. Fix it below first.");
+  await expect(page.getByRole("region", { name: "Save checks failed for cards" })).toBeVisible();
+  expect(sent).toHaveLength(0);
   await page.getByRole("button", { name: "Create card_status" }).click();
-  await expect(page.getByLabel("Failed save checks")).toContainText("access_db plan · MariaDB: cards: Table Scan of cards: the lookup would read all of cards.");
+  await expect(page.getByLabel("Failed save checks")).toContainText("Table Scan of cards: the lookup would read all of cards.");
   await expect(page.getByRole("button", { name: /^Write / })).toHaveCount(0);
+  expect(sent).toHaveLength(0);
+});
+
+test("coming back to the tab looks nothing up again", async ({ page }) => {
+  const sent = lookups(page);
+  await start(page, /Card access/, "uat");
+  await page.getByRole("combobox", { name: "Root table" }).selectOption({ label: "access_db · visitor_profile" });
+  await page.getByLabel("Sample", { exact: true }).fill("VP00012931");
+  await expect(lastCheck(page)).toHaveText("Last check: 1 location: 1 Found.");
+  const refetched = page.waitForRequest((r) => r.method() === "GET" && /\/applications\/card_access\/catalog$/.test(r.url()));
+  await page.evaluate(() => window.dispatchEvent(new Event("visibilitychange")));
+  await refetched; // the catalog is read again; its content hasn't changed
+  await page.waitForTimeout(3000);
+  expect(sent).toHaveLength(1);
+});
+
+test("from 1280 px Follow a key and Identifiers are beside the graph, and below it on narrower screens", async ({ page }) => {
+  await start(page, /Card access/, "uat");
+  await page.getByRole("combobox", { name: "Root table" }).selectOption({ label: "access_db · visitor_profile" });
+  const at = async (width: number) => {
+    await page.setViewportSize({ width, height: 900 });
+    const of = async (name: string) => {
+      const box = await page.getByRole("region", { name, exact: true }).boundingBox();
+      if (!box) throw new Error(`${name} is not on the page`);
+      return box;
+    };
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), `${width} scrolls sideways`).toBe(true);
+    return { graph: await of("Entity graph"), follow: await of("Follow a key"), identifiers: await of("Identifiers") };
+  };
+  for (const width of [1440, 1280]) {
+    const { graph: g, follow, identifiers } = await at(width);
+    for (const beside of [follow, identifiers]) expect(beside.x, `${width}`).toBeGreaterThanOrEqual(g.x + g.width);
+    expect(Math.abs(follow.y - g.y), `${width}`).toBeLessThan(2);
+  }
+  // At 1440 a root and what it links to are whole in the graph's frame, their outcomes with them.
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await start(page, /Wallet/, "uat");
+  await page.getByRole("combobox", { name: "Root table" }).selectOption({ label: "wallet_db · topups" });
+  await page.getByRole("region", { name: "Follow a key" }).getByRole("button", { name: "Add ledger_entries" }).click();
+  await linkWebhooks(page);
+  await page.getByLabel("Sample", { exact: true }).fill("tp_91f2c7");
+  await expect(graph(page).getByRole("button", { name: "Provider webhooks Missing" })).toBeVisible();
+  const clipped = await graph(page).evaluate((group) => {
+    const frame = (group.parentElement as HTMLElement).getBoundingClientRect();
+    return [...group.querySelectorAll("[data-box]")].filter((b) => b.getBoundingClientRect().right > frame.right).map((b) => b.getAttribute("data-box"));
+  });
+  expect(clipped).toEqual([]);
+  await start(page, /Card access/, "uat");
+  await page.getByRole("combobox", { name: "Root table" }).selectOption({ label: "access_db · visitor_profile" });
+  for (const width of [1279, 390]) {
+    const { graph: g, follow, identifiers } = await at(width);
+    for (const below of [follow, identifiers]) expect(below.y, `${width}`).toBeGreaterThanOrEqual(g.y + g.height);
+  }
 });
 
 test("outside Production too, a draft failing its index check is never looked up", async ({ page }) => {
@@ -266,21 +427,23 @@ test("a Transaction table read by a column the catalog does not call a key: the 
   await page.getByRole("combobox", { name: "Root table" }).selectOption({ label: "wallet_db · wallets" });
   await page.getByRole("region", { name: "Follow a key" }).getByRole("button", { name: "Add topups" }).click();
   const failed = page.getByRole("region", { name: "Save checks failed for topups" });
+  await page.getByRole("button", { name: "Create wallet_topups" }).click(); // Production: the press runs the checks
   await expect(failed).toContainText("Time filter: topups is a Transaction table: filter on its time column created_at");
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   // Not looked up while a save check fails, even by hand ...
   await page.getByLabel("Sample", { exact: true }).fill("u_88213");
   await page.getByLabel("Reason", { exact: true }).selectOption("incident");
   await page.getByLabel("Reference", { exact: true }).fill("WALLET-482");
+  await page.getByRole("button", { name: "Check sample" }).click();
   await expect(lastCheck(page)).toHaveText("Last check: not looked up: a save check fails. Fix it below first.");
-  await expect(page.getByRole("button", { name: "Check sample" })).toBeDisabled();
   await failed.getByRole("button", { name: "Mark topups.user_id as a link to wallets.user_id" }).click();
   await expect(failed.getByLabel("Diff of wallet/catalog.yaml")).toContainText("links_to: {connector: wallet_db, table: wallets, column: user_id}");
   await failed.getByRole("button", { name: "Confirm in catalog.yaml" }).click();
-  await expect(page.getByText("Every location passes its save checks.")).toBeVisible();
   // ... and allowed once the catalog's link is confirmed, though the entity itself didn't change.
   await expect(lastCheck(page)).toHaveText("Last check: Not checked yet.");
   await page.getByRole("button", { name: "Check sample" }).click();
   await expect(lastCheck(page)).toHaveText("Last check: 2 locations: 2 Found.");
+  await expect(page.getByText("Every location passes its save checks.")).toBeVisible();
   await page.getByRole("button", { name: "Create wallet_topups" }).click();
   await page.getByRole("button", { name: "Write wallet/entities/wallet_topups.yaml" }).click();
   await expect(page.getByRole("status", { name: "Entity created" })).toContainText("wallet_topups was created");
@@ -301,6 +464,7 @@ test("an entity id that exists is caught as it is typed", async ({ page }) => {
 });
 
 test("a connector not imported here says how to import it", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("mock-wallet-uat-unimported", "1"));
   await start(page, /Wallet/, "uat");
   await expect(page.getByText("wallet_db has not been imported in uat; run: owl catalog import wallet_db --application wallet --env uat")).toBeVisible();
   await expect(page.getByRole("combobox", { name: "Root table" }).locator("option", { hasText: "ledger_db · ledger_entries" })).toHaveCount(1);
@@ -322,6 +486,7 @@ test("no tables here: the graph offers the environments that have them, not a CL
   await offered.getByRole("button", { name: "Use UAT" }).click();
   await expect(page.getByRole("banner").getByLabel("Environment")).toHaveValue("uat");
   await expect(page.getByRole("combobox", { name: "Root table" })).toBeVisible();
+  await expect(page.getByLabel("Entity id")).toBeVisible();
 });
 
 test("no tables in any environment: the import command is still offered", async ({ page }) => {

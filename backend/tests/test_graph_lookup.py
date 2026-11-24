@@ -9,11 +9,13 @@ from typing import Any
 
 import pytest
 
+from probeowl.guards.breaker import PAUSE_S, CircuitBreaker
 from probeowl.model.kill_switch import KillTarget
 from probeowl.store.audit import list_events
 from probeowl.store.tables import LOCAL_WORKSPACE
 from tests.conftest import EXAMPLES, Setup
 from tests.test_kill_switch import GLOBAL, WALLET, WALLET_DB, engage
+from tests.test_run_breaker import Clock, on_replica
 from tests.test_runs import finished, hold, runs_stored
 
 ENTITY = (EXAMPLES / "wallet" / "entities" / "topup.yaml").read_text(encoding="utf-8")
@@ -26,6 +28,7 @@ expect:
   - count(record) >= 1
 """
 EMAIL = "c.customer@example.com"
+REFERENCED = {"reason": "incident", "reference": "WALLET-482"}
 
 
 def lookup(setup: Setup, client: Any = None, **changes: Any) -> Any:
@@ -90,6 +93,32 @@ def test_a_kill_switch_stops_a_lookup_before_it_reads(setup: Setup, target: Kill
     run = finished(setup.client(), lookup(setup).json()["id"])
     assert run["status"] == "skipped" and "kill switch" in run["skip_reason"]
     assert read_nothing(setup)
+
+
+def test_the_circuit_breaker_stops_a_lookup_and_the_next_ones_until_its_pause_ends(
+    setup: Setup,
+) -> None:
+    clock = Clock()
+    setup.breaker = CircuitBreaker(clock)
+    production = {"environment": "prod", "investigation": REFERENCED}
+    on_replica(setup, 120)
+    api = setup.client()
+    run = finished(api, lookup(setup, api, **production).json()["id"])
+    assert run["status"] == "skipped"
+    assert run["skip_reason"] == "ledger_db is paused: replica lag 120 s (max 60 s)"
+    assert run["locations"] == [] and read_nothing(setup)
+    assert sorted(e.action for e in events(setup) if e.run_id == run["id"]) == [
+        "run_finished",
+        "run_started",
+    ]
+    # The graph asks again as the draft changes: still paused, and the replica isn't measured again.
+    caught_up = on_replica(setup, 0)
+    again = finished(api, lookup(setup, api, **production).json()["id"])
+    assert again["status"] == "skipped" and "paused for another" in again["skip_reason"]
+    assert caught_up.measured == 0 and read_nothing(setup)
+    clock.now += PAUSE_S
+    resumed = finished(api, lookup(setup, api, **production).json()["id"])
+    assert resumed["status"] != "skipped" and resumed["locations"]
 
 
 def test_a_lookup_in_production_without_a_reference_is_refused(setup: Setup) -> None:

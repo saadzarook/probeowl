@@ -857,7 +857,10 @@ export const handlers = [
     const environment = query.get("environment") ?? "";
     const neverImported =
       notImportedHere(application, environment) ||
-      (application === UNIMPORTED.application && connector === UNIMPORTED.connector && environment === UNIMPORTED.environment);
+      (localStorage.getItem("mock-wallet-uat-unimported") !== null &&
+        application === UNIMPORTED.application &&
+        connector === UNIMPORTED.connector &&
+        environment === UNIMPORTED.environment);
     const found =
       imported.get(importKey(application, connector, environment)) ??
       (neverImported

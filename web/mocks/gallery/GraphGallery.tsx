@@ -89,12 +89,33 @@ function GraphExample({ example }: { example: Example }) {
   );
 }
 
+// Arrows up, down and straight across, the longest field names, and a reason that wraps.
+const REASONS: Example = {
+  slug: "reasons",
+  title: "Long reasons",
+  locations: [
+    { id: "root", title: "Order", connector: "orders_db", source: "orders", cardinality: "one", root: true, outcome: MISSING, detail: "no row for ORD-2026-000000000018, looked up in orders_db in UAT by order_reference" },
+    ...["first", "second", "third", "fourth"].map((id, i): GraphLocation => ({
+      id,
+      title: `${id} lookup`,
+      connector: "orders_db",
+      source: "order_lines",
+      cardinality: "many",
+      outcome: { tone: "blocked", label: "Blocked" },
+      detail: i % 2 === 0 ? "orders is Missing" : "orders is Missing, so order_reference has no value to look this location up by; nothing was read here",
+      ...(i === 1 ? { fix: "Confirm label: Transaction" } : {}),
+    })),
+  ],
+  keys: ["first", "second", "third", "fourth"].map((to, i) => ({ from: "root", to, field: i === 3 ? "provider_settlement_reference" : "provider_payment_id" })),
+};
+
 /** Both examples, each as the graph and as its Outline, sharing one selection. */
 export function GraphGallery() {
   return (
     <>
       <GraphExample example={VISITOR} />
       <GraphExample example={TOPUP} />
+      <GraphExample example={REASONS} />
     </>
   );
 }

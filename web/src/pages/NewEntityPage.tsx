@@ -12,7 +12,7 @@ import { useSampleRuns, type SampleRequest } from "../api/useSampleRuns";
 import { ChangePreview } from "../components/ChangePreview";
 import { EmptyState } from "../components/EmptyState";
 import { EntityIdentifiers } from "../components/EntityIdentifiers";
-import { EntityLocations } from "../components/EntityLocations";
+import { EntityLocations, FollowKeys } from "../components/EntityLocations";
 import { SaveChecksPanel } from "../components/SaveChecksPanel";
 import { draftProblems, entityTitle, entityYaml, type DraftIdentifier, type DraftLocation, type EntityDraft } from "../entityDraft";
 import { defaultRootKey, identifierCandidates, importedTables, pretickedIdentifiers, rootLocation, tableReference } from "../followKeys";
@@ -23,8 +23,8 @@ import { useSelection } from "../selection";
 
 // New entity is one screen, the entity graph (#163): the root table, a sample (one real subject's
 // ID), and a box per location showing its outcome on that sample as the entity is built. Outside
-// Production the sample is looked up again a second after each change; in Production only on Check
-// sample, with the reason and reference asked once per session.
+// Production the save checks run and the sample is looked up again after each change; in Production
+// neither touches a database until Check sample or Create is pressed: the checks read query plans.
 
 /** Fields the draft uses elsewhere, by location: the key graph's and the identifiers'. They stay selected. */
 function fieldsInUse(draft: EntityDraft): Map<string, Set<string>> {
@@ -127,6 +127,13 @@ function EntityGraphScreen() {
   const taken = (existing.data ?? []).some((e) => e.entity === current.entity);
   const production = environment?.production === true;
 
+  // Every change is checked as it would be saved, so a failing location shows where it is. The
+  // catalog counts by its content: its query refetches whenever the tab is returned to.
+  const draftNow = { entity: current.entity, yaml, environment: environment?.name ?? "", catalogVersion: JSON.stringify(catalog.data ?? null) };
+  const [created, setCreated] = useState(false);
+  const checkable = !created && current.locations.length > 0 && problems.length === 0;
+  const check = useEntityCheck(application?.name ?? "", draftNow, application !== undefined && environment !== undefined && checkable, !production);
+
   const save = useMutation({
     mutationFn: (base: string | undefined) =>
       saveEntity(application?.name ?? "", current.entity, {
@@ -136,15 +143,18 @@ function EntityGraphScreen() {
         ...(base ? { base } : {}),
       }),
     onSuccess: (change) => {
-      if (change.written) void client.invalidateQueries({ queryKey: ["entities", application?.name] });
-      else setPreview({ change, yaml });
+      if (change.written) {
+        setCreated(true);
+        void client.invalidateQueries({ queryKey: ["entities", application?.name] });
+      } else {
+        setPreview({ change, yaml });
+        if (production) check.record({ report: change.report, failures: [] });
+      }
+    },
+    onError: (error, base) => {
+      if (production && base === undefined && error instanceof SaveError && error.status === 422) check.record({ failures: error.errors });
     },
   });
-  const done = save.isSuccess && save.data.written;
-
-  // Every change is checked as it would be saved, so a failing location shows where it is.
-  const checkable = !done && current.locations.length > 0 && problems.length === 0;
-  const check = useEntityCheck(application?.name ?? "", current.entity, yaml, environment?.name ?? "", catalog.dataUpdatedAt, application !== undefined && environment !== undefined && checkable);
 
   // The sample's lookup: a draft test run of the generated Inspect probe. Outside Production its
   // reason is a proactive check, noted as the graph's; in Production the person gives both.
@@ -152,16 +162,17 @@ function EntityGraphScreen() {
   const probe = sampleProbeYaml(current);
   // No lookup before this exact draft has passed its save checks here, the index check included: the
   // draft run's own checks read no plan, and a lookup must not scan a table because it was just linked.
+  // In Production Check sample runs them first.
   const checked =
-    check.data !== undefined && check.data.of.yaml === yaml && check.data.of.environment === environment?.name && check.data.of.catalogVersion === catalog.dataUpdatedAt;
+    check.data !== undefined && check.data.of.yaml === yaml && check.data.of.environment === environment?.name && check.data.of.catalogVersion === draftNow.catalogVersion;
   const passed = checked && check.data?.failures.length === 0;
   const request = ((): SampleRequest | undefined => {
-    if (!checkable || !passed || taken || sample.trim() === "" || environment === undefined || !investigated) return undefined;
+    if (!checkable || (!production && !passed) || taken || sample.trim() === "" || environment === undefined || !investigated) return undefined;
     const reason: Reason = production && investigation.reason !== "" ? investigation.reason : "proactive_check";
     const reference = production ? investigation.reference.trim() : undefined;
     return {
       // The catalog too: a lookup refused for a missing catalog link runs again once it is confirmed.
-      key: JSON.stringify([yaml, probe, sample.trim(), environment.name, catalog.dataUpdatedAt]),
+      key: JSON.stringify([yaml, probe, sample.trim(), environment.name, draftNow.catalogVersion]),
       body: {
         probe,
         entity: yaml,
@@ -172,6 +183,27 @@ function EntityGraphScreen() {
     };
   })();
   const lookups = useSampleRuns(application?.name ?? "", request, !production);
+
+  // Production's Check sample: the save checks, then the lookup if they pass and nothing has changed
+  // (the draft, the environment, or the screen left) since the click.
+  const asked = request?.key;
+  const latest = useRef<string>(undefined);
+  useEffect(() => {
+    latest.current = asked;
+    return () => {
+      latest.current = undefined;
+    };
+  }, [asked]);
+  const checkSample = () => {
+    if (asked === undefined) return;
+    check.run().then(
+      (answer) => {
+        if (answer.failures.length === 0 && latest.current === asked) lookups.check();
+      },
+      () => undefined, // shown with the locations, as the query's error, with Retry
+    );
+  };
+  const lookAgain = production ? checkSample : lookups.check;
 
   if (application === undefined || environment === undefined) {
     return <EmptyState level={1} title="Choose an application" message="An entity belongs to one application." />;
@@ -220,18 +252,22 @@ function EntityGraphScreen() {
   const saveError = save.error instanceof SaveError ? save.error : undefined;
   const failures = failuresByLocation(check.data?.failures ?? [], current.locations.map((l) => l.name));
   const checks = {
-    checking: checkable && (check.isFetching || check.data === undefined),
+    checking: checkable && (check.isFetching || (!production && check.data === undefined)),
     byLocation: failures.byLocation,
     general: failures.general,
+    ...(production && !checked ? { waiting: "In Production the save checks, which read query plans, run only when you press Check sample or Create." } : {}),
     ...(check.isError ? { error: check.error.message } : {}),
-    onRetry: () => void check.refetch(),
+    onRetry: () => void check.run().catch(() => undefined),
   };
+  const failing = checked ? [...failures.byLocation.keys()] : [];
   const lastCheckText =
     sample.trim() === ""
       ? "no sample yet."
       : checked && !passed
         ? "not looked up: a save check fails. Fix it below first."
-        : lastCheck(current, lookups.state);
+        : production && check.isFetching
+          ? "running the save checks first…"
+          : lastCheck(current, lookups.state);
   const graph = graphOf(current, lookups.state);
   const focus = current.locations.find((l) => l.name === selected) ?? current.locations[0];
   const focusOutcome = focus ? boxOutcome(focus.name, lookups.state) : undefined;
@@ -249,7 +285,7 @@ function EntityGraphScreen() {
         </Button>
       </div>
     );
-  } else if (done) {
+  } else if (created && save.data) {
     body = (
       <section className="card" role="status" aria-label="Entity created">
         <h2>{current.entity} was created</h2>
@@ -326,7 +362,7 @@ function EntityGraphScreen() {
           )}
           {production && (
             <div role="group" aria-label="Production lookups">
-              <p className="hint">In Production the sample is looked up only when you check it, with a reason and a reference, asked once this session.</p>
+              <p className="hint">In Production nothing is read until you press Check sample, with a reason and a reference, asked once this session.</p>
               <FormGrid>
                 <Field id="graph-reason" label="Reason">
                   <Select value={investigation.reason} onChange={(e) => investigate({ reason: e.target.value as Reason | "" })}>
@@ -344,9 +380,9 @@ function EntityGraphScreen() {
               </FormGrid>
               <Button
                 type="button"
-                disabled={request === undefined || lookups.busy}
-                disabledReason={request === undefined ? "A sample, a reason and a reference first, and every save check passing" : undefined}
-                onClick={lookups.check}
+                disabled={request === undefined || lookups.busy || check.isFetching}
+                disabledReason={request === undefined ? "A root table, a sample, a reason and a reference first" : undefined}
+                onClick={checkSample}
               >
                 Check sample
               </Button>
@@ -360,73 +396,75 @@ function EntityGraphScreen() {
         </section>
 
         {rootTable && (
-          <section className="card" aria-labelledby="graph-title">
-            <h2 id="graph-title">Entity graph</h2>
-            <p role="status" aria-live="polite" aria-label="Last check" className="hint">
-              Last check: {lastCheckText}
-            </p>
-            {lookups.error && !refusal && (
-              <div className="error-state" role="alert">
-                <p>{lookups.error.message}</p>
-                <Button type="button" variant="outline" onClick={lookups.check}>
-                  Retry
-                </Button>
-              </div>
-            )}
-            {refusal && (
-              <p className="form-error" role="alert">
-                The sample was not looked up: {refusal.message}
-              </p>
-            )}
-            {wide ? (
-              <EntityGraph label={`Entity graph of ${current.entity || "the new entity"}`} locations={graph.locations} keys={graph.keys} selected={focus?.name ?? ""} onSelect={setSelected} />
-            ) : (
-              <EntityOutline label={`Outline of ${current.entity || "the new entity"}`} locations={graph.locations} keys={graph.keys} selected={focus?.name ?? ""} onSelect={setSelected} />
-            )}
-            {focus && focusOutcome && (
-              <section aria-label={`${focus.title || focus.name}: details`} className="mt-4">
-                <h3>{focus.title || focus.name}</h3>
-                <p>
-                  {focusOutcome.label}
-                  {focusOutcome.detail ? `: ${focusOutcome.detail}` : ""}
+          // From 1280 px, what adds to the graph is beside it; below that it follows.
+          <div className="xl:grid xl:grid-cols-10 xl:items-start xl:gap-4">
+            <div className="min-w-0 xl:col-span-7">
+              <section className="card" aria-labelledby="graph-title">
+                <h2 id="graph-title">Entity graph</h2>
+                <p role="status" aria-live="polite" aria-label="Last check" className="hint">
+                  Last check: {lastCheckText}
                 </p>
-                <p className="hint">
-                  <code>{focus.connector}</code> · <code>{focus.table}</code> · by <code>{focus.keyColumn}</code>
-                  {focus.keyFrom ? (
-                    <>
-                      {" "}
-                      from <code>{`${focus.keyFrom.location}.${focus.keyFrom.field}`}</code>
-                    </>
-                  ) : (
-                    ", the root key"
-                  )}
-                </p>
+                {lookups.error && !refusal && (
+                  <div className="error-state" role="alert">
+                    <p>{lookups.error.message}</p>
+                    <Button type="button" variant="outline" onClick={lookAgain}>
+                      Retry
+                    </Button>
+                  </div>
+                )}
+                {refusal && (
+                  <p className="form-error" role="alert">
+                    The sample was not looked up: {refusal.message}
+                  </p>
+                )}
+                {wide ? (
+                  <EntityGraph label={`Entity graph of ${current.entity || "the new entity"}`} locations={graph.locations} keys={graph.keys} selected={focus?.name ?? ""} onSelect={setSelected} />
+                ) : (
+                  <EntityOutline label={`Outline of ${current.entity || "the new entity"}`} locations={graph.locations} keys={graph.keys} selected={focus?.name ?? ""} onSelect={setSelected} />
+                )}
+                {focus && focusOutcome && (
+                  <section aria-label={`${focus.title || focus.name}: details`} className="mt-4">
+                    <h3>{focus.title || focus.name}</h3>
+                    <p>
+                      {focusOutcome.label}
+                      {focusOutcome.detail ? `: ${focusOutcome.detail}` : ""}
+                    </p>
+                    <p className="hint">
+                      <code>{focus.connector}</code> · <code>{focus.table}</code> · by <code>{focus.keyColumn}</code>
+                      {focus.keyFrom ? (
+                        <>
+                          {" "}
+                          from <code>{`${focus.keyFrom.location}.${focus.keyFrom.field}`}</code>
+                        </>
+                      ) : (
+                        ", the root key"
+                      )}
+                    </p>
+                  </section>
+                )}
               </section>
-            )}
-          </section>
-        )}
-
-        {rootTable && (
-          <EntityLocations
-            application={application.name}
-            checks={checks}
-            locations={current.locations}
-            rootKey={current.rootKey}
-            tables={tables}
-            catalog={catalogTables}
-            rowCeilings={rowCeilings}
-            inUse={fieldsInUse(current)}
-            onChange={setLocations}
-          />
-        )}
-
-        {rootTable && (
-          <EntityIdentifiers
-            rootKey={current.rootKey}
-            identifiers={current.identifiers}
-            candidates={identifierCandidates(current.locations, tables, current.rootKey)}
-            onChange={(identifiers) => update({ identifiers })}
-          />
+              <EntityLocations
+                application={application.name}
+                checks={checks}
+                locations={current.locations}
+                rootKey={current.rootKey}
+                tables={tables}
+                catalog={catalogTables}
+                rowCeilings={rowCeilings}
+                inUse={fieldsInUse(current)}
+                onChange={setLocations}
+              />
+            </div>
+            <div className="min-w-0 xl:col-span-3">
+              <FollowKeys locations={current.locations} rootKey={current.rootKey} tables={tables} catalog={catalogTables} rowCeilings={rowCeilings} onChange={setLocations} />
+              <EntityIdentifiers
+                rootKey={current.rootKey}
+                identifiers={current.identifiers}
+                candidates={identifierCandidates(current.locations, tables, current.rootKey)}
+                onChange={(identifiers) => update({ identifiers })}
+              />
+            </div>
+          </div>
         )}
 
         {rootTable && (
@@ -440,6 +478,15 @@ function EntityGraphScreen() {
                 <Input value={current.owner} onChange={(e) => update({ owner: e.target.value })} />
               </Field>
             </FormGrid>
+            <pre className="yaml-preview" tabIndex={0} aria-label={`${current.entity}.yaml`}>
+              {yaml}
+            </pre>
+            {failing.length > 0 && (
+              <p className="form-error" role="alert">
+                {failing.join(", ")} {failing.length === 1 ? "fails" : "fail"} a save check. Fix or remove {failing.length === 1 ? "it" : "them"} under Locations:
+                nothing is left out of the entity without you.
+              </p>
+            )}
             {problems.length > 0 ? (
               <ul className="form-error" aria-label="Before it can be created">
                 {problems.map((p) => (
@@ -449,7 +496,8 @@ function EntityGraphScreen() {
             ) : (
               <>
                 {preview === undefined || stale ? (
-                  <Button type="button" disabled={taken || save.isPending} onClick={() => save.mutate(undefined)}>
+                  // Outside Production a failing check is already known; in Production this press runs them.
+                  <Button type="button" disabled={taken || save.isPending || (!production && checked && !passed)} onClick={() => save.mutate(undefined)}>
                     Create {current.entity}
                   </Button>
                 ) : (
