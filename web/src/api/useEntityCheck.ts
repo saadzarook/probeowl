@@ -7,6 +7,8 @@ import { CHECK_DEBOUNCE_MS, useDebounced } from "./useSaveChecks";
 export interface EntityCheck {
   report?: SaveCheckReport;
   failures: FieldError[];
+  /** What was checked: an answer about an earlier draft says nothing about this one. */
+  of: { yaml: string; environment: string; catalogVersion: number };
 }
 
 /**
@@ -18,12 +20,13 @@ export function useEntityCheck(application: string, entity: string, yaml: string
   return useQuery({
     queryKey: ["entity-check", application, draft.entity, draft.yaml, draft.environment, draft.catalogVersion],
     queryFn: async (): Promise<EntityCheck> => {
+      const of = { yaml: draft.yaml, environment: draft.environment, catalogVersion: draft.catalogVersion };
       try {
         const change = await saveEntity(application, draft.entity, { entity: draft.yaml, environment: draft.environment, save_without_plan_check: false });
-        return { report: change.report, failures: [] };
+        return { report: change.report, failures: [], of };
       } catch (error) {
         if (error instanceof SaveError && error.status === 422) {
-          return { failures: error.errors.length > 0 ? error.errors : [{ field: "entity", message: error.message }] };
+          return { failures: error.errors.length > 0 ? error.errors : [{ field: "entity", message: error.message }], of };
         }
         throw error;
       }

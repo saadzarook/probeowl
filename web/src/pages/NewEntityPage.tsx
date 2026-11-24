@@ -76,8 +76,16 @@ function storeInvestigation(application: string, investigation: Investigation): 
   }
 }
 
-/** New entity: the entity graph, built against a sample. */
+/**
+ * New entity: the entity graph, built against a sample. Each application has its own: switching
+ * starts a new draft, so one application's tables, Production reason and reference never reach another's.
+ */
 export function NewEntityPage() {
+  const { application } = useSelection();
+  return <EntityGraphScreen key={application?.name ?? ""} />;
+}
+
+function EntityGraphScreen() {
   const { application, environment, selectEnvironment } = useSelection();
   const connectors = useConnectors(application?.name, environment?.name);
   // An entity that exists is opened from its probes, so its id is refused here, as it is typed.
@@ -142,8 +150,13 @@ export function NewEntityPage() {
   // reason is a proactive check, noted as the graph's; in Production the person gives both.
   const investigated = production ? investigation.reason !== "" && investigation.reference.trim() !== "" : true;
   const probe = sampleProbeYaml(current);
+  // No lookup before this exact draft has passed its save checks here, the index check included: the
+  // draft run's own checks read no plan, and a lookup must not scan a table because it was just linked.
+  const checked =
+    check.data !== undefined && check.data.of.yaml === yaml && check.data.of.environment === environment?.name && check.data.of.catalogVersion === catalog.dataUpdatedAt;
+  const passed = checked && check.data?.failures.length === 0;
   const request = ((): SampleRequest | undefined => {
-    if (!checkable || taken || sample.trim() === "" || environment === undefined || !investigated) return undefined;
+    if (!checkable || !passed || taken || sample.trim() === "" || environment === undefined || !investigated) return undefined;
     const reason: Reason = production && investigation.reason !== "" ? investigation.reason : "proactive_check";
     const reference = production ? investigation.reference.trim() : undefined;
     return {
@@ -213,6 +226,12 @@ export function NewEntityPage() {
     ...(check.isError ? { error: check.error.message } : {}),
     onRetry: () => void check.refetch(),
   };
+  const lastCheckText =
+    sample.trim() === ""
+      ? "no sample yet."
+      : checked && !passed
+        ? "not looked up: a save check fails. Fix it below first."
+        : lastCheck(current, lookups.state);
   const graph = graphOf(current, lookups.state);
   const focus = current.locations.find((l) => l.name === selected) ?? current.locations[0];
   const focusOutcome = focus ? boxOutcome(focus.name, lookups.state) : undefined;
@@ -326,7 +345,7 @@ export function NewEntityPage() {
               <Button
                 type="button"
                 disabled={request === undefined || lookups.busy}
-                disabledReason={request === undefined ? "A root table, a sample, a reason and a reference first" : undefined}
+                disabledReason={request === undefined ? "A sample, a reason and a reference first, and every save check passing" : undefined}
                 onClick={lookups.check}
               >
                 Check sample
@@ -344,7 +363,7 @@ export function NewEntityPage() {
           <section className="card" aria-labelledby="graph-title">
             <h2 id="graph-title">Entity graph</h2>
             <p role="status" aria-live="polite" aria-label="Last check" className="hint">
-              Last check: {sample.trim() === "" ? "no sample yet." : lastCheck(current, lookups.state)}
+              Last check: {lastCheckText}
             </p>
             {lookups.error && !refusal && (
               <div className="error-state" role="alert">

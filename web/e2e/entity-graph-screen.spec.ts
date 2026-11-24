@@ -99,9 +99,12 @@ test("the graph opens outside Production; in Production it looks up only on Chec
   await page.getByRole("link", { name: "Probes" }).click();
   await page.getByRole("link", { name: "New entity…" }).click();
   await expect(page.getByRole("banner").getByLabel("Environment")).toHaveValue("uat");
+  const banner = page.locator(".prod-banner");
+  await expect(banner).toHaveCount(0);
 
-  // Production on purpose: never live.
+  // Production on purpose: the red banner shows, and nothing is ever looked up live.
   await page.getByRole("banner").getByLabel("Environment").selectOption("prod");
+  await expect(banner).toContainText("Reason and Reference required");
   await page.getByRole("combobox", { name: "Root table" }).selectOption({ label: "access_db · visitor_profile" });
   await page.getByLabel("Sample", { exact: true }).fill("VP00012931");
   const check = page.getByRole("button", { name: "Check sample" });
@@ -219,6 +222,44 @@ test("Link by columns makes a lookup the save checks still judge: here the plan 
   await expect(page.getByRole("button", { name: /^Write / })).toHaveCount(0);
 });
 
+test("outside Production too, a draft failing its index check is never looked up", async ({ page }) => {
+  const sent = lookups(page);
+  await start(page, /Card access/, "uat");
+  await page.getByRole("combobox", { name: "Root table" }).selectOption({ label: "access_db · visitor_profile" });
+  await page.getByLabel("Sample", { exact: true }).fill("VP00012931");
+  await expect(lastCheck(page)).toHaveText("Last check: 1 location: 1 Found.");
+  expect(sent).toHaveLength(1);
+  // cards by status would scan the table: its plan check refuses it, so the sample is not looked up.
+  await page.getByRole("button", { name: "Link by columns…" }).click();
+  await page.getByLabel("Column of a location").selectOption("visitor_profile.status");
+  await page.getByLabel("New table").selectOption({ label: "access_db · cards" });
+  await page.getByLabel("Its column").selectOption("status");
+  await page.getByRole("button", { name: "Add the location" }).click();
+  await expect(lastCheck(page)).toHaveText("Last check: not looked up: a save check fails. Fix it below first.");
+  await page.waitForTimeout(2500); // longer than the checks' and the lookup's waits together
+  expect(sent).toHaveLength(1);
+  await page.getByRole("button", { name: "Remove cards" }).click();
+  await expect(lastCheck(page)).toHaveText("Last check: 1 location: 1 Found.");
+});
+
+test("another application starts its own graph: no draft, reason or reference carries over, and it opens outside Production", async ({ page }) => {
+  const sent = lookups(page);
+  await start(page, /Card access/, "prod");
+  await page.getByRole("combobox", { name: "Root table" }).selectOption({ label: "access_db · visitor_profile" });
+  await page.getByLabel("Sample", { exact: true }).fill("VP00012931");
+  await page.getByLabel("Reason", { exact: true }).selectOption("incident");
+  await page.getByLabel("Reference", { exact: true }).fill("ACCESS-311");
+  await page.getByRole("button", { name: "Application" }).click();
+  await page.getByRole("button", { name: /Wallet/ }).last().click();
+  await expect(page.getByRole("banner").getByLabel("Environment")).toHaveValue("uat");
+  await expect(page.getByLabel("Entity id")).toHaveValue("");
+  await expect(page.getByLabel("Sample", { exact: true })).toHaveValue("");
+  await page.getByRole("banner").getByLabel("Environment").selectOption("prod");
+  await expect(page.getByLabel("Reason", { exact: true })).toHaveValue("");
+  await expect(page.getByLabel("Reference", { exact: true })).toHaveValue("");
+  expect(sent).toHaveLength(0);
+});
+
 test("a Transaction table read by a column the catalog does not call a key: the link is marked inline, then the entity is created", async ({ page }) => {
   await start(page, /Wallet/, "prod");
   await page.getByLabel("Entity id").fill("wallet_topups");
@@ -226,18 +267,17 @@ test("a Transaction table read by a column the catalog does not call a key: the 
   await page.getByRole("region", { name: "Follow a key" }).getByRole("button", { name: "Add topups" }).click();
   const failed = page.getByRole("region", { name: "Save checks failed for topups" });
   await expect(failed).toContainText("Time filter: topups is a Transaction table: filter on its time column created_at");
-  // Looked up before the fix (Production: by hand) ...
+  // Not looked up while a save check fails, even by hand ...
   await page.getByLabel("Sample", { exact: true }).fill("u_88213");
   await page.getByLabel("Reason", { exact: true }).selectOption("incident");
   await page.getByLabel("Reference", { exact: true }).fill("WALLET-482");
-  await page.getByRole("button", { name: "Check sample" }).click();
-  await expect(lastCheck(page)).toHaveText("Last check: 2 locations: 2 Found.");
+  await expect(lastCheck(page)).toHaveText("Last check: not looked up: a save check fails. Fix it below first.");
+  await expect(page.getByRole("button", { name: "Check sample" })).toBeDisabled();
   await failed.getByRole("button", { name: "Mark topups.user_id as a link to wallets.user_id" }).click();
   await expect(failed.getByLabel("Diff of wallet/catalog.yaml")).toContainText("links_to: {connector: wallet_db, table: wallets, column: user_id}");
   await failed.getByRole("button", { name: "Confirm in catalog.yaml" }).click();
   await expect(page.getByText("Every location passes its save checks.")).toBeVisible();
-  // ... is out of date once the catalog changes, though the entity didn't: a refusal for a missing
-  // link is looked up again once the link is confirmed (live outside Production, by hand here).
+  // ... and allowed once the catalog's link is confirmed, though the entity itself didn't change.
   await expect(lastCheck(page)).toHaveText("Last check: Not checked yet.");
   await page.getByRole("button", { name: "Check sample" }).click();
   await expect(lastCheck(page)).toHaveText("Last check: 2 locations: 2 Found.");
