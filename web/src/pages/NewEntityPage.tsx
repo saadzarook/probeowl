@@ -396,9 +396,9 @@ function EntityGraphScreen() {
         </section>
 
         {rootTable && (
-          // From 1280 px, what adds to the graph is beside it; below that it follows.
-          <div className="xl:grid xl:grid-cols-10 xl:items-start xl:gap-4">
-            <div className="min-w-0 xl:col-span-7">
+          // From 1440 px, what adds to the graph is beside it; below that it follows.
+          <div className="wide:grid wide:grid-cols-10 wide:items-start wide:gap-4">
+            <div className="min-w-0 wide:col-span-7">
               <section className="card" aria-labelledby="graph-title">
                 <h2 id="graph-title">Entity graph</h2>
                 <p role="status" aria-live="polite" aria-label="Last check" className="hint">
@@ -455,7 +455,7 @@ function EntityGraphScreen() {
                 onChange={setLocations}
               />
             </div>
-            <div className="min-w-0 xl:col-span-3">
+            <div className="min-w-0 wide:col-span-3">
               <FollowKeys locations={current.locations} rootKey={current.rootKey} tables={tables} catalog={catalogTables} rowCeilings={rowCeilings} onChange={setLocations} />
               <EntityIdentifiers
                 rootKey={current.rootKey}

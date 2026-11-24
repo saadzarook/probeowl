@@ -207,7 +207,17 @@ for (const theme of ["light", "dark"] as const) {
   }
 }
 
-// What the wizard did, on the one screen.
+test("the screen calls itself the entity graph, never a wizard", async ({ page }) => {
+  await start(page, /Wallet/, "uat");
+  await page.getByRole("combobox", { name: "Root table" }).selectOption({ label: "wallet_db · wallets" });
+  await page.getByRole("region", { name: "Follow a key" }).getByRole("button", { name: "Add topups" }).click();
+  await expect(page.getByRole("region", { name: "Save checks failed for topups" })).toContainText("The entity graph followed it as a link");
+  await expect(page.getByLabel("wallets.yaml", { exact: true })).toContainText("# Written by the entity graph.");
+  await expect(page.getByRole("region", { name: "Identifiers" })).toContainText("the entity graph reads no data");
+  await expect(page.getByRole("main")).not.toContainText(/wizard/i);
+});
+
+// What the five steps did, on the one screen.
 
 test("Identifiers lists unique and id-like columns first, the rest under More columns", async ({ page }) => {
   await start(page, /Card access/, "uat");
@@ -344,7 +354,7 @@ test("coming back to the tab looks nothing up again", async ({ page }) => {
   expect(sent).toHaveLength(1);
 });
 
-test("from 1280 px Follow a key and Identifiers are beside the graph, and below it on narrower screens", async ({ page }) => {
+test("from 1440 px Follow a key and Identifiers are beside the graph, and below it on narrower screens", async ({ page }) => {
   await start(page, /Card access/, "uat");
   await page.getByRole("combobox", { name: "Root table" }).selectOption({ label: "access_db · visitor_profile" });
   const at = async (width: number) => {
@@ -357,12 +367,12 @@ test("from 1280 px Follow a key and Identifiers are beside the graph, and below 
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), `${width} scrolls sideways`).toBe(true);
     return { graph: await of("Entity graph"), follow: await of("Follow a key"), identifiers: await of("Identifiers") };
   };
-  for (const width of [1440, 1280]) {
+  for (const width of [1920, 1440]) {
     const { graph: g, follow, identifiers } = await at(width);
     for (const beside of [follow, identifiers]) expect(beside.x, `${width}`).toBeGreaterThanOrEqual(g.x + g.width);
     expect(Math.abs(follow.y - g.y), `${width}`).toBeLessThan(2);
   }
-  // At 1440 a root and what it links to are whole in the graph's frame, their outcomes with them.
+  // A root and what it links to are whole in the graph's frame, their outcomes with them.
   await page.setViewportSize({ width: 1440, height: 900 });
   await start(page, /Wallet/, "uat");
   await page.getByRole("combobox", { name: "Root table" }).selectOption({ label: "wallet_db · topups" });
@@ -370,14 +380,17 @@ test("from 1280 px Follow a key and Identifiers are beside the graph, and below 
   await linkWebhooks(page);
   await page.getByLabel("Sample", { exact: true }).fill("tp_91f2c7");
   await expect(graph(page).getByRole("button", { name: "Provider webhooks Missing" })).toBeVisible();
-  const clipped = await graph(page).evaluate((group) => {
-    const frame = (group.parentElement as HTMLElement).getBoundingClientRect();
-    return [...group.querySelectorAll("[data-box]")].filter((b) => b.getBoundingClientRect().right > frame.right).map((b) => b.getAttribute("data-box"));
-  });
-  expect(clipped).toEqual([]);
+  for (const width of [1440, 1439, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    const clipped = await graph(page).evaluate((group) => {
+      const frame = (group.parentElement as HTMLElement).getBoundingClientRect();
+      return [...group.querySelectorAll("[data-box]")].filter((b) => b.getBoundingClientRect().right > frame.right).map((b) => b.getAttribute("data-box"));
+    });
+    expect(clipped, `${width}`).toEqual([]);
+  }
   await start(page, /Card access/, "uat");
   await page.getByRole("combobox", { name: "Root table" }).selectOption({ label: "access_db · visitor_profile" });
-  for (const width of [1279, 390]) {
+  for (const width of [1439, 1280, 390]) {
     const { graph: g, follow, identifiers } = await at(width);
     for (const below of [follow, identifiers]) expect(below.y, `${width}`).toBeGreaterThanOrEqual(g.y + g.height);
   }
