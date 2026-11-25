@@ -1,7 +1,8 @@
 # Author: @SaadZarook
 """What every connector returns from one lookup: the material for a location's evidence."""
 
-from dataclasses import dataclass
+from collections.abc import Callable, Collection
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
@@ -29,3 +30,8 @@ class LookupResult:
     started_at: datetime
     duration_ms: int
     rows_total: int | None = None  # rows that matched, when counted because more did
+    # REST only: the request line with the named parameters' values masked. A statement binds its
+    # values, so a SQL query never holds one.
+    masked_query: Callable[[Collection[str]], str] | None = field(
+        default=None, compare=False, repr=False
+    )
