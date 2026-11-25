@@ -13,7 +13,7 @@ v0.2 phase (a) first-run setup and Add connection, v0.3 phase (b) the entity gra
 v0.4 phase (c) blocks and probe by example, v0.5 phase (d) templates and New runbook.
 See docs/implementation-plan.md, Releases. -->
 
-## [0.2.3] - DATE
+## [0.2.3] - 2026-11-25
 
 A security release on 0.2.2, with nothing else in it. Update if any of your entities use a REST
 connector.
