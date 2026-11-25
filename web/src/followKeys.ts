@@ -1,6 +1,6 @@
 // Author: @SaadZarook
 import type { CatalogTable, SchemaSnapshot } from "./api/client";
-import { DEFAULT_MAX_ROWS, type DraftColumn, type DraftIdentifier, type DraftLocation } from "./entityDraft";
+import { DEFAULT_MAX_FANOUT, DEFAULT_MAX_ROWS, type DraftColumn, type DraftIdentifier, type DraftLocation } from "./entityDraft";
 
 /** One imported table of a SQL connector in the chosen environment. */
 export interface ImportedTable {
@@ -21,6 +21,8 @@ export interface Link {
   from: { location: string; column: string };
   to: { connector: string; table: string; column: string };
   reason: LinkReason;
+  /** For "table key": the table whose key the column is named for. */
+  holds?: string;
 }
 
 // Names too common to mean two columns hold the same thing: offered only when the catalog says so.
@@ -90,6 +92,13 @@ function catalogLink(catalog: CatalogTable[], connector: string, table: string, 
   return catalog.find((t) => t.connector === connector && t.table === table)?.columns?.[column]?.links_to ?? undefined;
 }
 
+/** Whether the name says the column holds that table's key: cards.visitor_profile_id for visitor_profile.id. */
+function namesKeyOf(table: ImportedTable, column: string): boolean {
+  const [key] = table.primaryKey;
+  if (key === undefined || table.primaryKey.length !== 1) return false;
+  return [`${table.table}_${key}`, `${singular(table.table)}_${key}`].includes(column.toLowerCase());
+}
+
 /** Tables to add next, keyed from a column of an added location: confirmed by the catalog, or by a distinctive name. */
 export function suggestedLinks(locations: DraftLocation[], tables: ImportedTable[], catalog: CatalogTable[]): Link[] {
   const found = new Map<string, Link>();
@@ -99,7 +108,8 @@ export function suggestedLinks(locations: DraftLocation[], tables: ImportedTable
     if (!found.has(key) && !added.has(`${link.to.connector}/${link.to.table}`)) found.set(key, link);
   };
   for (const location of locations) {
-    const source = findTable(tables, location.connector, location.table);
+    // A fan-out can't have another, so nothing is keyed from one.
+    const source = location.maxFanout === undefined ? findTable(tables, location.connector, location.table) : undefined;
     if (!source) continue;
     for (const column of source.columns) {
       // The catalog says where this column points, on any connector.
@@ -115,11 +125,15 @@ export function suggestedLinks(locations: DraftLocation[], tables: ImportedTable
         } else if (!isGeneric(column) && source.columns.includes(column)) {
           offer({ from: { location: location.name, column }, to: { connector: other.connector, table: other.table, column }, reason: "same name" });
         } else if (source.primaryKey.length === 1) {
-          // cards.visitor_profile_id for visitor_profile.id: the name says which table's key it holds.
           const key = source.primaryKey[0] ?? "";
-          const names = [`${source.table}_${key}`, `${singular(source.table)}_${key}`];
-          if (names.includes(column.toLowerCase())) offer({ from: { location: location.name, column: key }, to: { connector: other.connector, table: other.table, column }, reason: "table key" });
+          if (namesKeyOf(source, column)) offer({ from: { location: location.name, column: key }, to: { connector: other.connector, table: other.table, column }, reason: "table key", holds: source.table });
         }
+      }
+      // The other way: a column of this table named for the other table's key.
+      const [otherKey] = other.primaryKey;
+      if (otherKey === undefined || other.primaryKey.length !== 1) continue;
+      for (const column of source.columns) {
+        if (namesKeyOf(other, column)) offer({ from: { location: location.name, column }, to: { connector: other.connector, table: other.table, column: otherKey }, reason: "table key", holds: other.table });
       }
     }
   }
@@ -178,6 +192,8 @@ export function linkedLocation(
     ...(source ? { follows: { connector: source.connector, table: source.table, column: link.from.column } } : {}),
     // Keyed by the root key itself, it needs no key_from: the root key is every lookup's default.
     ...(byRootKey ? {} : { keyFrom: { location: from.name, field: fromColumn.field } }),
+    // A key with several values is looked up once for each, up to max_fanout.
+    ...(from.cardinality === "many" && !byRootKey ? { maxFanout: DEFAULT_MAX_FANOUT } : {}),
     cardinality: one ? "one" : "many",
     ...(one ? {} : { maxRows: Math.min(DEFAULT_MAX_ROWS, rowCeiling ?? DEFAULT_MAX_ROWS) }),
     // Keyed by the root key, it exposes its key column as the root key, so it can find a subject too.
@@ -186,13 +202,14 @@ export function linkedLocation(
 }
 
 /** Why a link is offered, in words. */
-export function reasonText(reason: LinkReason): string {
+export function reasonText(link: Link, from: string | undefined): string {
+  const { connector, table } = link.to;
   return {
     catalog: "the catalog links these columns",
-    "same name": "same column name",
-    "table key": "named for that table's key",
+    "same name": connector === from ? `same column name, also on ${connector}` : `same column name on ${connector}`,
+    "table key": `named for ${possessive(link.holds ?? table)} key`,
     chosen: "chosen by you",
-  }[reason];
+  }[link.reason];
 }
 
 /** The root key's name: the root table's key column, or <entity>_id when it is just id. */
@@ -221,7 +238,7 @@ export function rootLocation(table: ImportedTable, tables: ImportedTable[], cata
  */
 export function identifierCandidates(locations: DraftLocation[], tables: ImportedTable[], rootKey: string): IdentifierCandidate[] {
   const exposesRootKey = (l: DraftLocation) => l.columns.some((c) => c.selected && c.field === rootKey);
-  return locations.filter(exposesRootKey).flatMap((location) => {
+  return locations.filter((l) => l.maxFanout === undefined && exposesRootKey(l)).flatMap((location) => {
     const table = tableOf(location, tables);
     return location.columns
       .filter((c) => c.selected && c.field !== rootKey)

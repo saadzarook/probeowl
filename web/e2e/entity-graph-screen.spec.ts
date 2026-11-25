@@ -247,7 +247,7 @@ test("a top-up's ledger entries come from another connector, keyed from the top-
   await page.getByRole("combobox", { name: "Root table" }).selectOption({ label: "wallet_db · topups" });
   const follow = page.getByRole("region", { name: "Follow a key" });
   await expect(follow).toContainText("topups.ledger_txn_id → ledger_db.ledger_entries.txn_id");
-  await expect(follow).toContainText("topups.user_id → wallet_db.wallets.user_id (same column name)");
+  await expect(follow).toContainText("topups.user_id → wallet_db.wallets.user_id (same column name, also on wallet_db)");
   await follow.getByRole("button", { name: "Add ledger_entries" }).click();
   await expect(page.getByRole("listitem", { name: "Location ledger_entries" })).toContainText("ledger_db · ledger_entries · by txn_id from topups.ledger_txn_id");
   await expect(graph(page).getByRole("button", { name: "Ledger entries Not checked" })).toHaveAccessibleDescription(/key ledger_txn_id from Topups/);
@@ -508,4 +508,44 @@ test("no tables in any environment: the import command is still offered", async 
   await page.getByRole("button", { name: /Onboarding/ }).last().click();
   await expect(page.getByText(/No tables imported in/)).toBeVisible();
   await expect(page.getByRole("group", { name: "Imported elsewhere" })).toHaveCount(0);
+});
+
+test("Follow a key offers what the selected box shares a key with, and a key from a many box is looked up for each row", async ({ page }) => {
+  await start(page, /Wallet/, "uat");
+  await page.getByRole("combobox", { name: "Root table" }).selectOption({ label: "wallet_db · topups" });
+  const follow = page.getByRole("region", { name: "Follow a key" });
+  await expect(follow).toContainText("From Topups:");
+  await expect(follow).toContainText("topups.id → wallet_db.topup_status_history.topup_id (named for topups' key)");
+  await follow.getByRole("button", { name: "Add topup_status_history" }).click();
+  // The added box is selected, and Follow a key follows it: nothing shares a key with it but topups.
+  await expect(follow).toContainText("From Topup status history:");
+  await expect(follow).toContainText("No table shares a key with Topup status history.");
+  await expect(follow.getByRole("button", { name: /^Add / })).toHaveCount(0);
+  // Back on the root, its own suggestions again.
+  await graph(page).getByRole("button", { name: /^Topups / }).click();
+  await expect(follow.getByRole("button", { name: "Add ledger_entries" })).toBeVisible();
+
+  // A key from the history, which has many rows: a fan-out, under it, capped by max_fanout.
+  await page.getByRole("button", { name: "Link by columns…" }).click();
+  await page.getByLabel("Column of a location").selectOption("topup_status_history.id");
+  await page.getByLabel("New table").selectOption({ label: "wallet_db · outbox_events" });
+  await page.getByLabel("Its column").selectOption("aggregate_id");
+  await page.getByRole("button", { name: "Add the location" }).click();
+  const events = page.getByRole("listitem", { name: "Location outbox_events" });
+  await expect(events.getByLabel(/max_fanout/)).toHaveValue("10");
+  await expect(events.getByLabel("Most rows (max_rows, at most 1000)")).toHaveCount(0);
+  const yaml = page.getByLabel("topups.yaml", { exact: true });
+  await expect(yaml).toContainText("each:");
+  await expect(yaml).toContainText("max_fanout: 10");
+  await expect(follow).toContainText("Outbox events is looked up for each row, so nothing can be keyed from it.");
+  await page.getByLabel("Sample", { exact: true }).fill("tp_91f2c7");
+  const box = graph(page).getByRole("button", { name: /^Outbox events / });
+  await expect(box).toHaveAccessibleDescription(/many, for each row of Topup status history; key id from Topup status history; 1 of 2: no row$/);
+  await expect(page.getByText(/each row/).first()).toBeVisible();
+  expect((await new AxeBuilder({ page }).include("main").analyze()).violations).toEqual([]);
+  // Changing the history to one row makes the fan-out an ordinary location again.
+  await page.getByRole("listitem", { name: "Location topup_status_history" }).getByLabel("Records per subject").selectOption("one");
+  await expect(events.getByLabel(/max_fanout/)).toHaveCount(0);
+  await expect(yaml).not.toContainText("each:");
+  await expect(yaml).toContainText("key_from: topup_status_history.id");
 });

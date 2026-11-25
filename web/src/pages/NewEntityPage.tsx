@@ -14,7 +14,7 @@ import { EmptyState } from "../components/EmptyState";
 import { EntityIdentifiers } from "../components/EntityIdentifiers";
 import { EntityLocations, FollowKeys } from "../components/EntityLocations";
 import { SaveChecksPanel } from "../components/SaveChecksPanel";
-import { draftProblems, entityTitle, entityYaml, type DraftIdentifier, type DraftLocation, type EntityDraft } from "../entityDraft";
+import { checkedName, draftProblems, entityTitle, entityYaml, withFanOuts, type DraftIdentifier, type DraftLocation, type EntityDraft } from "../entityDraft";
 import { defaultRootKey, identifierCandidates, importedTables, pretickedIdentifiers, rootLocation, tableReference } from "../followKeys";
 import { failuresByLocation } from "../locationChecks";
 import { REASON_LABELS, REFERENCE_PLACEHOLDER } from "../reasons";
@@ -232,7 +232,8 @@ function EntityGraphScreen() {
     const identifiers = current.identifiers.map((i) => (i.via === undefined ? { ...i, name: rootKey } : i));
     update({ rootKey, locations, identifiers });
   };
-  const setLocations = (locations: DraftLocation[]) => {
+  const setLocations = (changed: DraftLocation[]) => {
+    const locations = withFanOuts(changed);
     // An identifier on a location that is gone, or on a column no longer selected, goes too.
     const chosen = (i: DraftIdentifier) => locations.some((l) => l.name === i.via?.location && l.columns.some((c) => c.selected && c.field === i.via?.field));
     const kept = current.identifiers.filter((i) => i.via === undefined || chosen(i));
@@ -250,7 +251,11 @@ function EntityGraphScreen() {
 
   const stale = preview !== undefined && preview.yaml !== yaml;
   const saveError = save.error instanceof SaveError ? save.error : undefined;
-  const failures = failuresByLocation(check.data?.failures ?? [], current.locations.map((l) => l.name));
+  const failures = failuresByLocation(
+    check.data?.failures ?? [],
+    current.locations.map((l) => l.name),
+    (checked) => current.locations.find((l) => checkedName(l) === checked)?.name ?? checked,
+  );
   const checks = {
     checking: checkable && (check.isFetching || (!production && check.data === undefined)),
     byLocation: failures.byLocation,
@@ -456,7 +461,7 @@ function EntityGraphScreen() {
               />
             </div>
             <div className="min-w-0 wide:col-span-3">
-              <FollowKeys locations={current.locations} rootKey={current.rootKey} tables={tables} catalog={catalogTables} rowCeilings={rowCeilings} onChange={setLocations} />
+              <FollowKeys locations={current.locations} selected={focus ?? rootTable} rootKey={current.rootKey} tables={tables} catalog={catalogTables} rowCeilings={rowCeilings} onChange={setLocations} />
               <EntityIdentifiers
                 rootKey={current.rootKey}
                 identifiers={current.identifiers}
