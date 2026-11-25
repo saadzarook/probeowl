@@ -15,7 +15,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
-from urllib.parse import parse_qsl, quote, urlsplit
+from urllib.parse import parse_qsl, quote, unquote, urlsplit
 
 import httpx
 
@@ -30,6 +30,8 @@ log = logging.getLogger(__name__)
 
 _PLACEHOLDER = re.compile(r"\{\{\s*(\w+)\s*\}\}")
 _RETRY_STATUSES = {429, 500, 502, 503, 504}
+# A dot, slash or backslash written encoded: the API may decode it after the path was checked.
+_ENCODED_SEPARATOR = re.compile(r"%(2e|2f|5c)", re.IGNORECASE)
 REDACTED = "[redacted]"
 
 
@@ -97,6 +99,7 @@ def build_request(lookup: str, parameters: Mapping[str, object]) -> Request:
     split = urlsplit(target)
     if split.scheme or split.netloc or not target.startswith("/") or target.startswith("//"):
         raise GuardViolation(f"a REST lookup is a path under the base URL, not {target!r}")
+    _refuse_leaving(target, split.path)
     used: dict[str, ParameterValue] = {}
 
     def fill(template: str, in_path: bool) -> str:
@@ -104,6 +107,9 @@ def build_request(lookup: str, parameters: Mapping[str, object]) -> Request:
             name = match.group(1)
             used[name] = _value(name, parameters)
             text = str(used[name])
+            if in_path and text == "":
+                # The path would name a different resource, usually the whole collection.
+                raise GuardViolation(f"{{{{{name}}}}} is empty, so the path would lose a segment")
             if in_path and text in {".", ".."}:
                 raise GuardViolation(f"{{{{{name}}}}} would move up the path: {text!r}")
             # safe="" encodes / too, so a value is always exactly one path segment.
@@ -112,11 +118,35 @@ def build_request(lookup: str, parameters: Mapping[str, object]) -> Request:
         return _PLACEHOLDER.sub(value, template)
 
     path = fill(split.path, in_path=True)
+    # Again once filled: a value can complete a dot the template wrote, or another value's.
+    if any(_moves(unquote(segment)) for segment in path.split("/")):
+        raise GuardViolation(f"a REST lookup cannot move up the path: {target!r}")
     params = tuple(
         (key, fill(val, in_path=False))
         for key, val in parse_qsl(split.query, keep_blank_values=True)
     )
     return Request(path=path, params=params, used=used)
+
+
+def _refuse_leaving(target: str, path: str) -> None:
+    """GuardViolation if the template, as written, could reach outside the base URL.
+
+    The HTTP client resolves dot segments after joining the base URL, so "/../admin" would leave
+    it with the connector's credentials.
+    """
+    if "\\" in target or "#" in target:
+        raise GuardViolation(rf"a REST lookup has no \ or #: {target!r}")
+    if "//" in path:
+        raise GuardViolation(f"a REST lookup has no empty path segment (//): {target!r}")
+    if _ENCODED_SEPARATOR.search(path):
+        raise GuardViolation(rf"a REST lookup's path has no encoded . / or \: {target!r}")
+    if any(_moves(segment) for segment in path.split("/")):
+        raise GuardViolation(f"a REST lookup cannot move up the path: {target!r}")
+
+
+def _moves(segment: str) -> bool:
+    # Some servers drop a segment's ;parameters before they resolve it: "..;" is ".." to them.
+    return segment.split(";")[0] in {".", ".."}
 
 
 def _value(name: str, parameters: Mapping[str, object]) -> ParameterValue:
