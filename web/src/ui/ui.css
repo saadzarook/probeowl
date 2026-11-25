@@ -158,6 +158,12 @@
 /* Only these colours exist as utilities: Tailwind's own palette is removed, so a component can't
    reach for a literal colour (rule 10). Inline, so a utility reads the --ui-* value directly and
    never tokens.css's --color-* of the same name. */
+/* From 1440 px the entity graph has its tools beside it: the first width where a root and what it
+   links to fit in what is left (#163). */
+@theme {
+  --breakpoint-wide: 90rem;
+}
+
 @theme inline {
   --color-*: initial;
   --color-transparent: transparent;

@@ -62,7 +62,7 @@ function CatalogLinkFix({ application, fix }: { application: string; fix: LinkFi
   return (
     <div className="catalog-fix">
       <p>
-        The catalog does not call {entry.table}.{column} a key, so a {entry.label} table may not be read by it. The wizard followed it as a link:
+        The catalog does not call {entry.table}.{column} a key, so a {entry.label} table may not be read by it. The entity graph followed it as a link:
       </p>
       {preview === undefined ? (
         <Button

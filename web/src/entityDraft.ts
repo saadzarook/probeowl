@@ -103,9 +103,9 @@ export function entityDocument(draft: EntityDraft): Record<string, unknown> {
   };
 }
 
-/** The entity's YAML file, as the wizard writes it. */
+/** The entity's YAML file, as the entity graph writes it. */
 export function entityYaml(draft: EntityDraft): string {
-  const header = "# Written by the entity wizard. Edit freely; owl check <folder> checks it.\n";
+  const header = "# Written by the entity graph. Edit freely; owl check <folder> checks it.\n";
   return header + stringify(entityDocument(draft), { lineWidth: 0 });
 }
 

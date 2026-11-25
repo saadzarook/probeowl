@@ -7,9 +7,11 @@ import { linkedLocation, reasonText, suggestedLinks, tableReference, type Import
 import { linkFix, masked, type Failure } from "../locationChecks";
 import { LocationFailures } from "./LocationFailures";
 
-/** Where the draft's save checks stand, shown on the Locations step. */
+/** Where the draft's save checks stand, shown with the locations. */
 export interface ChecksState {
   checking: boolean;
+  /** Not run on this draft yet, and why: in Production they wait for a click. */
+  waiting?: string;
   byLocation: ReadonlyMap<string, Failure[]>;
   general: Failure[];
   /** The checks could not run: the message, with a retry. */
@@ -30,8 +32,93 @@ interface EntityLocationsProps {
   onChange: (locations: DraftLocation[]) => void;
 }
 
-/** The entity's locations: the ones added, each with its save checks, links to follow from them, and a link chosen by hand. */
+/** The entity's locations, each with its save checks. */
 export function EntityLocations({ application, locations, rootKey, tables, catalog, rowCeilings, inUse, checks, onChange }: EntityLocationsProps) {
+  const update = (name: string, change: Partial<DraftLocation>) => onChange(locations.map((l) => (l.name === name ? { ...l, ...change } : l)));
+  const keyedFrom = (name: string) => locations.filter((l) => l.keyFrom?.location === name).map((l) => l.name);
+
+  return (
+    <section className="card" aria-labelledby="added-locations">
+      <h2 id="added-locations">Locations</h2>
+      <ChecksStatus checks={checks} />
+      <ul className="wizard-locations">
+        {locations.map((location, index) => {
+          const used = inUse.get(location.name) ?? new Set<string>();
+          const dependants = keyedFrom(location.name);
+          const ceiling = rowCeilings.get(location.connector);
+          const failures = checks.byLocation.get(location.name) ?? [];
+          return (
+            <li key={location.name} aria-label={`Location ${location.name}`}>
+              <header className="wizard-location-header">
+                <strong>{location.name}</strong>
+                <span className="hint">
+                  {location.connector} · {location.table} · by {location.keyColumn}
+                  {location.keyFrom ? ` from ${location.keyFrom.location}.${location.keyFrom.field}` : index === 0 ? " (the root key)" : ` = ${rootKey}`}
+                </span>
+                {index > 0 && (
+                  <Button
+                    variant="outline"
+                    type="button"
+                    disabled={dependants.length > 0}
+                    title={dependants.length > 0 ? `${dependants.join(", ")} is keyed from it` : undefined}
+                    onClick={() => onChange(locations.filter((l) => l.name !== location.name))}
+                  >
+                    Remove {location.name}
+                  </Button>
+                )}
+              </header>
+              {index > 0 && (
+                <FormGrid className="xl:grid-cols-2">
+                  <Field id={`${location.name}-cardinality`} label="Records per subject">
+                    <Select value={location.cardinality} onChange={(e) => update(location.name, e.target.value === "many" ? { cardinality: "many", maxRows: Math.min(DEFAULT_MAX_ROWS, ceiling ?? DEFAULT_MAX_ROWS) } : { cardinality: "one", maxRows: undefined })}>
+                      <option value="one">One</option>
+                      <option value="many">Many</option>
+                    </Select>
+                  </Field>
+                  {location.cardinality === "many" && (
+                    <Field id={`${location.name}-max-rows`} label={`Most rows (max_rows${ceiling ? `, at most ${ceiling}` : ""})`}>
+                      <Input type="number" min={1} max={ceiling} value={location.maxRows ?? DEFAULT_MAX_ROWS} onChange={(e) => update(location.name, { maxRows: Number(e.target.value) || DEFAULT_MAX_ROWS })} />
+                    </Field>
+                  )}
+                </FormGrid>
+              )}
+              <LocationFailures
+                application={application}
+                location={location.name}
+                failures={failures}
+                linkFix={linkFix(location, failures, catalog, tables)}
+                rowCeiling={ceiling}
+                onLowerMaxRows={(maxRows) => update(location.name, { maxRows })}
+                onMaskPii={() => update(location.name, { columns: masked(location, catalog, tables).columns })}
+              />
+              <fieldset className="wizard-columns">
+                <legend className="mb-1 p-0 text-sm font-medium text-foreground">Columns to select</legend>
+                {location.columns.map((c) => {
+                  const locked = c.column === location.keyColumn || used.has(c.field);
+                  return (
+                    <label key={c.column} title={locked ? "Used by the key graph or an identifier" : undefined}>
+                      <input
+                        type="checkbox"
+                        checked={c.selected}
+                        disabled={locked}
+                        onChange={(e) => update(location.name, { columns: location.columns.map((x) => (x.column === c.column ? { ...x, selected: e.target.checked } : x)) })}
+                      />
+                      {c.field === c.column ? c.column : `${c.column} as ${c.field}`}
+                      {c.pii && <span className="pii-tag"> PII</span>}
+                    </label>
+                  );
+                })}
+              </fieldset>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+/** Follow a key: the tables that share a key with a location, and a link chosen by hand. */
+export function FollowKeys({ locations, rootKey, tables, catalog, rowCeilings, onChange }: Omit<EntityLocationsProps, "application" | "inUse" | "checks">) {
   const suggestions = suggestedLinks(locations, tables, catalog);
   const add = (link: Link) => {
     const from = locations.find((l) => l.name === link.from.location);
@@ -42,120 +129,39 @@ export function EntityLocations({ application, locations, rootKey, tables, catal
     const exposed = locations.map((l) => (l.name === from.name ? { ...l, columns: l.columns.map((c) => (c.column === link.from.column ? { ...c, selected: true } : c)) } : l));
     onChange([...exposed, added]);
   };
-  const update = (name: string, change: Partial<DraftLocation>) => onChange(locations.map((l) => (l.name === name ? { ...l, ...change } : l)));
-  const keyedFrom = (name: string) => locations.filter((l) => l.keyFrom?.location === name).map((l) => l.name);
 
   return (
-    <>
-      <section className="card" aria-labelledby="added-locations">
-        <h2 id="added-locations">Locations</h2>
-        <ChecksStatus checks={checks} />
-        <ul className="wizard-locations">
-          {locations.map((location, index) => {
-            const used = inUse.get(location.name) ?? new Set<string>();
-            const dependants = keyedFrom(location.name);
-            const ceiling = rowCeilings.get(location.connector);
-            const failures = checks.byLocation.get(location.name) ?? [];
-            return (
-              <li key={location.name} aria-label={`Location ${location.name}`}>
-                <header className="wizard-location-header">
-                  <strong>{location.name}</strong>
-                  <span className="hint">
-                    {location.connector} · {location.table} · by {location.keyColumn}
-                    {location.keyFrom ? ` from ${location.keyFrom.location}.${location.keyFrom.field}` : index === 0 ? " (the root key)" : ` = ${rootKey}`}
-                  </span>
-                  {index > 0 && (
-                    <Button
-                      variant="outline"
-                      type="button"
-                      disabled={dependants.length > 0}
-                      title={dependants.length > 0 ? `${dependants.join(", ")} is keyed from it` : undefined}
-                      onClick={() => onChange(locations.filter((l) => l.name !== location.name))}
-                    >
-                      Remove {location.name}
-                    </Button>
-                  )}
-                </header>
-                {index > 0 && (
-                  <FormGrid className="xl:grid-cols-2">
-                    <Field id={`${location.name}-cardinality`} label="Records per subject">
-                      <Select value={location.cardinality} onChange={(e) => update(location.name, e.target.value === "many" ? { cardinality: "many", maxRows: Math.min(DEFAULT_MAX_ROWS, ceiling ?? DEFAULT_MAX_ROWS) } : { cardinality: "one", maxRows: undefined })}>
-                        <option value="one">One</option>
-                        <option value="many">Many</option>
-                      </Select>
-                    </Field>
-                    {location.cardinality === "many" && (
-                      <Field id={`${location.name}-max-rows`} label={`Most rows (max_rows${ceiling ? `, at most ${ceiling}` : ""})`}>
-                        <Input type="number" min={1} max={ceiling} value={location.maxRows ?? DEFAULT_MAX_ROWS} onChange={(e) => update(location.name, { maxRows: Number(e.target.value) || DEFAULT_MAX_ROWS })} />
-                      </Field>
-                    )}
-                  </FormGrid>
-                )}
-                <LocationFailures
-                  application={application}
-                  location={location.name}
-                  failures={failures}
-                  linkFix={linkFix(location, failures, catalog, tables)}
-                  rowCeiling={ceiling}
-                  onLowerMaxRows={(maxRows) => update(location.name, { maxRows })}
-                  onMaskPii={() => update(location.name, { columns: masked(location, catalog, tables).columns })}
-                />
-                <fieldset className="wizard-columns">
-                  <legend className="mb-1 p-0 text-sm font-medium text-foreground">Columns to select</legend>
-                  {location.columns.map((c) => {
-                    const locked = c.column === location.keyColumn || used.has(c.field);
-                    return (
-                      <label key={c.column} title={locked ? "Used by the key graph or an identifier" : undefined}>
-                        <input
-                          type="checkbox"
-                          checked={c.selected}
-                          disabled={locked}
-                          onChange={(e) => update(location.name, { columns: location.columns.map((x) => (x.column === c.column ? { ...x, selected: e.target.checked } : x)) })}
-                        />
-                        {c.field === c.column ? c.column : `${c.column} as ${c.field}`}
-                        {c.pii && <span className="pii-tag"> PII</span>}
-                      </label>
-                    );
-                  })}
-                </fieldset>
-              </li>
-            );
-          })}
+    <section className="card" aria-labelledby="follow-keys">
+      <h2 id="follow-keys">Follow a key</h2>
+      <p className="hint">
+        Tables imported in this environment, on any connector, that share a key with a location. Common names such as id or status are offered
+        only when the catalog links them; choose those yourself below.
+      </p>
+      {suggestions.length === 0 ? (
+        <p>No table shares a key with these locations. Link one by its columns below.</p>
+      ) : (
+        <ul className="wizard-suggestions">
+          {suggestions.map((s) => (
+            <li key={`${s.from.location}.${s.from.column}>${s.to.connector}.${s.to.table}.${s.to.column}`}>
+              <span>
+                <code>
+                  {s.from.location}.{s.from.column}
+                </code>{" "}
+                →{" "}
+                <code>
+                  {s.to.connector}.{s.to.table}.{s.to.column}
+                </code>{" "}
+                <span className="hint">({reasonText(s.reason)})</span>
+              </span>
+              <Button variant="outline" type="button" onClick={() => add(s)}>
+                Add {s.to.table}
+              </Button>
+            </li>
+          ))}
         </ul>
-      </section>
-
-      <section className="card" aria-labelledby="follow-keys">
-        <h2 id="follow-keys">Follow a key</h2>
-        <p className="hint">
-          Tables imported in this environment, on any connector, that share a key with a location. Common names such as id or status are offered
-          only when the catalog links them; choose those yourself below.
-        </p>
-        {suggestions.length === 0 ? (
-          <p>No table shares a key with these locations. Link one by its columns below.</p>
-        ) : (
-          <ul className="wizard-suggestions">
-            {suggestions.map((s) => (
-              <li key={`${s.from.location}.${s.from.column}>${s.to.connector}.${s.to.table}.${s.to.column}`}>
-                <span>
-                  <code>
-                    {s.from.location}.{s.from.column}
-                  </code>{" "}
-                  →{" "}
-                  <code>
-                    {s.to.connector}.{s.to.table}.{s.to.column}
-                  </code>{" "}
-                  <span className="hint">({reasonText(s.reason)})</span>
-                </span>
-                <Button variant="outline" type="button" onClick={() => add(s)}>
-                  Add {s.to.table}
-                </Button>
-              </li>
-            ))}
-          </ul>
-        )}
-        <LinkByColumns locations={locations} tables={tables} onLink={add} />
-      </section>
-    </>
+      )}
+      <LinkByColumns locations={locations} tables={tables} onLink={add} />
+    </section>
   );
 }
 
@@ -176,6 +182,8 @@ function ChecksStatus({ checks }: { checks: ChecksState }) {
     <div aria-live="polite">
       {checks.checking ? (
         <p className="hint" aria-busy="true">Checking the locations…</p>
+      ) : checks.waiting !== undefined ? (
+        <p className="hint">{checks.waiting}</p>
       ) : failed === 0 ? (
         <p className="hint">Every location passes its save checks.</p>
       ) : (

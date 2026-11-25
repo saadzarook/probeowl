@@ -7,7 +7,7 @@ import { expectNoOverflow } from "../e2e/overflow";
 
 // A newcomer's first entity on a real MariaDB, as the v0.1 retest made it. dev/native/newcomer_live.sh
 // serves the folder this needs, names it in PROBEOWL_LIVE_NEWCOMER_FOLDER, and picks the case:
-// - unmarked: cards confirmed as Transaction, its link not in the catalog: the wizard fixes it inline;
+// - unmarked: cards confirmed as Transaction, its link not in the catalog: the entity graph fixes it inline;
 // - suggested: cards not confirmed yet: the Tables screen confirms it with the link its import suggests.
 const folder = process.env["PROBEOWL_LIVE_NEWCOMER_FOLDER"];
 const scenario = process.env["PROBEOWL_LIVE_NEWCOMER_CASE"] ?? "unmarked";
@@ -23,29 +23,26 @@ async function chooseApplication(page: Page, path: string) {
   await page.getByLabel("Environment").selectOption("uat");
 }
 
-/** The wizard from the root table to Add cards, on the Locations step. */
+/** The entity graph from the root table and the sample to Add cards. */
 async function addCards(page: Page) {
   await chooseApplication(page, "/probes/new-entity");
-  await page.getByLabel("Entity id").fill("visitor_profile");
-  await page.getByRole("button", { name: "Next: Root table" }).click();
   await page.getByRole("combobox", { name: "Root table" }).selectOption({ label: "access_uat_test_mariadb · visitor_profile" });
+  await expect(page.getByLabel("Entity id")).toHaveValue("visitor_profile");
   await expect(page.getByLabel(/Root key/)).toHaveValue("visitor_profile_id");
-  await page.getByRole("button", { name: "Next: Locations" }).click();
+  await page.getByLabel("Sample", { exact: true }).fill("VP00012931");
   const follow = page.getByRole("region", { name: "Follow a key" });
   await expect(follow).toContainText("visitor_profile.id → access_uat_test_mariadb.cards.visitor_profile_id");
   await follow.getByRole("button", { name: "Add cards" }).click();
 }
 
-/** From a passing Locations step: card_id ticked, Create, and the file and catalog as they should be. */
+/** From passing locations: both boxes Found on the real sample, card_id ticked, Create and Write, and the file and catalog as they should be. */
 async function createAndRead(page: Page) {
-  await expectNoOverflow(page, "the wizard's Locations");
-  await page.getByRole("button", { name: "Next: Identifiers" }).click();
+  await expect(page.getByRole("status", { name: "Last check" })).toHaveText("Last check: 2 locations: 2 Found.", { timeout: 60_000 });
+  await expectNoOverflow(page, "the entity graph");
   await expect(page.getByLabel("Find by cards.card_id")).toBeChecked();
-  await expectNoOverflow(page, "the wizard's Identifiers");
   await expect(page.getByLabel("Find by visitor_profile.email")).not.toBeChecked();
-  await page.getByRole("button", { name: "Next: Preview" }).click();
-  await page.getByRole("button", { name: "Check" }).click();
   await page.getByRole("button", { name: "Create visitor_profile" }).click();
+  await page.getByRole("button", { name: /^Write .*visitor_profile\.yaml$/ }).click();
   await expect(page.getByRole("status", { name: "Entity created" })).toContainText("visitor_profile was created", { timeout: 30_000 });
 
   const written = parse(readFileSync(join(folder ?? "", "access_uat_test", "entities", "visitor_profile.yaml"), "utf-8")) as {
@@ -59,11 +56,11 @@ async function createAndRead(page: Page) {
   expect(catalog).toContain("links_to");
 }
 
-test("the wizard keeps cards, fixes its catalog link inline, and writes both locations with card_id", async ({ page }) => {
+test("the entity graph keeps cards, fixes its catalog link inline, and writes both locations with card_id", async ({ page }) => {
   test.skip(scenario !== "unmarked", "the unmarked case: newcomer_live.sh without --suggested");
   test.setTimeout(120_000);
   await addCards(page);
-  // The real save checks refuse the lookup, on cards itself, with the fix the wizard knows.
+  // The real save checks refuse the lookup, on cards itself, with the fix the entity graph knows.
   const failed = page.getByRole("region", { name: "Save checks failed for cards" });
   await expect(failed).toContainText("Time filter: cards is a Transaction table", { timeout: 30_000 });
   await failed.getByRole("button", { name: "Mark cards.visitor_profile_id as a link to visitor_profile.id" }).click();
@@ -73,7 +70,7 @@ test("the wizard keeps cards, fixes its catalog link inline, and writes both loc
   await createAndRead(page);
 });
 
-test("the import suggests cards.visitor_profile_id as a link, so the wizard's cards passes at once", async ({ page }) => {
+test("the import suggests cards.visitor_profile_id as a link, so the entity graph's cards passes at once", async ({ page }) => {
   test.skip(scenario !== "suggested", "the suggested case: newcomer_live.sh --suggested");
   test.setTimeout(120_000);
   await chooseApplication(page, "/tables");

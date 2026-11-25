@@ -16,6 +16,7 @@ export type Entity = components["schemas"]["Entity"];
 export type ProbeSummary = components["schemas"]["ProbeSummary"];
 export type Reason = components["schemas"]["Reason"];
 export type LocationResult = components["schemas"]["LocationResult"];
+export type Outcome = components["schemas"]["Outcome"];
 export type ExpectationEvaluation = components["schemas"]["ExpectationEvaluation"];
 export type SaveCheck = components["schemas"]["SaveCheck"];
 export type SaveCheckReport = components["schemas"]["SaveCheckReport"];

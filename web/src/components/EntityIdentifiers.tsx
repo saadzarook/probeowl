@@ -27,7 +27,7 @@ export function EntityIdentifiers({ rootKey, identifiers, candidates, onChange }
       <h2 id="identifiers">Identifiers</h2>
       <p className="hint">
         What a person can paste to find a subject. Unique is ticked where the column has a unique index; PII where the catalog marks it. Unique columns that are not personal data are ticked for you; untick any you do not want. A pattern is
-        optional: the wizard reads no data to guess one. Only locations keyed by the root key are offered: a value found there leads to its
+        optional: the entity graph reads no data to guess one. Only locations keyed by the root key are offered: a value found there leads to its
         subject.
       </p>
       <div className="wizard-row">

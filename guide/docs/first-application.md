@@ -79,8 +79,9 @@ connector](connectors.md#adding-a-connector).
 ## 5. Write an entity
 
 An entity says what a subject is and where its data lives. The quickest way is **New entity…** in
-the **Probe editor**: pick the root table from the imported schema and follow its keys to other
-tables, then check and create it. See [New entity](web-app/probes.md#new-entity).
+the **Probe editor**: pick the root table from the imported schema, give one real subject's ID as
+the sample, and follow its keys to other tables, seeing each one find the sample or not, then
+create it. See [New entity](web-app/probes.md#new-entity).
 
 Or write it yourself. Create `probeowl/wallet/entities/topup.yaml`:
 

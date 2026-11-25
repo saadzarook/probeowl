@@ -33,6 +33,10 @@ test("rule 3: four columns from 1280, two from 640, one below; an error moves no
   const lefts = async () => new Set(await Promise.all(["Environment", "Entity", "Any ID", "Reference"].map(async (l) => (await box(page, l)).x)));
   await gallery(page, 1280);
   expect((await lefts()).size).toBe(4);
+  // One row: every control starts at the same top, whatever each field's help takes (#163's
+  // Reference help wraps; a shorter field once stretched its label row and dropped its control).
+  const tops = await Promise.all(["Environment", "Entity", "Any ID", "Reference"].map(async (l) => Math.round((await box(page, l)).y)));
+  expect(new Set(tops).size, `tops ${tops.join(", ")}`).toBe(1);
   await gallery(page, 640);
   expect((await lefts()).size).toBe(2);
   await gallery(page, 639);

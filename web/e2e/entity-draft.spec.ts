@@ -17,7 +17,7 @@ import {
 } from "../src/followKeys";
 import { failuresByLocation, linkFix } from "../src/locationChecks";
 
-// The entity wizard's logic, with no page: the YAML it writes and the keys it offers to follow.
+// The entity graph's logic, with no page: the YAML it writes and the keys it offers to follow.
 
 const prod = (application: string) => importedTables(schemaSnapshots.filter((s) => s.application === application && s.environment === "prod"));
 const wallet = prod("wallet");
@@ -90,7 +90,7 @@ test("a link keyed by the root key needs no key_from, and the YAML is a valid en
     ],
   };
   const text = entityYaml(draft);
-  expect(text.startsWith("# Written by the entity wizard.")).toBe(true);
+  expect(text.startsWith("# Written by the entity graph.")).toBe(true);
   const document = parse(text) as { root_key: string; identifiers: Record<string, unknown>; locations: Record<string, Record<string, unknown>> };
   const location = (name: string) => document.locations[name] ?? {};
   expect(document.root_key).toBe("visitor_profile_id");
