@@ -13,6 +13,30 @@ v0.2 phase (a) first-run setup and Add connection, v0.3 phase (b) the entity gra
 v0.4 phase (c) blocks and probe by example, v0.5 phase (d) templates and New runbook.
 See docs/implementation-plan.md, Releases. -->
 
+## [0.2.3] - 2026-11-25
+
+A security release on 0.2.2, with nothing else in it. Update if any of your entities use a REST
+connector.
+
+### Security
+
+- A REST lookup's path can no longer leave its connector's base URL. A path written with `..`, such
+  as `GET /../admin/{{id}}`, was sent outside the base URL's path, on the same host, with the
+  connector's token. Every earlier release is affected. Found by the maintainers; the advisory has
+  the details.
+
+### Changed
+
+- **Some REST lookups that were accepted are now refused,** by `owl check`, by the save checks and
+  before any request is sent. A path may not hold:
+    - `.` or `..` as a segment, with or without `;` parameters, also when a value completes it;
+    - `//`, an empty segment;
+    - `#` or `\`;
+    - an encoded dot, slash or backslash (`%2e`, `%2f`, `%5c`).
+
+  An empty value for a key in the path is refused when the lookup runs. Every other key still goes in
+  as one encoded path segment. Run `owl check` after updating: it names each lookup to change.
+
 ## [0.2.2] - 2026-11-22
 
 A patch release on phase (a): a new look on every screen, layouts for narrow screens, dark mode,

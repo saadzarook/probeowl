@@ -88,6 +88,86 @@ def test_a_value_cannot_move_up_the_path(value: str) -> None:
         build_request("GET /payments/{{id}}", {"id": value})
 
 
+LEAVING = [
+    "GET /../admin/{{id}}",
+    "GET /payments/../../admin/{{id}}",
+    "GET /./payments/{{id}}",
+    "GET /payments/..",
+    "GET /..;/admin/{{id}}",
+    "GET /..;x=1/admin/{{id}}",
+    "GET /payments/.;/{{id}}",
+    "GET /.	./admin/{{id}}",  # a tab is dropped from a URL as it is read
+    "GET /%2e%2e/admin/{{id}}",
+    "GET /%2E./admin/{{id}}",
+    "GET /payments%2f..%2fadmin/{{id}}",
+    "GET /payments//{{id}}",
+    "GET ///evil.example/{{id}}",
+    r"GET /\evil.example/{{id}}",
+    "GET \\evil.example/{{id}}",
+    "GET /payments/..%5cadmin",
+    "GET /payments/{{id}}#top",
+    "GET https:/evil.example/{{id}}",
+]
+
+
+@pytest.mark.parametrize("lookup", LEAVING)
+def test_a_path_that_could_leave_the_base_url_is_refused_and_nothing_is_sent(lookup: str) -> None:
+    sent: list[httpx.Request] = []
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        sent.append(request)
+        return httpx.Response(200, json={})
+
+    api = RestAdapter(
+        RestBinding.model_validate({"base_url": "http://127.0.0.1:9/api/v1"}),
+        None,
+        transport=httpx.MockTransport(answer),
+    )
+    with pytest.raises(GuardViolation):
+        api.lookup(lookup, {"id": "pay_1"}, 10)
+    assert sent == []
+
+
+@pytest.mark.parametrize(
+    ("lookup", "values"),
+    [
+        ("GET /payments/.{{a}}", {"a": "."}),
+        ("GET /payments/{{a}}.", {"a": "."}),
+        ("GET /payments/{{a}}{{b}}", {"a": ".", "b": "."}),
+        ("GET /payments/{{a}}", {"a": ""}),
+        ("GET /payments/{{a}}", {"a": "..;"}),
+        ("GET /payments/..{{a}}/lines", {"a": ";x"}),
+        ("GET /payments/{{a}}/lines", {"a": ""}),
+    ],
+)
+def test_a_value_cannot_complete_a_dot_segment_or_remove_one(
+    lookup: str, values: dict[str, str]
+) -> None:
+    with pytest.raises(GuardViolation):
+        build_request(lookup, values)
+
+
+@pytest.mark.parametrize(
+    "value", ["../x", "a/b", "%2e%2e", "..%2f", "\\", "a#b", "a?b=1", "//h", "é"]
+)
+def test_whatever_the_key_holds_it_is_sent_as_one_segment_under_the_base_url(value: str) -> None:
+    sent: list[bytes] = []
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        sent.append(request.url.raw_path)
+        return httpx.Response(200, json={})
+
+    api = RestAdapter(
+        RestBinding.model_validate({"base_url": "http://127.0.0.1:9/api/v1"}),
+        None,
+        transport=httpx.MockTransport(answer),
+    )
+    api.lookup("GET /cards/{{id}}/status", {"id": value}, 10)
+    [path] = sent
+    assert path.startswith(b"/api/v1/cards/") and path.endswith(b"/status")
+    assert path.count(b"/") == 5 and b"?" not in path and b"#" not in path
+
+
 @pytest.mark.parametrize("value", [None, ["a"], {"a": 1}])
 def test_a_value_must_be_a_single_value(value: object) -> None:
     with pytest.raises(GuardViolation, match="must be a single value"):
