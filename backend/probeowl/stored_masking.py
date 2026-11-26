@@ -6,16 +6,27 @@ and CLI that read it, never hold the value (#66). `owl store mask-pii` applies t
 stored before this, with the current configuration.
 """
 
+import re
+from collections.abc import Iterable
 from dataclasses import dataclass
+from urllib.parse import quote, unquote
 
 from pydantic import JsonValue
 from sqlalchemy import Connection, select, update
 
-from probeowl.engine.masking import MASKED, key_is_pii, mask_rows, pii_fields
+from probeowl.engine.masking import (
+    MASKED,
+    key_is_pii,
+    mask_keys,
+    mask_rows,
+    mask_text,
+    mask_values,
+    pii_fields,
+)
 from probeowl.model import Run
 from probeowl.model.check import LoadedApplication
-from probeowl.model.entity import Entity
-from probeowl.model.run import Evidence
+from probeowl.model.entity import Entity, LocationBase
+from probeowl.model.run import Evidence, LocationResult
 from probeowl.model.runbook_step import StepResult
 from probeowl.store.runs import get_run, save_run
 from probeowl.store.tables import audit_events, runbook_steps, runs
@@ -25,6 +36,7 @@ def masked_run(run: Run, entity: Entity) -> Run:
     """The run with each PII identifier masked wherever it shows, and its subject if the key is."""
     hidden = pii_fields(entity)
     key = key_is_pii(entity)
+    locations, values = _masked_locations(run.locations, entity, hidden)
     identifier = entity.identifiers.get(run.identifier)
     return run.model_copy(
         update={
@@ -46,9 +58,10 @@ def masked_run(run: Run, entity: Entity) -> Run:
             and run.resolution.model_copy(
                 update={"evidence": _masked_evidence(run.resolution.evidence, hidden)}
             ),
-            "locations": [
-                result.model_copy(update={"evidence": _masked_evidence(result.evidence, hidden)})
-                for result in run.locations
+            "locations": locations,
+            "expectations": [
+                e.model_copy(update={"detail": e.detail and mask_text(e.detail, values)})
+                for e in run.expectations
             ],
             "healthy_attempt": run.healthy_attempt
             and run.healthy_attempt.model_copy(
@@ -61,6 +74,103 @@ def masked_run(run: Run, entity: Entity) -> Run:
             ),
         }
     )
+
+
+def _masked_locations(
+    results: list[LocationResult], entity: Entity, hidden: set[str]
+) -> tuple[list[LocationResult], set[str]]:
+    """The results with their evidence masked, and the values a stored request line gave away."""
+    given: set[str] = set()
+    masked = []
+    for result in results:
+        evidence = _masked_evidence(result.evidence, hidden)
+        if evidence is not None:
+            evidence, values = _masked_request(evidence, _templates(entity, result))
+            given |= values
+        masked.append(result.model_copy(update={"evidence": evidence}))
+    if not given:
+        return masked, given
+    # Any location may hold the key in a field of another name, and an error could have named it.
+    return [
+        result.model_copy(
+            update={
+                "reason": result.reason and mask_text(result.reason, given),
+                "evidence": result.evidence and _masked_echo(result.evidence, given),
+            }
+        )
+        for result in masked
+    ], given
+
+
+def _masked_echo(evidence: Evidence, values: set[str]) -> Evidence:
+    return evidence.model_copy(
+        update={
+            "rows": mask_values(evidence.rows, values),
+            "column_types": mask_keys(evidence.column_types, values),
+        }
+    )
+
+
+def _is_request(evidence: Evidence) -> bool:
+    return evidence.query.startswith("GET ")
+
+
+def _templates(entity: Entity, result: LocationResult) -> list[str]:
+    """The lookups the location has now: what its stored request line was probably made from."""
+    location: LocationBase | None
+    if result.parent is not None:
+        parent = entity.locations.get(result.parent)
+        location = parent.each.get(result.location) if parent is not None else None
+    else:
+        location = entity.locations.get(result.location)
+    if location is None:
+        return []
+    return [each for each in (location.lookup, location.fallback) if each is not None]
+
+
+_PLACEHOLDER = re.compile(r"\{\{\s*(\w+)\s*\}\}")
+
+
+def _masked_request(evidence: Evidence, templates: Iterable[str]) -> tuple[Evidence, set[str]]:
+    """Evidence whose request line shows no value its parameters mask, and the values it showed.
+
+    Runs stored before 0.2.4 kept them in the path and query. A line none of the location's
+    lookups could have sent has nothing to say which part is the value: all of it is masked.
+    """
+    hidden = {name for name, value in evidence.parameters.items() if value == MASKED}
+    if not hidden or not _is_request(evidence):
+        return evidence, set()
+    for template in templates:
+        names = _PLACEHOLDER.findall(template)
+        found = _as_sent(template).fullmatch(evidence.query)
+        # The keys too: a line the fallback sent can look like the lookup's.
+        if found is None or set(names) != set(evidence.parameters):
+            continue
+        line, values, at = "", set(), 0
+        for index, name in enumerate(names, start=1):
+            start, end = found.span(index)
+            if name in hidden:
+                line += evidence.query[at:start] + MASKED
+                values.add(unquote(found.group(index).replace("+", " ")))
+                values.add(unquote(found.group(index)))
+            else:
+                line += evidence.query[at:end]
+            at = end
+        line += evidence.query[at:]
+        return evidence.model_copy(update={"query": line}), values - {MASKED, ""}
+    return evidence.model_copy(update={"query": f"GET {MASKED}"}), set()
+
+
+def _as_sent(template: str) -> re.Pattern[str]:
+    """What a lookup's request line looks like: any base path, then the template's own parts."""
+    target = template.strip().partition(" ")[2].strip()
+    parts = _PLACEHOLDER.split(target)
+    # Every other part is a placeholder's name. A value is one path segment, or one query value.
+    pattern = "".join(
+        r"([^/?&#]*)" if index % 2 else re.escape(quote(part, safe="/:@!$&'()*+,;=-._~%?"))
+        for index, part in enumerate(parts)
+    )
+    return re.compile(rf"GET (?:/[^?]*)?{pattern}")
 
 
 def masked_step(result: StepResult, entity: Entity) -> StepResult:
@@ -207,6 +317,8 @@ def _what_changed(run: Run, masked: Run) -> list[str]:
         names.append("resolution evidence")
     changed = [a.location for a, b in zip(run.locations, masked.locations, strict=True) if a != b]
     names += [f"{location} evidence" for location in changed]
+    if run.expectations != masked.expectations:
+        names.append("expectations")
     if run.healthy_attempt != masked.healthy_attempt:
         names.append("healthy comparison")
     return names

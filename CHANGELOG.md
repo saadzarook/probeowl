@@ -13,6 +13,30 @@ v0.2 phase (a) first-run setup and Add connection, v0.3 phase (b) the entity gra
 v0.4 phase (c) blocks and probe by example, v0.5 phase (d) templates and New runbook.
 See docs/implementation-plan.md, Releases. -->
 
+## [0.2.4] - 2026-11-26
+
+A security release on 0.2.3, with nothing else in it. Update if an identifier or a masked field is the
+key of a REST lookup, then run `owl store mask-pii <folder>` and, when you have read its list, again
+with `--apply`.
+
+### Security
+
+- A masked key no longer shows in a lookup's evidence. A REST lookup masked the key in its parameters
+  but kept it in the request line, such as `GET /payments/<key>`, in the API and in the store. A key
+  that is a PII identifier and one masked at its source location were both affected, in every earlier
+  release. It is now masked in the request line, and wherever else it shows: in rows under another
+  name, an error, and a failed expectation's detail, for SQL lookups too.
+- Runs stored before are masked as they are read. They still hold the key in the store until
+  `owl store mask-pii --apply` is run, which now cleans stored requests. The audit never held it.
+- `owl serve` keeps the URLs of the REST requests it makes, and the query strings of requests made to
+  it, out of its logs. A search held what was typed.
+
+### Changed
+
+- The evidence of a lookup with a masked key shows `[masked]` in its request line, and in any field
+  holding that key. A stored request that none of its location's lookups could have sent is masked
+  whole.
+
 ## [0.2.3] - 2026-11-25
 
 A security release on 0.2.2, with nothing else in it. Update if any of your entities use a REST

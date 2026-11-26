@@ -62,6 +62,9 @@ echo "== no response names a host, port, login or secret reference"
 uv run python ci/scan_responses.py "${PROBEOWL_CONFIG:-../examples}" http://127.0.0.1:7878 $runs ||
     failures=$((failures + 1))
 
+echo "== a REST lookup's key that is PII is masked everywhere"
+sh ci/pii_key_check.sh || failures=$((failures + 1))
+
 if [ "$failures" -ne 0 ]; then
     echo "M1 exit check: $failures failures" >&2
     exit 1
