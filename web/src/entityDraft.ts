@@ -4,6 +4,9 @@ import { stringify } from "yaml";
 /** A many location's row cap when nothing else is said: the usual 100, never above the row ceiling. */
 export const DEFAULT_MAX_ROWS = 100;
 
+/** The most rows a fan-out is repeated for when nothing else is said. */
+export const DEFAULT_MAX_FANOUT = 10;
+
 /** One column a location selects: its name in the table, the field it exposes, and whether it is personal data. */
 export interface DraftColumn {
   column: string;
@@ -27,7 +30,28 @@ export interface DraftLocation {
   follows?: { connector: string; table: string; column: string };
   cardinality: "one" | "many";
   maxRows?: number;
+  /** A fan-out: looked up again for each row of the many location its key comes from, up to this many. */
+  maxFanout?: number;
   columns: DraftColumn[];
+}
+
+/** A location's name as the save checks say it: a fan-out's is under the location it fans out from. */
+export function checkedName(location: DraftLocation): string {
+  return location.maxFanout !== undefined && location.keyFrom ? `${location.keyFrom.location}.${location.name}` : location.name;
+}
+
+/**
+ * The locations with each one keyed from a many location made a fan-out, and no other: a key with
+ * several values would leave an ordinary location Blocked. Changing a location to many, or back,
+ * changes those keyed from it.
+ */
+export function withFanOuts(locations: DraftLocation[]): DraftLocation[] {
+  return locations.map((location) => {
+    const from = locations.find((l) => l.name === location.keyFrom?.location);
+    const { maxFanout, ...rest } = location;
+    if (from?.cardinality !== "many") return maxFanout === undefined ? location : rest;
+    return maxFanout === undefined ? { ...location, maxFanout: DEFAULT_MAX_FANOUT } : location;
+  });
 }
 
 /** One identifier: a field of a location that finds the subject, or the root key itself (no via). */
@@ -60,17 +84,22 @@ export function lookupSql(location: DraftLocation, rootKey: string): string {
   return `SELECT ${columns.join(", ")} FROM ${location.table} WHERE ${location.keyColumn} = :${parameterOf(location, rootKey)}`;
 }
 
-function locationDocument(location: DraftLocation, rootKey: string): Record<string, unknown> {
+function locationDocument(location: DraftLocation, rootKey: string, all: DraftLocation[]): Record<string, unknown> {
   const selected = location.columns.filter((c) => c.selected);
   const pii = selected.filter((c) => c.pii).map((c) => c.field);
+  const fanOut = location.maxFanout !== undefined;
+  const each = all.filter((l) => l.maxFanout !== undefined && l.keyFrom?.location === location.name);
   return {
     title: location.title,
     using: location.connector,
-    ...(location.keyFrom ? { key_from: `${location.keyFrom.location}.${location.keyFrom.field}` } : {}),
+    // A fan-out's key is its parent row's field, so it needs no key_from.
+    ...(location.keyFrom && !fanOut ? { key_from: `${location.keyFrom.location}.${location.keyFrom.field}` } : {}),
     lookup: lookupSql(location, rootKey),
-    ...(location.cardinality === "many" ? { cardinality: "many", max_rows: location.maxRows ?? DEFAULT_MAX_ROWS } : {}),
+    ...(location.cardinality === "many" ? { cardinality: "many", ...(fanOut ? {} : { max_rows: location.maxRows ?? DEFAULT_MAX_ROWS }) } : {}),
+    ...(fanOut ? { max_fanout: location.maxFanout } : {}),
     exposes: selected.map((c) => c.field),
     ...(pii.length > 0 ? { pii } : {}),
+    ...(each.length > 0 ? { each: Object.fromEntries(each.map((l) => [l.name, locationDocument(l, rootKey, all)])) } : {}),
   };
 }
 
@@ -99,7 +128,7 @@ export function entityDocument(draft: EntityDraft): Record<string, unknown> {
     root_key: draft.rootKey,
     owner: draft.owner,
     identifiers: Object.fromEntries(draft.identifiers.map((i) => [i.name, identifierDocument(i)])),
-    locations: Object.fromEntries(draft.locations.map((l) => [l.name, locationDocument(l, draft.rootKey)])),
+    locations: Object.fromEntries(draft.locations.filter((l) => l.maxFanout === undefined).map((l) => [l.name, locationDocument(l, draft.rootKey, draft.locations)])),
   };
 }
 
@@ -119,6 +148,8 @@ export function draftProblems(draft: EntityDraft): string[] {
   if (draft.locations.length === 0) problems.push("Choose the root table.");
   for (const location of draft.locations) {
     if (!location.columns.some((c) => c.selected)) problems.push(`${location.name} selects no column.`);
+    const from = draft.locations.find((l) => l.name === location.keyFrom?.location);
+    if (from?.maxFanout !== undefined) problems.push(`${location.name} is keyed from ${from.name}, which is looked up for each row: a fan-out can't have another.`);
   }
   return problems;
 }

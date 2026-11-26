@@ -2,7 +2,7 @@
 import { expect, test } from "@playwright/test";
 import { parse } from "yaml";
 import { cardAccessCatalog, schemaSnapshots, walletCatalog } from "../mocks/fixtures/catalog";
-import { DEFAULT_MAX_ROWS, entityTitle, entityYaml, lookupSql, type EntityDraft } from "../src/entityDraft";
+import { checkedName, DEFAULT_MAX_FANOUT, DEFAULT_MAX_ROWS, draftProblems, entityTitle, entityYaml, lookupSql, withFanOuts, type DraftLocation, type EntityDraft } from "../src/entityDraft";
 import {
   defaultRootKey,
   identifierCandidates,
@@ -10,6 +10,7 @@ import {
   isGeneric,
   linkedLocation,
   pretickedIdentifiers,
+  reasonText,
   rootLocation,
   suggestedLinks,
   tableReference,
@@ -191,4 +192,73 @@ test("a refused save's failures go to the location they name; the time filter's 
   expect(fix?.entry.columns["ledger_txn_id"]).toEqual(walletCatalog.tables[0]?.columns["ledger_txn_id"]);
   // No time filter failure, no fix.
   expect(linkFix(topups, [{ check: "Index check", message: "full scan" }], walletCatalog.tables, tables)).toBeUndefined();
+});
+
+const small = (connector: string, name: string, columns: string[], primaryKey: string[] = ["id"]): ImportedTable => ({ connector, schema: null, table: name, columns, primaryKey, unique: [] });
+
+test("a column named for another table's key is offered in both directions, saying whose key", () => {
+  const orders = small("shop", "orders", ["id", "customer_id"]);
+  const customers = small("crm", "customers", ["id", "email"]);
+  const tables = [orders, customers];
+  // From orders, its customer_id leads to customers; from customers, its id leads back to orders.
+  const down = suggestedLinks([rootLocation(orders, tables, [], "order_id")], tables, []);
+  expect(offered(down)).toEqual(["orders.customer_id > crm.customers.id (table key)"]);
+  expect(down.map((l) => reasonText(l, "shop"))).toEqual(["named for customers' key"]);
+  const up = suggestedLinks([rootLocation(customers, tables, [], "customer_id")], tables, []);
+  expect(offered(up)).toEqual(["customers.id > shop.orders.customer_id (table key)"]);
+  expect(up.map((l) => reasonText(l, "crm"))).toEqual(["named for customers' key"]);
+  // Not a key of several columns: one column doesn't name it.
+  expect(suggestedLinks([rootLocation(orders, tables, [], "order_id")], [orders, small("crm", "customers", ["id", "region"], ["id", "region"])], [])).toEqual([]);
+});
+
+test("a shared column name says which connector the other table is on", () => {
+  const here = small("wallet_db", "topups", ["id", "ledger_txn_id"]);
+  const there = small("ledger_db", "entries", ["entry", "ledger_txn_id"], ["entry"]);
+  const beside = small("wallet_db", "audits", ["entry", "ledger_txn_id"], ["entry"]);
+  const links = suggestedLinks([rootLocation(here, [here, there, beside], [], "topup_id")], [here, there, beside], []);
+  expect(links.map((l) => `${l.to.table}: ${reasonText(l, "wallet_db")}`)).toEqual(["entries: same column name on ledger_db", "audits: same column name, also on wallet_db"]);
+});
+
+test("a key from a many location is a fan-out, under its parent, capped, and only one level deep", () => {
+  const people = small("db", "persons", ["id", "name"]);
+  const badges = { ...small("db", "badges", ["badge_id", "person_id"], ["badge_id"]), unique: [["badge_id"]] };
+  const doors = small("doors_db", "door_events", ["event_id", "badge_id"], ["event_id"]);
+  const tables = [people, badges, doors];
+  const root = rootLocation(people, tables, [], "person_id");
+  const [toBadges] = suggestedLinks([root], tables, []);
+  const badge = toBadges && linkedLocation(toBadges, root, "person_id", tables, [], [root], 1000);
+  if (!badge) throw new Error("no badges");
+  expect([badge.cardinality, badge.maxFanout]).toEqual(["many", undefined]); // keyed by the root key itself
+  const toDoors = suggestedLinks([root, badge], tables, []).find((l) => l.to.table === "door_events");
+  const door = toDoors && linkedLocation(toDoors, badge, "person_id", tables, [], [root, badge], 1000);
+  if (!door) throw new Error("no door_events");
+  expect(door.maxFanout).toBe(DEFAULT_MAX_FANOUT);
+  expect(checkedName(door)).toBe("badges.door_events");
+  const draft: EntityDraft = { entity: "person", title: "", owner: "t", rootKey: "person_id", locations: [root, badge, door], identifiers: [] };
+  const { locations } = parse(entityYaml(draft)) as { locations: Record<string, { each?: Record<string, Record<string, unknown>> }> };
+  expect(Object.keys(locations)).toEqual(["persons", "badges"]);
+  const each = locations["badges"]?.each?.["door_events"] ?? {};
+  expect(each).toMatchObject({ using: "doors_db", max_fanout: 10, cardinality: "many", lookup: "SELECT event_id, badge_id FROM door_events WHERE badge_id = :badge_id" });
+  expect(each["key_from"]).toBeUndefined();
+  expect(each["max_rows"]).toBeUndefined(); // not a field of a fan-out
+  // Nothing is offered from a fan-out, and nothing keyed from one is accepted.
+  expect(suggestedLinks([door], tables, [])).toEqual([]);
+  const nested: DraftLocation = { ...root, name: "readers", keyFrom: { location: "door_events", field: "event_id" } };
+  expect(draftProblems({ ...draft, locations: [...draft.locations, nested] }).join()).toContain("a fan-out can't have another");
+  // It can't find a subject.
+  expect(identifierCandidates([root, badge, door], tables, "person_id").some((c) => c.location === "door_events")).toBe(false);
+});
+
+test("a location changed to one row, or to many, changes those keyed from it", () => {
+  const at = (name: string, cardinality: "one" | "many", from?: string): DraftLocation => ({ name, title: name, connector: "db", table: name, keyColumn: "k", cardinality, columns: [], ...(from ? { keyFrom: { location: from, field: "k" } } : {}) });
+  const many = withFanOuts([at("a", "one"), at("b", "many", "a"), at("c", "one", "b")]);
+  expect(many.map((l) => l.maxFanout)).toEqual([undefined, undefined, DEFAULT_MAX_FANOUT]);
+  expect(withFanOuts(many.map((l) => (l.name === "b" ? { ...l, cardinality: "one" as const } : l))).map((l) => l.maxFanout)).toEqual([undefined, undefined, undefined]);
+  // A cap a person set is kept.
+  expect(withFanOuts(many.map((l) => (l.name === "c" ? { ...l, maxFanout: 3 } : l)))[2]?.maxFanout).toBe(3);
+});
+
+test("a fan-out's failed check shows on it, though the check names it under its parent", () => {
+  const found = failuresByLocation([{ field: "Read-only SQL: badges.doors", message: "no", check: "Read-only SQL", location: "badges.doors" }], ["badges", "doors"], (checked) => (checked === "badges.doors" ? "doors" : checked));
+  expect([...found.byLocation.keys()]).toEqual(["doors"]);
 });

@@ -18,12 +18,12 @@ export const PII_MASKED = "PII masked";
  * A refused save's failures: by location when the error names one of the draft's, else general.
  * Read from the error's check and location fields, never from its field's text (#108).
  */
-export function failuresByLocation(errors: FieldError[], locations: string[]): { byLocation: Map<string, Failure[]>; general: Failure[] } {
+export function failuresByLocation(errors: FieldError[], locations: readonly string[], nameOf: (checked: string) => string = (checked) => checked): { byLocation: Map<string, Failure[]>; general: Failure[] } {
   const byLocation = new Map<string, Failure[]>();
   const general: Failure[] = [];
   for (const error of errors) {
     const failure = { check: error.check ?? error.field, message: error.message };
-    const location = error.location ?? undefined;
+    const location = error.location ? nameOf(error.location) : undefined;
     if (location !== undefined && locations.includes(location)) {
       byLocation.set(location, [...(byLocation.get(location) ?? []), failure]);
     } else {

@@ -2,7 +2,7 @@
 import { Button, Field, FormGrid, Input, Select } from "../ui";
 import { useState } from "react";
 import type { CatalogTable } from "../api/client";
-import { DEFAULT_MAX_ROWS, type DraftLocation } from "../entityDraft";
+import { DEFAULT_MAX_FANOUT, DEFAULT_MAX_ROWS, type DraftLocation } from "../entityDraft";
 import { linkedLocation, reasonText, suggestedLinks, tableReference, type ImportedTable, type Link } from "../followKeys";
 import { linkFix, masked, type Failure } from "../locationChecks";
 import { LocationFailures } from "./LocationFailures";
@@ -75,7 +75,12 @@ export function EntityLocations({ application, locations, rootKey, tables, catal
                       <option value="many">Many</option>
                     </Select>
                   </Field>
-                  {location.cardinality === "many" && (
+                  {location.maxFanout !== undefined && (
+                    <Field id={`${location.name}-max-fanout`} label={`Most rows of ${location.keyFrom?.location ?? ""} it is looked up for (max_fanout)`}>
+                      <Input type="number" min={1} value={location.maxFanout} onChange={(e) => update(location.name, { maxFanout: Math.max(1, Number(e.target.value) || DEFAULT_MAX_FANOUT) })} />
+                    </Field>
+                  )}
+                  {location.cardinality === "many" && location.maxFanout === undefined && (
                     <Field id={`${location.name}-max-rows`} label={`Most rows (max_rows${ceiling ? `, at most ${ceiling}` : ""})`}>
                       <Input type="number" min={1} max={ceiling} value={location.maxRows ?? DEFAULT_MAX_ROWS} onChange={(e) => update(location.name, { maxRows: Number(e.target.value) || DEFAULT_MAX_ROWS })} />
                     </Field>
@@ -117,9 +122,15 @@ export function EntityLocations({ application, locations, rootKey, tables, catal
   );
 }
 
-/** Follow a key: the tables that share a key with a location, and a link chosen by hand. */
-export function FollowKeys({ locations, rootKey, tables, catalog, rowCeilings, onChange }: Omit<EntityLocationsProps, "application" | "inUse" | "checks">) {
-  const suggestions = suggestedLinks(locations, tables, catalog);
+interface FollowKeysProps extends Omit<EntityLocationsProps, "application" | "inUse" | "checks"> {
+  /** The selected box: the tables offered share a key with it. */
+  selected: DraftLocation;
+}
+
+/** Follow a key: the tables that share a key with the selected location, and a link chosen by hand. */
+export function FollowKeys({ locations, selected, rootKey, tables, catalog, rowCeilings, onChange }: FollowKeysProps) {
+  const suggestions = suggestedLinks(locations, tables, catalog).filter((s) => s.from.location === selected.name);
+  const title = selected.title || selected.name;
   const add = (link: Link) => {
     const from = locations.find((l) => l.name === link.from.location);
     if (!from) return;
@@ -134,11 +145,11 @@ export function FollowKeys({ locations, rootKey, tables, catalog, rowCeilings, o
     <section className="card" aria-labelledby="follow-keys">
       <h2 id="follow-keys">Follow a key</h2>
       <p className="hint">
-        Tables imported in this environment, on any connector, that share a key with a location. Common names such as id or status are offered
-        only when the catalog links them; choose those yourself below.
+        From <strong>{title}</strong>: tables imported in this environment, on any connector, that share a key with it. Select another box for
+        its own. Common names such as id or status are offered only when the catalog links them; choose those yourself below.
       </p>
       {suggestions.length === 0 ? (
-        <p>No table shares a key with these locations. Link one by its columns below.</p>
+        <p>{selected.maxFanout !== undefined ? `${title} is looked up for each row, so nothing can be keyed from it.` : `No table shares a key with ${title}. Link one by its columns below.`}</p>
       ) : (
         <ul className="wizard-suggestions">
           {suggestions.map((s) => (
@@ -151,7 +162,7 @@ export function FollowKeys({ locations, rootKey, tables, catalog, rowCeilings, o
                 <code>
                   {s.to.connector}.{s.to.table}.{s.to.column}
                 </code>{" "}
-                <span className="hint">({reasonText(s.reason)})</span>
+                <span className="hint">({reasonText(s, selected.connector)})</span>
               </span>
               <Button variant="outline" type="button" onClick={() => add(s)}>
                 Add {s.to.table}
@@ -210,7 +221,7 @@ function LinkByColumns({ locations, tables, onLink }: { locations: DraftLocation
   const [from, setFrom] = useState("");
   const [table, setTable] = useState("");
   const [column, setColumn] = useState("");
-  const fromChoices = locations.flatMap((l) => l.columns.map((c) => `${l.name}.${c.column}`));
+  const fromChoices = locations.filter((l) => l.maxFanout === undefined).flatMap((l) => l.columns.map((c) => `${l.name}.${c.column}`));
   const target = tables.find((t) => `${t.connector}.${t.table}` === table);
   const [fromLocation, fromColumn] = from.split(".");
   const ready = fromLocation !== undefined && fromColumn !== undefined && target !== undefined && column !== "";

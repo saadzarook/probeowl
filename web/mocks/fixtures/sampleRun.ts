@@ -14,6 +14,7 @@ interface DraftLocation {
   lookup?: string;
   key_from?: string;
   cardinality?: string;
+  each?: Record<string, DraftLocation & { max_fanout?: number }>;
 }
 
 const NOT_THERE = /0{5,}$/;
@@ -35,13 +36,26 @@ export function sampleRun(id: string, entityYaml: string, value: string, running
   const locations = Object.entries(entity.locations ?? {});
   const root = locations[0]?.[0];
   const missingRoot = NOT_THERE.test(value);
-  const results: LocationResult[] = locations.map(([name, location]) => {
+  const results: LocationResult[] = locations.flatMap(([name, location]): LocationResult[] => {
+    const own = ownResult(name, location);
+    if (own.outcome !== "found") return [own];
+    // A fan-out, once for each of the two rows, up to max_fanout: the second has no row.
+    const each = Object.entries(location.each ?? {}).flatMap(([child, spec]) =>
+      Array.from({ length: Math.min(2, spec.max_fanout ?? 2) }, (_, row): LocationResult =>
+        row === 0
+          ? { location: child, title: spec.title ?? child, parent: name, row, outcome: "found", evidence: evidence(spec, 1) }
+          : { location: child, title: spec.title ?? child, parent: name, row, outcome: "missing", reason: "no row", evidence: evidence(spec, 0) },
+      ),
+    );
+    return [own, ...each];
+  });
+  function ownResult(name: string, location: DraftLocation): LocationResult {
     const title = location.title ?? name;
     if (missingRoot && name === root) return { location: name, title, outcome: "missing", reason: `no row for ${value}`, evidence: evidence(location, 0) };
     if (missingRoot) return { location: name, title, outcome: "blocked", reason: `${root} is Missing` };
     if (/webhook/.test(location.lookup ?? "")) return { location: name, title, outcome: "missing", reason: "no row", evidence: evidence(location, 0) };
     return { location: name, title, outcome: "found", evidence: evidence(location, location.cardinality === "many" ? 2 : 1) };
-  });
+  }
   const base = draftRun(id);
   return {
     ...base,

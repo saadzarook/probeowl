@@ -107,6 +107,7 @@ export function graphOf(draft: EntityDraft, state: SampleState): { locations: Gr
       source: location.table,
       cardinality: location.cardinality,
       root: index === 0,
+      ...(location.maxFanout !== undefined ? { fanOut: true } : {}),
       outcome: { tone: outcome.tone, label: outcome.label },
       ...(outcome.detail ? { detail: outcome.detail } : {}),
     };
