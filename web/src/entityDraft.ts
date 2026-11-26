@@ -15,15 +15,20 @@ export interface DraftColumn {
   pii: boolean;
 }
 
-/** One SQL location: a table on a connector, looked up by one of its columns. */
+/**
+ * One location: a table on a SQL connector, looked up by one of its columns, or a path on a REST
+ * connector, looked up with its key as the last segment.
+ */
 export interface DraftLocation {
   name: string;
   title: string;
   connector: string;
-  /** As written in the lookup: the table, with its schema when it needs one. */
+  /** As written in the lookup: the table, with its schema when it needs one. Empty for REST. */
   table: string;
-  /** The column the lookup filters by. */
+  /** The column the lookup filters by. Empty for REST. */
   keyColumn: string;
+  /** REST: the path under the connector's base URL, before the key, such as /payments. */
+  path?: string;
   /** Where the key comes from: another location's field; undefined for the root key. */
   keyFrom?: { location: string; field: string };
   /** The table column its key column holds, when the wizard followed a link: what the catalog can record as that link. */
@@ -32,7 +37,13 @@ export interface DraftLocation {
   maxRows?: number;
   /** A fan-out: looked up again for each row of the many location its key comes from, up to this many. */
   maxFanout?: number;
+  /** SQL: the columns it can select. REST: the fields its answers had, selected when exposed. */
   columns: DraftColumn[];
+}
+
+/** Whether the location reads a REST API. */
+export function isRest(location: DraftLocation): boolean {
+  return location.path !== undefined;
 }
 
 /** A location's name as the save checks say it: a fan-out's is under the location it fans out from. */
@@ -78,6 +89,16 @@ export function parameterOf(location: DraftLocation, rootKey: string): string {
   return location.keyFrom?.field ?? rootKey;
 }
 
+/** A REST location's lookup: its path, then its key as one more segment, which ProbeOwl encodes. */
+export function restLookup(location: DraftLocation, rootKey: string): string {
+  return `GET ${location.path ?? ""}/{{${parameterOf(location, rootKey)}}}`;
+}
+
+/** What a location reads, in a few words: its table, or its REST lookup. */
+export function sourceText(location: DraftLocation, rootKey: string): string {
+  return isRest(location) ? restLookup(location, rootKey) : location.table;
+}
+
 /** The single SELECT a location runs: its selected columns, by its key, as one parameter. */
 export function lookupSql(location: DraftLocation, rootKey: string): string {
   const columns = location.columns.filter((c) => c.selected).map((c) => (c.field === c.column ? c.column : `${c.column} AS ${c.field}`));
@@ -94,10 +115,11 @@ function locationDocument(location: DraftLocation, rootKey: string, all: DraftLo
     using: location.connector,
     // A fan-out's key is its parent row's field, so it needs no key_from.
     ...(location.keyFrom && !fanOut ? { key_from: `${location.keyFrom.location}.${location.keyFrom.field}` } : {}),
-    lookup: lookupSql(location, rootKey),
+    lookup: isRest(location) ? restLookup(location, rootKey) : lookupSql(location, rootKey),
     ...(location.cardinality === "many" ? { cardinality: "many", ...(fanOut ? {} : { max_rows: location.maxRows ?? DEFAULT_MAX_ROWS }) } : {}),
     ...(fanOut ? { max_fanout: location.maxFanout } : {}),
-    exposes: selected.map((c) => c.field),
+    // A REST location exposes nothing until a field is ticked: everything it answers is masked.
+    ...(selected.length > 0 || !isRest(location) ? { exposes: selected.map((c) => c.field) } : {}),
     ...(pii.length > 0 ? { pii } : {}),
     ...(each.length > 0 ? { each: Object.fromEntries(each.map((l) => [l.name, locationDocument(l, rootKey, all)])) } : {}),
   };
@@ -147,7 +169,8 @@ export function draftProblems(draft: EntityDraft): string[] {
   if (draft.owner.trim() === "") problems.push("Name the owning team.");
   if (draft.locations.length === 0) problems.push("Choose the root table.");
   for (const location of draft.locations) {
-    if (!location.columns.some((c) => c.selected)) problems.push(`${location.name} selects no column.`);
+    // A REST location may expose nothing yet: its first lookup shows what it can.
+    if (!isRest(location) && !location.columns.some((c) => c.selected)) problems.push(`${location.name} selects no column.`);
     const from = draft.locations.find((l) => l.name === location.keyFrom?.location);
     if (from?.maxFanout !== undefined) problems.push(`${location.name} is keyed from ${from.name}, which is looked up for each row: a fan-out can't have another.`);
   }

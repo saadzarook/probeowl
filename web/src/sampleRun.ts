@@ -1,7 +1,7 @@
 // Author: @SaadZarook
 import { stringify } from "yaml";
 import type { LocationResult, Outcome, Run } from "./api/client";
-import type { EntityDraft } from "./entityDraft";
+import { sourceText, type EntityDraft } from "./entityDraft";
 import type { BadgeTone, GraphKey, GraphLocation } from "./ui";
 
 // The entity graph's sample (#163): one real subject, looked up as the draft entity is built. Each
@@ -104,7 +104,7 @@ export function graphOf(draft: EntityDraft, state: SampleState): { locations: Gr
       id: location.name,
       title: location.title || location.name,
       connector: location.connector,
-      source: location.table,
+      source: sourceText(location, draft.rootKey),
       cardinality: location.cardinality,
       root: index === 0,
       ...(location.maxFanout !== undefined ? { fanOut: true } : {}),

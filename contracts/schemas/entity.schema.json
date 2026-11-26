@@ -53,7 +53,7 @@
           "default": "one"
         },
         "exposes": {
-          "description": "Fields other locations and identifiers may use.",
+          "description": "Fields other locations and identifiers may use. REST locations: the only fields of the JSON response shown unmasked; every other field is masked in every result and in evidence.",
           "items": {
             "maxLength": 128,
             "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
@@ -73,7 +73,7 @@
           "type": "array"
         },
         "mask": {
-          "description": "REST locations: fields of the JSON response masked in every result and in evidence, as dotted paths such as customer.email.",
+          "description": "REST locations: fields inside an exposed field masked in every result and in evidence, as dotted paths such as customer.email. A field not exposed is masked already; listing it here says it is meant to be.",
           "items": {
             "description": "A field, or a dotted path into nested fields: customer.email.",
             "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",
@@ -113,7 +113,7 @@
           "title": "Anchor Time"
         },
         "compare": {
-          "description": "REST locations: fields of the JSON response a healthy comparison shows. SQL locations mark compare columns in the table catalog instead.",
+          "description": "REST locations: fields of the JSON response a healthy comparison shows. A field that is not exposed, or is masked, is compared by fingerprint: same or different, never its value. SQL locations mark compare columns in the table catalog instead.",
           "items": {
             "description": "A field, or a dotted path into nested fields: customer.email.",
             "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",
@@ -312,7 +312,7 @@
           "default": "one"
         },
         "exposes": {
-          "description": "Fields other locations and identifiers may use.",
+          "description": "Fields other locations and identifiers may use. REST locations: the only fields of the JSON response shown unmasked; every other field is masked in every result and in evidence.",
           "items": {
             "maxLength": 128,
             "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
@@ -332,7 +332,7 @@
           "type": "array"
         },
         "mask": {
-          "description": "REST locations: fields of the JSON response masked in every result and in evidence, as dotted paths such as customer.email.",
+          "description": "REST locations: fields inside an exposed field masked in every result and in evidence, as dotted paths such as customer.email. A field not exposed is masked already; listing it here says it is meant to be.",
           "items": {
             "description": "A field, or a dotted path into nested fields: customer.email.",
             "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",
@@ -372,7 +372,7 @@
           "title": "Anchor Time"
         },
         "compare": {
-          "description": "REST locations: fields of the JSON response a healthy comparison shows. SQL locations mark compare columns in the table catalog instead.",
+          "description": "REST locations: fields of the JSON response a healthy comparison shows. A field that is not exposed, or is masked, is compared by fingerprint: same or different, never its value. SQL locations mark compare columns in the table catalog instead.",
           "items": {
             "description": "A field, or a dotted path into nested fields: customer.email.",
             "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",

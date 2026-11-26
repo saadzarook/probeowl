@@ -3,6 +3,7 @@
 
 import re
 from collections.abc import Collection
+from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
@@ -41,15 +42,61 @@ def masked_key_reason(entity: Entity) -> str:
     return f"{entity.entity}'s key is PII and stored masked: paste its {entity.root_key}"
 
 
-def masked_fields(entity: Entity, location: LocationBase) -> set[str]:
-    """The fields masked in this location's rows: its own pii and mask, and every PII identifier."""
-    return {f.lower() for f in [*location.pii, *location.mask]} | pii_fields(entity)
+@dataclass(frozen=True)
+class Masked:
+    """The fields a location's rows mask. `field in masked` answers for a name or a dotted path.
+
+    fields: names and dotted paths, lowercase. shown: for a REST location, the fields it exposes,
+    lowercase; every other field of its JSON is masked. None for SQL, which selects its columns.
+    """
+
+    fields: frozenset[str] = frozenset()
+    shown: frozenset[str] | None = None
+
+    def __contains__(self, field: object) -> bool:
+        if not isinstance(field, str):
+            return False
+        path = field.lower().split(".")
+        if self.shown is not None and path[0] not in self.shown:
+            return True
+        # A masked field masks everything inside it: mask customer, and customer.email is masked.
+        return any(".".join(path[:end]) in self.fields for end in range(1, len(path) + 1))
 
 
-def mask_rows(rows: list[dict[str, Any]], fields: Collection[str]) -> list[dict[str, Any]]:
+NOTHING_MASKED = Masked()
+
+
+def is_rest(location: LocationBase) -> bool:
+    """Whether the location reads a REST API: its lookup is a GET, where SQL is only a SELECT."""
+    return location.lookup.lstrip()[:4].upper() == "GET "
+
+
+def masked_fields(entity: Entity, location: LocationBase) -> Masked:
+    """The fields masked in this location's rows: its own pii and mask, and every PII identifier.
+
+    A REST location also masks every field it does not expose. An API answers with whatever it
+    has, so a field is shown only when the entity says it may be.
+    """
+    fields = frozenset({f.lower() for f in [*location.pii, *location.mask]} | pii_fields(entity))
+    shown = frozenset(f.lower() for f in location.exposes) if is_rest(location) else None
+    return Masked(fields, shown)
+
+
+def mask_rows(rows: list[dict[str, Any]], fields: Collection[str] | Masked) -> list[dict[str, Any]]:
     """Copies of rows with each field masked: SQL column names or dotted REST paths."""
-    paths = [field.lower().split(".") for field in fields]
-    return [_mask(row, paths) for row in rows]
+    named = fields.fields if isinstance(fields, Masked) else fields
+    shown = fields.shown if isinstance(fields, Masked) else None
+    paths = [field.lower().split(".") for field in named]
+    return [_unexposed(_mask(row, paths), shown) for row in rows]
+
+
+def _unexposed(row: Any, shown: frozenset[str] | None) -> Any:
+    if shown is None or not isinstance(row, dict):
+        return row
+    # The whole value, an object or a list too: its name shows, so a person can choose to expose it.
+    return {
+        key: item if key.lower() in shown or item is None else MASKED for key, item in row.items()
+    }
 
 
 def _mask(value: Any, paths: list[list[str]]) -> Any:

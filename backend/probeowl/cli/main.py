@@ -15,7 +15,12 @@ from probeowl.api.app import DEFAULT_PORT, create_app
 from probeowl.api.guide_site import find_guide
 from probeowl.api.web_app import find_web_app
 from probeowl.catalog.service import CatalogService
-from probeowl.checks.rules import folder_failures, pii_key_warnings, unbound_warnings
+from probeowl.checks.rules import (
+    folder_failures,
+    pii_key_warnings,
+    unbound_warnings,
+    unexposed_warnings,
+)
 from probeowl.checks.saving import ProbeWrites
 from probeowl.checks.time_offsets import unchecked_without_imports
 from probeowl.cli import init as init_wizard
@@ -292,7 +297,11 @@ def check(
         raise typer.Exit(1)
     typer.echo(f"OK: {summary}")
     for loaded in applications.values():
-        for warning in [*pii_key_warnings(loaded), *unbound_warnings(loaded)]:
+        for warning in [
+            *pii_key_warnings(loaded),
+            *unbound_warnings(loaded),
+            *unexposed_warnings(loaded),
+        ]:
             typer.echo(f"warning: {warning}", err=True)
     for name, loaded in applications.items():
         # owl check reads no schema imports, so the time offset check is left to saving.

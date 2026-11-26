@@ -30,7 +30,7 @@ from probeowl.engine.locations import (
     read_locations,
     unreadable,
 )
-from probeowl.engine.masking import MASKED, mask_text, masked_fields
+from probeowl.engine.masking import MASKED, NOTHING_MASKED, Masked, mask_text, masked_fields
 from probeowl.errors import ConfigError
 from probeowl.model.entity import Entity
 from probeowl.model.probe import Probe
@@ -379,7 +379,7 @@ def _readable(read: LocationRead, location: str) -> list[dict[str, Any]]:
     return read.rows
 
 
-def _detail(node: Node, data: _Data, masked: dict[str, set[str]], entity: Entity) -> str:
+def _detail(node: Node, data: _Data, masked: dict[str, Masked], entity: Entity) -> str:
     """The values a failed expectation compared, with masked values hidden."""
     if isinstance(node, Call) and node.rows is not None:
         return _set_detail(node, data, masked, entity)
@@ -395,14 +395,14 @@ def _detail(node: Node, data: _Data, masked: dict[str, set[str]], entity: Entity
 _SHOWN_ROWS = 5
 
 
-def _set_detail(node: Call, data: _Data, masked: dict[str, set[str]], entity: Entity) -> str:
+def _set_detail(node: Call, data: _Data, masked: dict[str, Masked], entity: Entity) -> str:
     """Which rows a failed all(), none() or unique() is about, by their first exposed field."""
     assert node.rows is not None  # only set functions reach here
     location = node.rows.location
     if node.name == "unique":
         assert node.rows.field is not None  # unique takes location.field
         repeated = duplicates(matching_rows(node, data), node.rows.field)
-        if node.rows.field.lower() in masked.get(location, set()):
+        if node.rows.field.lower() in masked.get(location, NOTHING_MASKED):
             return f"{len(repeated)} masked values repeat"
         shown = [f"{value} ({count} times)" for value, count in repeated.items()]
         return "repeated: " + _listed(shown)
@@ -410,7 +410,9 @@ def _set_detail(node: Call, data: _Data, masked: dict[str, set[str]], entity: En
         return "false"
     rows = failing_rows(node, data)
     exposes = entity.locations[location].exposes
-    label = next((f for f in exposes if f.lower() not in masked.get(location, set())), None)
+    label = next(
+        (f for f in exposes if f.lower() not in masked.get(location, NOTHING_MASKED)), None
+    )
     if label is None:
         return f"{len(rows)} rows"
     verb = "fails for" if node.name == "all" else "found"
@@ -427,11 +429,11 @@ def _show_plain(value: Any) -> str:
     return "null" if value is None else str(value)
 
 
-def _reads_masked(node: Node, masked: dict[str, set[str]]) -> bool:
+def _reads_masked(node: Node, masked: dict[str, Masked]) -> bool:
     if isinstance(node, Ref) and len(node.parts) > 1:
-        return node.parts[1].lower() in masked.get(node.parts[0], set())
+        return node.parts[1].lower() in masked.get(node.parts[0], NOTHING_MASKED)
     if isinstance(node, Call) and node.rows is not None and node.rows.field is not None:
-        return node.rows.field.lower() in masked.get(node.rows.location, set())
+        return node.rows.field.lower() in masked.get(node.rows.location, NOTHING_MASKED)
     if isinstance(node, Binary):
         return _reads_masked(node.left, masked) or _reads_masked(node.right, masked)
     return False

@@ -14,10 +14,11 @@ import { EmptyState } from "../components/EmptyState";
 import { EntityIdentifiers } from "../components/EntityIdentifiers";
 import { EntityLocations, FollowKeys } from "../components/EntityLocations";
 import { SaveChecksPanel } from "../components/SaveChecksPanel";
-import { checkedName, draftProblems, entityTitle, entityYaml, withFanOuts, type DraftIdentifier, type DraftLocation, type EntityDraft } from "../entityDraft";
+import { checkedName, draftProblems, entityTitle, entityYaml, isRest, sourceText, withFanOuts, type DraftIdentifier, type DraftLocation, type EntityDraft } from "../entityDraft";
 import { defaultRootKey, identifierCandidates, importedTables, pretickedIdentifiers, rootLocation, tableReference } from "../followKeys";
 import { failuresByLocation } from "../locationChecks";
 import { REASON_LABELS, REFERENCE_PLACEHOLDER } from "../reasons";
+import { restLookups, withFieldsSeen } from "../restLookup";
 import { boxOutcome, graphOf, lastCheck, sampleProbeYaml } from "../sampleRun";
 import { useSelection } from "../selection";
 
@@ -93,6 +94,7 @@ function EntityGraphScreen() {
   const catalog = useCatalog(application?.name);
   const review = useCatalogReview(application?.name);
   const sql = (connectors.data ?? []).filter((c) => c.type !== "rest").map((c) => c.connector);
+  const restConnectors = (connectors.data ?? []).filter((c) => c.type === "rest").map((c) => c.connector);
   const schemas = useSchemas(application?.name, sql, environment?.name, new Set(sql));
   const snapshots = [...schemas.values()].flatMap((r) => (r.snapshot ? [r.snapshot] : []));
   const notices = sql.filter((c) => schemas.get(c)?.notice !== undefined).map((c) => notImported(application?.name ?? "", c, environment?.name ?? ""));
@@ -108,6 +110,8 @@ function EntityGraphScreen() {
   const [acknowledged, setAcknowledged] = useState(false);
   const [preview, setPreview] = useState<{ change: EntityChange; yaml: string }>();
   const [investigation, setInvestigation] = useState<Investigation>(() => storedInvestigation(application?.name ?? ""));
+  // REST paths whose first request has gone, by Check sample: only those are looked up live.
+  const [sent, setSent] = useState<ReadonlySet<string>>(new Set());
   const client = useQueryClient();
 
   // The graph opens in the application's first environment outside Production, once.
@@ -182,7 +186,27 @@ function EntityGraphScreen() {
       },
     };
   })();
-  const lookups = useSampleRuns(application?.name ?? "", request, !production);
+  // A REST path is sent the first time only when the person presses Check sample; then it is live.
+  const unsent = restLookups(current.locations).filter((l) => !sent.has(l));
+  const lookups = useSampleRuns(application?.name ?? "", request, !production && unsent.length === 0);
+  const sendFirst = () => {
+    setSent(new Set([...sent, ...unsent]));
+    lookups.check();
+  };
+
+  // A REST answer's fields, masked unless exposed, are offered to expose once a lookup shows them.
+  const finished = lookups.state.kind === "done" ? lookups.state.run : undefined;
+  useEffect(() => {
+    if (finished === undefined) return;
+    // From a timer, not the effect itself, as useSampleRuns starts a lookup.
+    const timer = setTimeout(() =>
+      setDraft((before) => {
+        const locations = withFieldsSeen(before.locations, finished);
+        return locations === before.locations ? before : { ...before, locations };
+      }),
+    );
+    return () => clearTimeout(timer);
+  }, [finished]);
 
   // Production's Check sample: the save checks, then the lookup if they pass and nothing has changed
   // (the draft, the environment, or the screen left) since the click.
@@ -196,6 +220,7 @@ function EntityGraphScreen() {
   }, [asked]);
   const checkSample = () => {
     if (asked === undefined) return;
+    setSent(new Set([...sent, ...unsent]));
     check.run().then(
       (answer) => {
         if (answer.failures.length === 0 && latest.current === asked) lookups.check();
@@ -409,6 +434,17 @@ function EntityGraphScreen() {
                 <p role="status" aria-live="polite" aria-label="Last check" className="hint">
                   Last check: {lastCheckText}
                 </p>
+                {!production && unsent.length > 0 && (
+                  <div role="group" aria-label="First REST request">
+                    <p className="hint">
+                      Nothing is sent to {[...new Set(current.locations.filter((l) => isRest(l) && unsent.includes(`${l.connector} ${l.path ?? ""}`)).map((l) => l.connector))].join(", ")} until you
+                      press Check sample. After its first lookup, its path is looked up as you edit, like the rest.
+                    </p>
+                    <Button type="button" disabled={request === undefined || lookups.busy} disabledReason={request === undefined ? "A sample, and every save check passing, first" : undefined} onClick={sendFirst}>
+                      Check sample
+                    </Button>
+                  </div>
+                )}
                 {lookups.error && !refusal && (
                   <div className="error-state" role="alert">
                     <p>{lookups.error.message}</p>
@@ -435,7 +471,7 @@ function EntityGraphScreen() {
                       {focusOutcome.detail ? `: ${focusOutcome.detail}` : ""}
                     </p>
                     <p className="hint">
-                      <code>{focus.connector}</code> · <code>{focus.table}</code> · by <code>{focus.keyColumn}</code>
+                      <code>{focus.connector}</code> · {isRest(focus) ? <code>{sourceText(focus, current.rootKey)}</code> : <><code>{focus.table}</code> · by <code>{focus.keyColumn}</code></>}
                       {focus.keyFrom ? (
                         <>
                           {" "}
@@ -461,7 +497,16 @@ function EntityGraphScreen() {
               />
             </div>
             <div className="min-w-0 wide:col-span-3">
-              <FollowKeys locations={current.locations} selected={focus ?? rootTable} rootKey={current.rootKey} tables={tables} catalog={catalogTables} rowCeilings={rowCeilings} onChange={setLocations} />
+              <FollowKeys
+                locations={current.locations}
+                selected={focus ?? rootTable}
+                rootKey={current.rootKey}
+                tables={tables}
+                catalog={catalogTables}
+                rowCeilings={rowCeilings}
+                restConnectors={restConnectors}
+                onChange={setLocations}
+              />
               <EntityIdentifiers
                 rootKey={current.rootKey}
                 identifiers={current.identifiers}

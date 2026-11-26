@@ -17,6 +17,8 @@ import {
   type ImportedTable,
 } from "../src/followKeys";
 import { failuresByLocation, linkFix } from "../src/locationChecks";
+import { restLinks, restLocation, restLookups, restPathProblem, withFieldsSeen } from "../src/restLookup";
+import type { Run } from "../src/api/client";
 
 // The entity graph's logic, with no page: the YAML it writes and the keys it offers to follow.
 
@@ -261,4 +263,77 @@ test("a location changed to one row, or to many, changes those keyed from it", (
 test("a fan-out's failed check shows on it, though the check names it under its parent", () => {
   const found = failuresByLocation([{ field: "Read-only SQL: badges.doors", message: "no", check: "Read-only SQL", location: "badges.doors" }], ["badges", "doors"], (checked) => (checked === "badges.doors" ? "doors" : checked));
   expect([...found.byLocation.keys()]).toEqual(["doors"]);
+});
+
+// --- Follow a key to a REST API (#165) ---------------------------------------------------------
+
+test("a REST path is refused before anything is sent: a whole address, //, dot segments, ?, #, a backslash, {{…}}, spaces and encoded separators", () => {
+  const refused: Record<string, RegExp> = {
+    "": /Type the path/,
+    payments: /Start the path with \//,
+    "https://evil.example/payments": /not a whole address/,
+    "//evil.example/payments": /not a whole address/,
+    "/payments//x": /\/\/ is refused/,
+    "/payments/../admin": /Dot segments \(\. and \.\.\) are refused/,
+    "/payments/./x": /Dot segments \(\. and \.\.\) are refused/,
+    "/..": /Dot segments \(\. and \.\.\) are refused/,
+    "/payments?id=1": /\?, # and \\ are refused/,
+    "/payments#x": /\?, # and \\ are refused/,
+    "/payments\\x": /\?, # and \\ are refused/,
+    "/payments/{{id}}": /Leave out \{\{…\}\}/,
+    "/pay ments": /Spaces are refused/,
+    "/payments/%2e%2e": /Encoded dots and slashes/,
+    "/payments%2Fx": /Encoded dots and slashes/,
+    "/payments%5cx": /Encoded dots and slashes/,
+  };
+  for (const [path, why] of Object.entries(refused)) expect(restPathProblem(path), JSON.stringify(path)).toMatch(why);
+  for (const path of ["/payments", "/v1/payments/", " /payments ", "/a.b/c-d_e~f"]) expect(restPathProblem(path), path).toBeUndefined();
+});
+
+test("a REST lookup takes its key as the last segment, keyed from a field, and exposes only what is ticked", () => {
+  const root = rootLocation(table(wallet, "topups"), wallet, walletCatalog.tables, "topup_id");
+  const payments = restLocation("checkout_api", "/payments/", { location: root, field: "provider_payment_id" }, "topup_id", [root]);
+  expect(payments).toMatchObject({ name: "payments", title: "Payments", connector: "checkout_api", path: "/payments", keyFrom: { location: "topups", field: "provider_payment_id" }, cardinality: "one" });
+  expect(payments.maxFanout).toBeUndefined();
+  const seen = withFieldsSeen([root, payments], {
+    locations: [{ location: "payments", title: "Payments", outcome: "found", evidence: { connector: "checkout_api", query: "GET /payments/[masked]", rows: [{ status: "[masked]", id: "[masked]", customer: "[masked]" }], rows_total: 1, started_at: "", duration_ms: 1 } }],
+  } as unknown as Run);
+  const shown = seen[1];
+  expect(shown?.columns.map((c) => [c.field, c.selected])).toEqual([
+    ["customer", false],
+    ["id", false],
+    ["status", false],
+  ]);
+  // Nothing new: the same locations, so the page doesn't change for it.
+  expect(withFieldsSeen(seen, { locations: [] } as unknown as Run)).toBe(seen);
+  const ticked = { ...payments, columns: (shown?.columns ?? []).map((c) => ({ ...c, selected: c.field === "status" })) };
+  const draft: EntityDraft = { entity: "topup", title: "", owner: "t", rootKey: "topup_id", locations: [root, ticked], identifiers: [] };
+  const { locations } = parse(entityYaml(draft)) as { locations: Record<string, Record<string, unknown>> };
+  expect(locations["payments"]).toEqual({ title: "Payments", using: "checkout_api", key_from: "topups.provider_payment_id", lookup: "GET /payments/{{provider_payment_id}}", exposes: ["status"] });
+  expect(draftProblems({ ...draft, locations: [root, payments] })).toEqual([]); // nothing to tick before its first lookup
+  // It can't find a subject: an identifier's lookup is SQL.
+  expect(identifierCandidates([root, { ...ticked, columns: [...ticked.columns, { column: "topup_id", field: "topup_id", selected: true, pii: false }] }], wallet, "topup_id").some((c) => c.location === "payments")).toBe(false);
+  expect(restLookups(draft.locations)).toEqual(["checkout_api /payments"]);
+});
+
+test("a REST lookup by the root key needs no key_from, and one keyed from a many location fans out", () => {
+  const root = rootLocation(table(access, "visitor_profile"), access, cardAccessCatalog.tables, "visitor_profile_id");
+  const byRoot = restLocation("door_controller_api", "/visitors", { location: root, field: "visitor_profile_id" }, "visitor_profile_id", [root]);
+  expect(byRoot.keyFrom).toBeUndefined();
+  expect(byRoot.maxFanout).toBeUndefined();
+  const cards: DraftLocation = { ...root, name: "cards", title: "Cards", table: "cards", keyColumn: "visitor_profile_id", cardinality: "many", maxRows: 50 };
+  const doors = restLocation("door_controller_api", "/cards", { location: cards, field: "card_id" }, "visitor_profile_id", [root, cards]);
+  expect(doors.maxFanout).toBe(DEFAULT_MAX_FANOUT);
+  expect(checkedName(doors)).toBe("cards.door_controller_cards");
+  const draft: EntityDraft = { entity: "visitor", title: "", owner: "t", rootKey: "visitor_profile_id", locations: [root, cards, doors], identifiers: [] };
+  const { locations } = parse(entityYaml(draft)) as { locations: Record<string, { each?: Record<string, Record<string, unknown>> }> };
+  expect(locations["cards"]?.each?.["door_controller_cards"]).toEqual({ title: "Door controller cards", using: "door_controller_api", lookup: "GET /cards/{{card_id}}", max_fanout: 10 });
+});
+
+test("the catalog offers a REST lookup for a column it marks as a key of a REST connector", () => {
+  const root = rootLocation(table(wallet, "topups"), wallet, walletCatalog.tables, "topup_id");
+  expect(restLinks(root, walletCatalog.tables, ["checkout_api"])).toEqual([{ from: { location: "topups", column: "provider_payment_id" }, connector: "checkout_api" }]);
+  expect(restLinks(root, walletCatalog.tables, [])).toEqual([]);
+  // Nothing is keyed from a fan-out, so none is offered there.
+  expect(restLinks({ ...root, maxFanout: 3 }, walletCatalog.tables, ["checkout_api"])).toEqual([]);
 });

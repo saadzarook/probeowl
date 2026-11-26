@@ -71,6 +71,22 @@ export const SCREENS: Screen[] = [
   },
   { name: "Audit", path: "/audit" },
   { name: "New entity", path: "/probes/new-entity" },
+  {
+    name: "the entity graph with a REST lookup",
+    path: "/probes/new-entity",
+    ready: async (page) => {
+      await page.getByRole("button", { name: "Application" }).click();
+      await page.getByRole("button", { name: /Wallet/ }).last().click();
+      await page.getByRole("combobox", { name: "Root table" }).selectOption({ label: "wallet_db · topups" });
+      await page.getByLabel("Sample", { exact: true }).fill("tp_91f2c7");
+      const rest = page.getByRole("group", { name: "REST lookup" });
+      await rest.getByRole("button", { name: "Use checkout_api" }).click();
+      await rest.getByLabel("Path under the base URL").fill("/payments");
+      await rest.getByRole("button", { name: "Add the REST lookup" }).click();
+      await page.getByRole("group", { name: "First REST request" }).getByRole("button", { name: "Check sample" }).click();
+      await page.getByRole("listitem", { name: "Location payments" }).getByLabel("status", { exact: true }).waitFor();
+    },
+  },
   { name: "Setup", path: "/setup" },
 ];
 

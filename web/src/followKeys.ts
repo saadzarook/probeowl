@@ -238,7 +238,8 @@ export function rootLocation(table: ImportedTable, tables: ImportedTable[], cata
  */
 export function identifierCandidates(locations: DraftLocation[], tables: ImportedTable[], rootKey: string): IdentifierCandidate[] {
   const exposesRootKey = (l: DraftLocation) => l.columns.some((c) => c.selected && c.field === rootKey);
-  return locations.filter((l) => l.maxFanout === undefined && exposesRootKey(l)).flatMap((location) => {
+  // A REST location can't find a subject: an identifier's lookup is SQL.
+  return locations.filter((l) => l.maxFanout === undefined && l.path === undefined && exposesRootKey(l)).flatMap((location) => {
     const table = tableOf(location, tables);
     return location.columns
       .filter((c) => c.selected && c.field !== rootKey)

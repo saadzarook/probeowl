@@ -301,6 +301,34 @@ def locations_used(node: Node) -> set[str]:
     return found
 
 
+def fields_used(node: Node) -> set[tuple[str, str]]:
+    """The (location, top-level field) pairs an expression reads, for checks at load time."""
+    found: set[tuple[str, str]] = set()
+
+    def visit(n: Node | None, rows_of: str | None) -> None:
+        if isinstance(n, Ref):
+            if len(n.parts) > 1:
+                found.add((n.parts[0], n.parts[1]))
+            elif rows_of is not None:
+                found.add((rows_of, n.parts[0]))  # a bare field inside all(cards, ...)
+        elif isinstance(n, Unary):
+            visit(n.operand, rows_of)
+        elif isinstance(n, Binary):
+            visit(n.left, rows_of)
+            visit(n.right, rows_of)
+        elif isinstance(n, ListOf):
+            for item in n.items:
+                visit(item, rows_of)
+        elif isinstance(n, Call) and n.rows is not None:
+            if n.rows.field is not None:
+                found.add((n.rows.location, n.rows.field))
+            visit(n.rows.where, n.rows.location)
+            visit(n.predicate, n.rows.location)
+
+    visit(node, None)
+    return found
+
+
 # --- Evaluation -----------------------------------------------------------------------------
 
 

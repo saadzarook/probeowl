@@ -520,7 +520,7 @@ test("Follow a key offers what the selected box shares a key with, and a key fro
   // The added box is selected, and Follow a key follows it: nothing shares a key with it but topups.
   await expect(follow).toContainText("From Topup status history:");
   await expect(follow).toContainText("No table shares a key with Topup status history.");
-  await expect(follow.getByRole("button", { name: /^Add / })).toHaveCount(0);
+  await expect(follow.getByRole("button", { name: /^Add (?!the REST lookup$)/ })).toHaveCount(0);
   // Back on the root, its own suggestions again.
   await graph(page).getByRole("button", { name: /^Topups / }).click();
   await expect(follow.getByRole("button", { name: "Add ledger_entries" })).toBeVisible();
@@ -548,4 +548,58 @@ test("Follow a key offers what the selected box shares a key with, and a key fro
   await expect(events.getByLabel(/max_fanout/)).toHaveCount(0);
   await expect(yaml).not.toContainText("each:");
   await expect(yaml).toContainText("key_from: topup_status_history.id");
+});
+
+test("a key looked up in a REST API: nothing sent while typing, the first request on Check sample, live after it", async ({ page }) => {
+  const sent = lookups(page);
+  await start(page, /Wallet/, "uat");
+  await page.getByRole("combobox", { name: "Root table" }).selectOption({ label: "wallet_db · topups" });
+  await page.getByLabel("Sample", { exact: true }).fill("tp_91f2c7");
+  await expect(graph(page).getByRole("button", { name: "Topups Found" })).toBeVisible();
+  expect(sent).toHaveLength(1);
+
+  // The catalog marks provider_payment_id as a key of checkout_api: the form is filled in for it.
+  const rest = page.getByRole("group", { name: "REST lookup" });
+  await expect(rest).toContainText("topups.provider_payment_id → checkout_api (the catalog marks it as a key of checkout_api)");
+  await rest.getByRole("button", { name: "Use checkout_api" }).click();
+  await expect(rest.getByLabel("REST connector")).toHaveValue("checkout_api");
+  await expect(rest.getByLabel(/^Key, a field of Topups/)).toHaveValue("provider_payment_id");
+  // A path that would leave the base URL is refused as it is typed; nothing is added or sent.
+  const path = rest.getByLabel("Path under the base URL");
+  await path.fill("/payments/../admin");
+  await expect(rest.getByText(/Dot segments \(\. and \.\.\) are refused/)).toBeVisible();
+  await rest.getByRole("button", { name: "Add the REST lookup" }).click();
+  await expect(page.getByRole("listitem", { name: "Location payments" })).toHaveCount(0);
+  await path.fill("https://evil.example/payments");
+  await expect(rest.getByText(/not a whole address/)).toBeVisible();
+  await path.fill("/payments");
+  await expect(rest).toContainText("Looked up as GET /payments/{{provider_payment_id}}");
+  await rest.getByRole("button", { name: "Add the REST lookup" }).click();
+
+  const yaml = page.getByLabel("topups.yaml", { exact: true });
+  await expect(yaml).toContainText("lookup: GET /payments/{{provider_payment_id}}");
+  await expect(yaml).toContainText("key_from: topups.provider_payment_id");
+  // Added, and not sent: its first request waits for Check sample, past the second live lookups wait.
+  const first = page.getByRole("group", { name: "First REST request" });
+  await expect(first).toContainText("Nothing is sent to checkout_api until you press Check sample.");
+  await expect(page.getByText("Every location passes its save checks.")).toBeVisible();
+  await page.waitForTimeout(1500);
+  expect(sent).toHaveLength(1);
+  await expect(graph(page).getByRole("button", { name: /^Payments / })).toHaveAccessibleName(/Not checked/);
+  expect((await new AxeBuilder({ page }).include("main").analyze()).violations).toEqual([]);
+
+  await first.getByRole("button", { name: "Check sample" }).click();
+  await expect(graph(page).getByRole("button", { name: "Payments Found" })).toBeVisible();
+  expect(sent).toHaveLength(2);
+  expect((sent[1]?.postDataJSON() as { entity: string }).entity).toContain("GET /payments/{{provider_payment_id}}");
+  await expect(first).toHaveCount(0);
+  // Its answer's fields, every one masked: ticking one shows it, and that change is looked up live.
+  const payments = page.getByRole("listitem", { name: "Location payments" });
+  await expect(payments).toContainText("Only ticked fields are shown. Every other field of the answer is masked, in every run.");
+  for (const field of ["amount", "currency", "customer", "id", "status"]) await expect(payments.getByLabel(field, { exact: true })).not.toBeChecked();
+  await payments.getByLabel("status", { exact: true }).check();
+  await expect(yaml).toContainText("exposes:\n      - status");
+  await expect.poll(() => sent.length).toBe(3);
+  expect((sent[2]?.postDataJSON() as { entity: string }).entity).toMatch(/exposes:\n\s+- status/);
+  expect((await new AxeBuilder({ page }).include("main").analyze()).violations).toEqual([]);
 });

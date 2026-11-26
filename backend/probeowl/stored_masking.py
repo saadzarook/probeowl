@@ -1,6 +1,9 @@
 # Author: @SaadZarook
 """A run as it may be stored: every PII identifier masked, the subject too when the key is PII.
 
+Each location's rows are masked as the runner masks them now: its pii and mask fields, and for a
+REST location every field it does not expose.
+
 RunService passes each run through masked_run before saving it, so the store, and the API, audit
 and CLI that read it, never hold the value (#66). `owl store mask-pii` applies the same to runs
 stored before this, with the current configuration.
@@ -16,11 +19,13 @@ from sqlalchemy import Connection, select, update
 
 from probeowl.engine.masking import (
     MASKED,
+    Masked,
     key_is_pii,
     mask_keys,
     mask_rows,
     mask_text,
     mask_values,
+    masked_fields,
     pii_fields,
 )
 from probeowl.model import Run
@@ -36,7 +41,7 @@ def masked_run(run: Run, entity: Entity) -> Run:
     """The run with each PII identifier masked wherever it shows, and its subject if the key is."""
     hidden = pii_fields(entity)
     key = key_is_pii(entity)
-    locations, values = _masked_locations(run.locations, entity, hidden)
+    locations, values, unexposed = _masked_locations(run.locations, entity, hidden)
     identifier = entity.identifiers.get(run.identifier)
     return run.model_copy(
         update={
@@ -60,7 +65,9 @@ def masked_run(run: Run, entity: Entity) -> Run:
             ),
             "locations": locations,
             "expectations": [
-                e.model_copy(update={"detail": e.detail and mask_text(e.detail, values)})
+                e.model_copy(
+                    update={"detail": e.detail and mask_text(e.detail, values | unexposed)}
+                )
                 for e in run.expectations
             ],
             "healthy_attempt": run.healthy_attempt
@@ -78,28 +85,62 @@ def masked_run(run: Run, entity: Entity) -> Run:
 
 def _masked_locations(
     results: list[LocationResult], entity: Entity, hidden: set[str]
-) -> tuple[list[LocationResult], set[str]]:
-    """The results with their evidence masked, and the values a stored request line gave away."""
+) -> tuple[list[LocationResult], set[str], set[str]]:
+    """The results with their evidence masked, the values a stored request line gave away, and
+    the values of REST fields the runner masks now, which a failed expectation's detail may show.
+    """
     given: set[str] = set()
+    unexposed: set[str] = set()
     masked = []
     for result in results:
+        location = _location(entity, result)
         evidence = _masked_evidence(result.evidence, hidden)
-        if evidence is not None:
-            evidence, values = _masked_request(evidence, _templates(entity, result))
+        if evidence is not None and location is not None:
+            fields = masked_fields(entity, location)
+            unexposed |= _unexposed_values(evidence.rows, fields)
+            evidence = evidence.model_copy(update={"rows": mask_rows(evidence.rows, fields)})
+            evidence, values = _masked_request(evidence, _templates(location))
             given |= values
         masked.append(result.model_copy(update={"evidence": evidence}))
     if not given:
-        return masked, given
+        return masked, given, unexposed
     # Any location may hold the key in a field of another name, and an error could have named it.
-    return [
-        result.model_copy(
-            update={
-                "reason": result.reason and mask_text(result.reason, given),
-                "evidence": result.evidence and _masked_echo(result.evidence, given),
-            }
-        )
-        for result in masked
-    ], given
+    return (
+        [
+            result.model_copy(
+                update={
+                    "reason": result.reason and mask_text(result.reason, given),
+                    "evidence": result.evidence and _masked_echo(result.evidence, given),
+                }
+            )
+            for result in masked
+        ],
+        given,
+        unexposed,
+    )
+
+
+def _unexposed_values(rows: list[dict[str, JsonValue]], fields: Masked) -> set[str]:
+    """The values held by the fields a REST location does not expose, as text, nested ones too."""
+    if fields.shown is None:
+        return set()
+    found: set[str] = set()
+    for row in rows:
+        for key, value in row.items():
+            if key.lower() not in fields.shown:
+                found |= _scalars(value)
+    return found - {MASKED, ""}
+
+
+def _scalars(value: JsonValue) -> set[str]:
+    if isinstance(value, dict):
+        return set().union(*(_scalars(item) for item in value.values()))
+    if isinstance(value, list):
+        return set().union(*(_scalars(item) for item in value))
+    # A boolean or a null says nothing about whom a record is about.
+    if value is None or isinstance(value, bool):
+        return set()
+    return {str(value)}
 
 
 def _masked_echo(evidence: Evidence, values: set[str]) -> Evidence:
@@ -115,16 +156,16 @@ def _is_request(evidence: Evidence) -> bool:
     return evidence.query.startswith("GET ")
 
 
-def _templates(entity: Entity, result: LocationResult) -> list[str]:
-    """The lookups the location has now: what its stored request line was probably made from."""
-    location: LocationBase | None
+def _location(entity: Entity, result: LocationResult) -> LocationBase | None:
+    """The location a stored result came from, as the configuration has it now."""
     if result.parent is not None:
         parent = entity.locations.get(result.parent)
-        location = parent.each.get(result.location) if parent is not None else None
-    else:
-        location = entity.locations.get(result.location)
-    if location is None:
-        return []
+        return parent.each.get(result.location) if parent is not None else None
+    return entity.locations.get(result.location)
+
+
+def _templates(location: LocationBase) -> list[str]:
+    """The lookups the location has now: what its stored request line was probably made from."""
     return [each for each in (location.lookup, location.fallback) if each is not None]
 
 
