@@ -76,9 +76,13 @@ locations:
   reported: that's the finding.
 - **`fallback`** is tried when the lookup finds nothing, such as searching the provider by our own
   reference when the link was never saved.
-- **`exposes`** lists the fields other locations, identifiers and expectations may use.
-- **`pii`** (SQL columns) and **`mask`** (REST fields, as dotted paths) are masked in every result
-  and in the evidence, before anything is stored. Columns the catalog marks as PII are masked too.
+- **`exposes`** lists the fields other locations, identifiers and expectations may use. For a REST
+  location it is also all that's shown: an API answers with whatever it has, so every field it
+  doesn't expose is masked. An expectation can still read one; when it fails, its detail shows
+  `[masked]`, and `owl check` warns about it.
+- **`pii`** (SQL columns) and **`mask`** (REST fields inside an exposed one, as dotted paths) are
+  masked in every result and in the evidence, before anything is stored. Columns the catalog marks
+  as PII are masked too.
 - **`cardinality: many`** with **`max_rows`** for lists. The connector's row ceiling (default
   1,000) is the most any lookup can return.
 - **`title`** is how the web app and the run header name it. Leave it out and the name is used,

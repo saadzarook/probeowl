@@ -68,7 +68,12 @@ class LocationBase(ProbeOwlModel):
     fallback: str | None = Field(default=None, description="Tried when the lookup finds nothing.")
     cardinality: Cardinality = Cardinality.ONE
     exposes: list[FieldName] = Field(
-        default_factory=list, description="Fields other locations and identifiers may use."
+        default_factory=list,
+        description=(
+            "Fields other locations and identifiers may use. REST locations: the only fields of "
+            "the JSON response shown unmasked; every other field is masked in every result and "
+            "in evidence."
+        ),
     )
     pii: list[FieldName] = Field(
         default_factory=list,
@@ -77,8 +82,9 @@ class LocationBase(ProbeOwlModel):
     mask: list[FieldPath] = Field(
         default_factory=list,
         description=(
-            "REST locations: fields of the JSON response masked in every result and in "
-            "evidence, as dotted paths such as customer.email."
+            "REST locations: fields inside an exposed field masked in every result and in "
+            "evidence, as dotted paths such as customer.email. A field not exposed is masked "
+            "already; listing it here says it is meant to be."
         ),
     )
     within: Duration | None = Field(
@@ -90,8 +96,9 @@ class LocationBase(ProbeOwlModel):
     compare: list[FieldPath] = Field(
         default_factory=list,
         description=(
-            "REST locations: fields of the JSON response a healthy comparison shows. "
-            "SQL locations mark compare columns in the table catalog instead."
+            "REST locations: fields of the JSON response a healthy comparison shows. A field "
+            "that is not exposed, or is masked, is compared by fingerprint: same or different, "
+            "never its value. SQL locations mark compare columns in the table catalog instead."
         ),
     )
     expected_to_vary: list[FieldPath] = Field(

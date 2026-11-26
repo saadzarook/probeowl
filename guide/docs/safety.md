@@ -79,8 +79,9 @@ owl kill off --application wallet --connector ledger_db --reason "failover done"
 ## Masking
 
 Personal data is masked in the runner, before anything is stored, shown or logged: columns listed
-in a location's `pii`, REST fields in its `mask`, columns the catalog marks as PII, and identifiers
-marked `pii: true`. A masked value shows as `[masked]` on screen, in evidence, in the CLI and in
+in a location's `pii`, columns the catalog marks as PII, and identifiers marked `pii: true`. A REST
+location shows only the fields in its `exposes`: every other field of the API's answer is masked,
+and `mask` masks fields inside an exposed one. A masked value shows as `[masked]` on screen, in evidence, in the CLI and in
 the store. An identifier you typed that is PII, such as an email, is stored masked too.
 
 ## Production investigation record

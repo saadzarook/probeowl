@@ -4507,7 +4507,9 @@ components:
             pattern: ^[A-Za-z_][A-Za-z0-9_]*$
           type: array
           title: Exposes
-          description: Fields other locations and identifiers may use.
+          description: 'Fields other locations and identifiers may use. REST locations:
+            the only fields of the JSON response shown unmasked; every other field
+            is masked in every result and in evidence.'
         pii:
           items:
             type: string
@@ -4523,8 +4525,9 @@ components:
             description: 'A field, or a dotted path into nested fields: customer.email.'
           type: array
           title: Mask
-          description: 'REST locations: fields of the JSON response masked in every
-            result and in evidence, as dotted paths such as customer.email.'
+          description: 'REST locations: fields inside an exposed field masked in every
+            result and in evidence, as dotted paths such as customer.email. A field
+            not exposed is masked already; listing it here says it is meant to be.'
         within:
           anyOf:
           - type: string
@@ -4549,7 +4552,9 @@ components:
           type: array
           title: Compare
           description: 'REST locations: fields of the JSON response a healthy comparison
-            shows. SQL locations mark compare columns in the table catalog instead.'
+            shows. A field that is not exposed, or is masked, is compared by fingerprint:
+            same or different, never its value. SQL locations mark compare columns
+            in the table catalog instead.'
         expected_to_vary:
           items:
             type: string
@@ -5165,7 +5170,9 @@ components:
             pattern: ^[A-Za-z_][A-Za-z0-9_]*$
           type: array
           title: Exposes
-          description: Fields other locations and identifiers may use.
+          description: 'Fields other locations and identifiers may use. REST locations:
+            the only fields of the JSON response shown unmasked; every other field
+            is masked in every result and in evidence.'
         pii:
           items:
             type: string
@@ -5181,8 +5188,9 @@ components:
             description: 'A field, or a dotted path into nested fields: customer.email.'
           type: array
           title: Mask
-          description: 'REST locations: fields of the JSON response masked in every
-            result and in evidence, as dotted paths such as customer.email.'
+          description: 'REST locations: fields inside an exposed field masked in every
+            result and in evidence, as dotted paths such as customer.email. A field
+            not exposed is masked already; listing it here says it is meant to be.'
         within:
           anyOf:
           - type: string
@@ -5207,7 +5215,9 @@ components:
           type: array
           title: Compare
           description: 'REST locations: fields of the JSON response a healthy comparison
-            shows. SQL locations mark compare columns in the table catalog instead.'
+            shows. A field that is not exposed, or is masked, is compared by fingerprint:
+            same or different, never its value. SQL locations mark compare columns
+            in the table catalog instead.'
         expected_to_vary:
           items:
             type: string

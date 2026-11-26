@@ -13,6 +13,19 @@ v0.2 phase (a) first-run setup and Add connection, v0.3 phase (b) the entity gra
 v0.4 phase (c) blocks and probe by example, v0.5 phase (d) templates and New runbook.
 See docs/implementation-plan.md, Releases. -->
 
+### Changed
+
+- A REST location shows only the fields it exposes. Every other field of an API's answer is now
+  masked, for existing entities too, where before only the fields in `mask` were. An API answers with
+  whatever it has, such as a customer's details, and nobody knows its fields before the first lookup.
+  - A compare field that isn't exposed is compared by fingerprint: same or different, never its value.
+  - An expectation still reads the real value; when one fails, its detail shows `[masked]` for such a
+    field.
+  - `owl check` warns about each compare field and each probe's read that are now masked. Add the
+    field to `exposes` to show it, or to `mask` to say it's meant to be masked.
+  - Runs stored before are masked as they are read. `owl store mask-pii --apply` masks them in the
+    store.
+
 ## [0.2.4] - 2026-11-26
 
 A security release on 0.2.3, with nothing else in it. Update if an identifier or a masked field is the
