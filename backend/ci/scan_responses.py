@@ -3,12 +3,19 @@
 
 Part of the M1, M2 and M3 exit checks, against the dev stack and real runs: the unit tests'
 fake connectors never produce a driver's own text.
-Usage: scan_responses.py <config folder> <server> [run id ...]
+
+With --pii, also fail if a value that must be masked is in any response, result rows included, in
+a page of the audit, or in a file given with --log: a masked key once showed in a REST lookup's
+request line, which this did not look for.
+
+Usage: scan_responses.py <config folder> <server> [run id ...] [--pii <value>]... [--log <file>]...
 """
 
+import argparse
 import re
 import sys
 from pathlib import Path
+from urllib.parse import quote
 
 import httpx
 
@@ -56,13 +63,36 @@ def paths(config: Path, runs: list[str]) -> list[str]:
     return found
 
 
-def main(config: Path, server: str, runs: list[str]) -> int:
+def shown(text: str, pii: list[str]) -> set[str]:
+    """Which of the values text holds: as they are, or URL-encoded, in any case."""
+    folded = text.casefold()
+    return {v for v in pii if v.casefold() in folded or quote(v, safe="").casefold() in folded}
+
+
+def main(
+    config: Path,
+    server: str,
+    runs: list[str],
+    pii: list[str] | None = None,
+    logs: list[Path] | None = None,
+) -> int:
+    pii, logs = pii or [], logs or []
     values = binding_values(config)
-    scanned = paths(config, runs)
+    scanned = paths(config, runs) + (["/api/audit"] if pii else [])
     leaks = 0
+    for log in logs:
+        # Never the value itself: this output is a log too.
+        if found := shown(log.read_text(encoding="utf-8", errors="replace"), pii):
+            print(f"FAIL: {log} holds {len(found)} value(s) that must be masked", file=sys.stderr)
+            leaks += 1
     with httpx.Client(base_url=server, timeout=120) as api:
         for path in scanned:
             text = api.get(path).text
+            # A config file is as its author wrote it, samples in its comments included.
+            authored = path.endswith("/yaml")
+            if not authored and (found := shown(text, pii)):
+                print(f"FAIL: {path} returned {len(found)} value(s) to mask", file=sys.stderr)
+                leaks += 1
             leaked = {value for value in values if value in text}
             shaped = ANY_BINDING.search(ROWS.sub("", text))
             if shaped is not None:
@@ -70,9 +100,19 @@ def main(config: Path, server: str, runs: list[str]) -> int:
             if leaked:
                 print(f"FAIL: {path} returned {sorted(leaked)}", file=sys.stderr)
                 leaks += 1
-    print(f"Scanned {len(scanned)} responses, {len(runs)} of them real runs: {leaks} leaked")
+    print(
+        f"Scanned {len(scanned)} responses, {len(runs)} of them real runs, for {len(pii)} masked "
+        f"value(s), and {len(logs)} log(s): {leaks} leaked"
+    )
     return 1 if leaks else 0
 
 
 if __name__ == "__main__":
-    sys.exit(main(Path(sys.argv[1]), sys.argv[2], sys.argv[3:]))
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("config", type=Path)
+    parser.add_argument("server")
+    parser.add_argument("runs", nargs="*")
+    parser.add_argument("--pii", action="append", default=[])
+    parser.add_argument("--log", action="append", type=Path, default=[])
+    given = parser.parse_intermixed_args()
+    sys.exit(main(given.config, given.server, given.runs, given.pii, given.log))

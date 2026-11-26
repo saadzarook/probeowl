@@ -30,7 +30,7 @@ from probeowl.engine.locations import (
     read_locations,
     unreadable,
 )
-from probeowl.engine.masking import MASKED, masked_fields
+from probeowl.engine.masking import MASKED, mask_text, masked_fields
 from probeowl.errors import ConfigError
 from probeowl.model.entity import Entity
 from probeowl.model.probe import Probe
@@ -156,6 +156,8 @@ def run_probe(
     )
     data = _Data(reads)
     masked = {name: masked_fields(entity, loc) for name, loc in _all_locations(entity)}
+    # A masked key can also be in a field of another name, such as an API's echo of it.
+    hidden = frozenset().union(*(read.all_hidden_values() for read in reads.values()))
     expectations: list[ExpectationEvaluation] = []
     # The data skipped expectations could not use: read and absent, or not readable (#81).
     # Data from a connector with no binding here is neither: such a check is not applicable.
@@ -182,7 +184,7 @@ def run_probe(
                 continue
             caveat = _caveat(data.read)
             result = ExpectationResult.PASS if passed else ExpectationResult.FAIL
-            detail = None if passed else _detail(node, data, masked, entity)
+            detail = None if passed else mask_text(_detail(node, data, masked, entity), hidden)
             expectations.append(_evaluation(index, text, result, detail, caveat))
     locations = [result for read in reads.values() for result in read.results()]
     return ProbeResult(

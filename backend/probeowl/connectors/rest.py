@@ -11,7 +11,8 @@ import logging
 import re
 import threading
 import time
-from collections.abc import Callable, Mapping
+import uuid
+from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -19,7 +20,7 @@ from urllib.parse import parse_qsl, quote, unquote, urlsplit
 
 import httpx
 
-from probeowl.connectors.failures import Failure, Unreachable
+from probeowl.connectors.failures import MASKED, Failure, Unreachable
 from probeowl.connectors.lookup import LookupResult
 from probeowl.errors import ConnectorError, GuardViolation
 from probeowl.guards.result import cap_result
@@ -191,7 +192,6 @@ class RestAdapter:
     def lookup(self, lookup: str, parameters: Mapping[str, object], max_rows: int) -> LookupResult:
         """GET one resource; no rows when it does not exist (404)."""
         request = build_request(lookup, parameters)
-        url = self._client.build_request("GET", request.path, params=request.params).url
         started_at = datetime.now(UTC)
         start = time.monotonic()
         try:
@@ -203,7 +203,8 @@ class RestAdapter:
         capped = cap_result(rows, ceiling, self._limits.max_bytes)
         return LookupResult(
             # The path as sent: where the API lives never leaves the backend.
-            query=self._redact(f"GET {url.raw_path.decode('ascii')}"),
+            query=self._request_line(request),
+            masked_query=lambda hidden: self._masked_line(lookup, parameters, hidden),
             parameters=self._redact(request.used),
             guards=self._guards(),
             # An API may echo the credential back; it is never stored.
@@ -212,6 +213,25 @@ class RestAdapter:
             started_at=started_at,
             duration_ms=round((time.monotonic() - start) * 1000),
         )
+
+    def _request_line(self, request: Request) -> str:
+        url = self._client.build_request("GET", request.path, params=request.params).url
+        line: str = self._redact(f"GET {url.raw_path.decode('ascii')}")
+        return line
+
+    def _masked_line(
+        self, lookup: str, parameters: Mapping[str, object], hidden: Collection[str]
+    ) -> str:
+        """The request line with each hidden parameter's value masked, wherever it was sent.
+
+        Filled again with a stand-in, not searched for the value: a short value could also be
+        part of the path, and an encoded one would not be found.
+        """
+        stand_ins = {name: uuid.uuid4().hex for name in hidden if name in parameters}
+        line = self._request_line(build_request(lookup, {**parameters, **stand_ins}))
+        for stand_in in stand_ins.values():
+            line = line.replace(stand_in, MASKED)
+        return line
 
     def unreachable(self) -> Unreachable | None:
         """Why the API cannot be reached, or None if it answers. One GET of its base URL, no retry.
