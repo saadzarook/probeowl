@@ -14,16 +14,27 @@ interface DraftLocation {
   lookup?: string;
   key_from?: string;
   cardinality?: string;
+  exposes?: string[];
   each?: Record<string, DraftLocation & { max_fanout?: number }>;
 }
 
 const NOT_THERE = /0{5,}$/;
 
+// What a REST API answers, whatever the path: as the runner returns it, a field the location doesn't
+// expose is masked whole, under its name (#165).
+const REST_ANSWER: Record<string, unknown> = { id: "pay_7hq2m9", status: "captured", amount: "500.00", currency: "USD", customer: { tier: "gold" } };
+
+function restRow(location: DraftLocation): Record<string, unknown> {
+  const shown = new Set(location.exposes ?? []);
+  return Object.fromEntries(Object.entries(REST_ANSWER).map(([field, value]) => [field, shown.has(field) ? value : "[masked]"]));
+}
+
 function evidence(location: DraftLocation, count: number): NonNullable<LocationResult["evidence"]> {
+  const rest = (location.lookup ?? "").startsWith("GET ");
   return {
     connector: location.using ?? "",
     query: location.lookup ?? "",
-    rows: Array.from({ length: count }, (_, i) => ({ row: i + 1 })),
+    rows: Array.from({ length: count }, (_, i) => (rest ? restRow(location) : { row: i + 1 })),
     rows_total: count,
     started_at: "2026-11-22T10:00:00Z",
     duration_ms: 12,

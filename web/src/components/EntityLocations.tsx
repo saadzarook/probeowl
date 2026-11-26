@@ -2,10 +2,12 @@
 import { Button, Field, FormGrid, Input, Select } from "../ui";
 import { useState } from "react";
 import type { CatalogTable } from "../api/client";
-import { DEFAULT_MAX_FANOUT, DEFAULT_MAX_ROWS, type DraftLocation } from "../entityDraft";
+import { DEFAULT_MAX_FANOUT, DEFAULT_MAX_ROWS, isRest, sourceText, type DraftLocation } from "../entityDraft";
 import { linkedLocation, reasonText, suggestedLinks, tableReference, type ImportedTable, type Link } from "../followKeys";
 import { linkFix, masked, type Failure } from "../locationChecks";
+import { restLinks } from "../restLookup";
 import { LocationFailures } from "./LocationFailures";
+import { RestLookupForm } from "./RestLookupForm";
 
 /** Where the draft's save checks stand, shown with the locations. */
 export interface ChecksState {
@@ -52,7 +54,7 @@ export function EntityLocations({ application, locations, rootKey, tables, catal
               <header className="wizard-location-header">
                 <strong>{location.name}</strong>
                 <span className="hint">
-                  {location.connector} · {location.table} · by {location.keyColumn}
+                  {location.connector} · {isRest(location) ? sourceText(location, rootKey) : `${location.table} · by ${location.keyColumn}`}
                   {location.keyFrom ? ` from ${location.keyFrom.location}.${location.keyFrom.field}` : index === 0 ? " (the root key)" : ` = ${rootKey}`}
                 </span>
                 {index > 0 && (
@@ -97,9 +99,16 @@ export function EntityLocations({ application, locations, rootKey, tables, catal
                 onMaskPii={() => update(location.name, { columns: masked(location, catalog, tables).columns })}
               />
               <fieldset className="wizard-columns">
-                <legend className="mb-1 p-0 text-sm font-medium text-foreground">Columns to select</legend>
+                <legend className="mb-1 p-0 text-sm font-medium text-foreground">{isRest(location) ? "Fields to show (exposes)" : "Columns to select"}</legend>
+                {isRest(location) && (
+                  <p className="hint">
+                    {location.columns.length === 0
+                      ? "Its fields show here once the sample is looked up."
+                      : "Only ticked fields are shown. Every other field of the answer is masked, in every run."}
+                  </p>
+                )}
                 {location.columns.map((c) => {
-                  const locked = c.column === location.keyColumn || used.has(c.field);
+                  const locked = (!isRest(location) && c.column === location.keyColumn) || used.has(c.field);
                   return (
                     <label key={c.column} title={locked ? "Used by the key graph or an identifier" : undefined}>
                       <input
@@ -125,10 +134,12 @@ export function EntityLocations({ application, locations, rootKey, tables, catal
 interface FollowKeysProps extends Omit<EntityLocationsProps, "application" | "inUse" | "checks"> {
   /** The selected box: the tables offered share a key with it. */
   selected: DraftLocation;
+  /** The application's REST connectors, which a key can be looked up in. */
+  restConnectors: string[];
 }
 
 /** Follow a key: the tables that share a key with the selected location, and a link chosen by hand. */
-export function FollowKeys({ locations, selected, rootKey, tables, catalog, rowCeilings, onChange }: FollowKeysProps) {
+export function FollowKeys({ locations, selected, rootKey, tables, catalog, rowCeilings, restConnectors, onChange }: FollowKeysProps) {
   const suggestions = suggestedLinks(locations, tables, catalog).filter((s) => s.from.location === selected.name);
   const title = selected.title || selected.name;
   const add = (link: Link) => {
@@ -138,6 +149,11 @@ export function FollowKeys({ locations, selected, rootKey, tables, catalog, rowC
     if (!added) return;
     // The column the new location is keyed from must be one its location exposes.
     const exposed = locations.map((l) => (l.name === from.name ? { ...l, columns: l.columns.map((c) => (c.column === link.from.column ? { ...c, selected: true } : c)) } : l));
+    onChange([...exposed, added]);
+  };
+  const addRest = (added: DraftLocation, field: string) => {
+    // As for a table: the field the new location is keyed from is exposed by its location.
+    const exposed = locations.map((l) => (l.name === selected.name ? { ...l, columns: l.columns.map((c) => (c.field === field ? { ...c, selected: true } : c)) } : l));
     onChange([...exposed, added]);
   };
 
@@ -172,6 +188,17 @@ export function FollowKeys({ locations, selected, rootKey, tables, catalog, rowC
         </ul>
       )}
       <LinkByColumns locations={locations} tables={tables} onLink={add} />
+      {selected.maxFanout === undefined && (
+        <RestLookupForm
+          key={selected.name}
+          from={selected}
+          rootKey={rootKey}
+          locations={locations}
+          connectors={restConnectors}
+          links={restLinks(selected, catalog, restConnectors)}
+          onAdd={addRest}
+        />
+      )}
     </section>
   );
 }
