@@ -10,6 +10,8 @@ from pathlib import Path
 
 MAX_BYTES = 5_000_000
 BACKUPS = 3
+# At INFO these log each request's whole URL, and a REST lookup's key is in it.
+_LOGS_URLS = ("httpx", "httpcore")
 _FORMAT = "%(asctime)s %(levelname)s %(name)s: %(message)s"
 
 
@@ -24,6 +26,27 @@ class _PrivateFile(RotatingFileHandler):
         return os.fdopen(descriptor, "a", encoding="utf-8")
 
 
+class _NoQueryString(logging.Filter):
+    """Cuts the query string from uvicorn's access log: a search holds what the person pasted."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if isinstance(record.args, tuple):
+            record.args = tuple(
+                arg.partition("?")[0] if isinstance(arg, str) and arg.startswith("/") else arg
+                for arg in record.args
+            )
+        return True
+
+
+def keep_urls_out_of_logs() -> None:
+    """No log of owl serve's holds a request's URL: a REST lookup's, or one with a query string."""
+    for name in _LOGS_URLS:
+        logging.getLogger(name).setLevel(logging.WARNING)
+    access = logging.getLogger("uvicorn.access")
+    if not any(isinstance(each, _NoQueryString) for each in access.filters):
+        access.addFilter(_NoQueryString())
+
+
 def default_log_file() -> Path:
     """Where owl serve logs unless told otherwise."""
     return Path.home() / ".probeowl" / "owl-serve.log"
@@ -31,6 +54,7 @@ def default_log_file() -> Path:
 
 def configure_server_log(path: Path) -> None:
     """Send ProbeOwl's log to the terminal and to path, replacing where it went before."""
+    keep_urls_out_of_logs()
     path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     logger = logging.getLogger("probeowl")
     for old in list(logger.handlers):

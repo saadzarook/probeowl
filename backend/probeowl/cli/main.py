@@ -340,7 +340,8 @@ def store_mask_pii(
     url: StoreUrl = None,
     apply: Annotated[bool, typer.Option("--apply", help="Write the masked runs.")] = False,
 ) -> None:
-    """Mask PII in runs stored before v0.2: a PII key's subject, and PII identifiers' values.
+    """Mask PII in stored runs: a PII key's subject, PII identifiers' values, and masked keys
+    in REST requests, which runs stored before 0.2.4 kept.
 
     A dry run by default: it lists each run it would change and what in it, never a value.
     With --apply it writes them, in one transaction, and audits it. It uses the folder's

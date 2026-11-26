@@ -403,9 +403,13 @@ class RunService:
             raise
 
     def get(self, run_id: str) -> Run:
-        """A run as stored: masked, with the locations read so far."""
+        """A run as stored: masked, with the locations read so far.
+
+        Masked again as it is read: a run stored by an earlier release may hold more.
+        """
         with self._store.connect() as conn:
-            return get_run(conn, self._workspace, run_id)
+            run = get_run(conn, self._workspace, run_id)
+        return self._masked(run)
 
     def recent(
         self, application: str, environment: str, before: tuple[datetime, str] | None = None

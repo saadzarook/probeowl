@@ -1,10 +1,12 @@
 # Author: @SaadZarook
 """Masking in the runner: PII never leaves it, so evidence, the store and the API never see it."""
 
+import re
 from collections.abc import Collection
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
+from urllib.parse import quote
 
 from pydantic import JsonValue
 
@@ -65,6 +67,48 @@ def _mask(value: Any, paths: list[list[str]]) -> Any:
         else:
             masked[key] = _mask(item, here) if here else item
     return masked
+
+
+# Shorter than this, a masked value is only matched whole: "42" would otherwise hide half the text.
+_LEAST_WITHIN = 4
+
+
+def mask_values(value: Any, hidden: Collection[str]) -> Any:
+    """A copy of value with each hidden value masked, whatever field it is in, keys too.
+
+    For what a lookup by a masked key answers: a table may hold the key in a column of another
+    name, and an API may echo it under any name, or in a link.
+    """
+    if not hidden:
+        return value
+    if isinstance(value, dict):
+        return {k: mask_values(v, hidden) for k, v in mask_keys(value, hidden).items()}
+    if isinstance(value, list):
+        return [mask_values(item, hidden) for item in value]
+    if isinstance(value, str):
+        return mask_text(value, hidden)
+    if value is None or isinstance(value, bool):
+        return value
+    return MASKED if str(value) in hidden else value
+
+
+def mask_keys(value: dict[str, Any], hidden: Collection[str]) -> dict[str, Any]:
+    """A copy with each key that is a hidden value masked; part of one may be a field's name."""
+    whole = {v.casefold() for v in hidden}
+    return {MASKED if str(k).casefold() in whole else k: v for k, v in value.items()}
+
+
+def mask_text(text: str, hidden: Collection[str]) -> str:
+    """text with each hidden value masked: as it is, or URL-encoded."""
+    if any(text.casefold() == value.casefold() for value in hidden):
+        return MASKED
+    within = {v for v in hidden if len(v) >= _LEAST_WITHIN}
+    within |= {quote(v, safe="") for v in within}
+    if not within:
+        return text
+    # Longest first, so a value is not left half masked by a shorter one inside it.
+    found = "|".join(re.escape(v) for v in sorted(within, key=len, reverse=True))
+    return re.sub(found, MASKED, text, flags=re.IGNORECASE)
 
 
 def to_json(value: Any) -> JsonValue:

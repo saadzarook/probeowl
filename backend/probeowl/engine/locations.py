@@ -11,13 +11,21 @@ most max_fanout rows, and each of those lookups has its own outcome.
 
 import threading
 import time
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from probeowl.connectors.lookup import LookupResult, ReplicaLag
-from probeowl.engine.masking import mask_rows, masked_fields, pii_fields, to_json
+from probeowl.engine.masking import (
+    mask_keys,
+    mask_rows,
+    mask_text,
+    mask_values,
+    masked_fields,
+    pii_fields,
+    to_json,
+)
 from probeowl.engine.typed_values import column_kinds
 from probeowl.errors import ConfigError, ProbeOwlError, ReadsStopped
 from probeowl.model.common import seconds, split_field_ref
@@ -67,6 +75,8 @@ class LocationRead:
     # For a fan-out lookup: the many location and the row of it this lookup is for.
     parent: str | None = None
     row: int | None = None
+    # Values its evidence masks, for masking them in an expectation's detail. Never stored.
+    hidden_values: frozenset[str] = frozenset()
     # Per fan-out location: one read per row of this location; None past max_fanout.
     fanout: dict[str, list["LocationRead | None"]] = field(default_factory=dict)
     # Blocked only: True when the chain starts at data that could not be read (Error, Stale,
@@ -85,6 +95,11 @@ class LocationRead:
             caveat=self.caveat,
             evidence=self.evidence,
         )
+
+    def all_hidden_values(self) -> frozenset[str]:
+        """The values its evidence masks, and its fan-out lookups' evidence."""
+        children = [read for reads in self.fanout.values() for read in reads if read is not None]
+        return self.hidden_values.union(*(child.hidden_values for child in children))
 
     def results(self) -> list[LocationResult]:
         """This location's result, then its fan-out lookups', row by row."""
@@ -220,7 +235,9 @@ class _Reader:
             raise  # the whole run stops, not this one location
         except ProbeOwlError as err:
             # A connector that fails, refuses or times out is this location's Error outcome.
-            return LocationRead(name, Outcome.ERROR, reason=str(err))
+            return LocationRead(
+                name, Outcome.ERROR, reason=self._safe(str(err), location, parameters, None)
+            )
         if location.each and read.outcome is Outcome.FOUND:
             self._fan_out(read, location)
         return read
@@ -256,7 +273,8 @@ class _Reader:
         except ReadsStopped:
             raise
         except ProbeOwlError as err:
-            read = LocationRead(child, Outcome.ERROR, reason=str(err))
+            reason = self._safe(str(err), spec, parameters, parent)
+            read = LocationRead(child, Outcome.ERROR, reason=reason)
         read.parent, read.row = parent, index
         return read
 
@@ -308,6 +326,7 @@ class _Reader:
             reason="; ".join(notes) or None,
             caveat=caveat,
             evidence=evidence,
+            hidden_values=self._hidden_values(location, result.parameters, parent),
         )
 
     def _lookup(
@@ -325,8 +344,38 @@ class _Reader:
         self, location: Location | FanOutLocation, result: LookupResult, parent: str | None
     ) -> Evidence:
         masked = masked_fields(self._entity, location)
+        hidden = self._hidden(location, result.parameters, parent)
+        parameters = mask_rows([dict(result.parameters)], hidden)[0]
+        rows = mask_rows(result.rows, masked)
+        kinds = column_kinds(result.rows)
+        query = result.query
+        if hidden:
+            # The key can come back in a field of another name.
+            values = self._hidden_values(location, result.parameters, parent)
+            rows = mask_values(rows, values)
+            kinds = mask_keys(kinds, values)
+            if result.masked_query is not None:
+                # A request carries its values in the path and the query string.
+                query = result.masked_query(hidden)
+        return Evidence(
+            connector=location.using,
+            query=query,
+            parameters={key: to_json(value) for key, value in parameters.items()},
+            guards=result.guards,
+            rows=[{key: to_json(value) for key, value in row.items()} for row in rows],
+            rows_total=result.rows_total,
+            column_types=kinds,
+            started_at=result.started_at,
+            duration_ms=result.duration_ms,
+        )
+
+    def _hidden(
+        self, location: Location | FanOutLocation, names: Iterable[str], parent: str | None
+    ) -> set[str]:
+        """The parameters whose values this lookup's evidence masks, wherever it could show them."""
+        names = list(names)
         # A PII identifier, such as a root key that is PII, is masked as a parameter too (#66).
-        hidden = {f for f in result.parameters if f.lower() in pii_fields(self._entity)}
+        hidden = {f for f in names if f.lower() in pii_fields(self._entity)}
         # A key that is a masked field of its source location is masked in evidence too.
         if isinstance(location, Location) and location.key_from is not None:
             source, key = split_field_ref(location.key_from)
@@ -336,24 +385,28 @@ class _Reader:
         if parent is not None:
             # A fan-out lookup's parameters come from its parent's row: masked there, here too.
             upstream = self._entity.locations[parent]
-            hidden.update(
-                f for f in result.parameters if f.lower() in masked_fields(self._entity, upstream)
-            )
-        parameters = mask_rows([dict(result.parameters)], hidden)[0]
-        return Evidence(
-            connector=location.using,
-            query=result.query,
-            parameters={key: to_json(value) for key, value in parameters.items()},
-            guards=result.guards,
-            rows=[
-                {key: to_json(value) for key, value in row.items()}
-                for row in mask_rows(result.rows, masked)
-            ],
-            rows_total=result.rows_total,
-            column_types=column_kinds(result.rows),
-            started_at=result.started_at,
-            duration_ms=result.duration_ms,
-        )
+            hidden.update(f for f in names if f.lower() in masked_fields(self._entity, upstream))
+        return hidden
+
+    def _hidden_values(
+        self,
+        location: Location | FanOutLocation,
+        parameters: Mapping[str, object],
+        parent: str | None,
+    ) -> frozenset[str]:
+        """Those parameters' values, as text: kept in memory only, to mask them in other text."""
+        hidden = self._hidden(location, parameters, parent)
+        values = (parameters.get(name) for name in hidden)
+        return frozenset(str(v) for v in values if v is not None and str(v) != "")
+
+    def _safe(
+        self,
+        text: str,
+        location: Location | FanOutLocation,
+        parameters: Mapping[str, object],
+        parent: str | None,
+    ) -> str:
+        return mask_text(text, self._hidden_values(location, parameters, parent))
 
 
 def lag_caveat(outcome: Outcome, lag: ReplicaLag | None) -> str | None:
