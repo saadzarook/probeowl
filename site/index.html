@@ -391,7 +391,7 @@ footer { margin-top: 96px; border-top: 1px solid var(--rule); }
           </div>
           <a class="btn btn-amber" href="./guide/">Read the guide</a>
         </div>
-        <p class="meta"><a href="https://github.com/saadzarook/probeowl/releases/tag/v0.2.3">v0.2.3 pre-release</a> · <a href="#new">what’s new</a> · Apache 2.0 · runs on your machine</p>
+        <p class="meta"><a href="https://github.com/saadzarook/probeowl/releases/tag/v0.2.4">v0.2.4 pre-release</a> · <a href="#new">what’s new</a> · Apache 2.0 · runs on your machine</p>
       </div>
 
       <figure class="term" style="margin:0" aria-label="A ProbeOwl run in the terminal">
@@ -426,6 +426,7 @@ footer { margin-top: 96px; border-top: 1px solid var(--rule); }
       <li><h3>Search with <kbd>Ctrl</kbd>+<kbd>K</kbd></h3><p>Applications, entities, probes, connectors, runbooks, tables, runs and the guide, from the keyboard. A masked value shows as <code>[masked]</code> and never matches.</p></li>
       <li><h3>Drafting with an AI assistant</h3><p><code>owl mcp</code> lets an assistant draft a probe and check it. Drafts only: no tool writes a file, returns data or a secret, or touches Production. You paste it in.</p></li>
     </ul>
+    <p class="new-note"><strong>Security fix in 0.2.4:</strong> a REST lookup whose key is masked kept that key in the request line of its evidence. Update if a REST lookup’s key is masked, then run <code>owl store mask-pii</code>. <a href="https://github.com/saadzarook/probeowl/security/advisories/GHSA-wwhv-83mx-34v4">Advisory</a></p>
     <p class="new-note"><strong>Security fix in 0.2.3:</strong> a REST lookup’s path could leave its connector’s base URL. Update if you use a REST connector. <a href="https://github.com/saadzarook/probeowl/security/advisories/GHSA-wx48-24m4-7gww">Advisory</a></p>
     <p class="new-note">New in 0.2.2: a new look on every screen. In a narrow window or on a phone the sidebar becomes a Menu and tables become cards, dark mode follows your system setting, and <code>owl serve</code> no longer allows inline styles: each page gets a nonce of its own.</p>
     <p class="new-note">New in 0.2.1: a run whose data couldn’t be read is <strong>Not checked</strong>, not Failed, and <code>owl validate</code> and <code>owl inspect</code> exit 0, 1 or 2, so update scripts that check exit codes. The audit can be read, on the Audit screen and with <code>owl audit</code>. And the fixes from newcomers’ first runs are in.</p>
@@ -771,7 +772,7 @@ footer { margin-top: 96px; border-top: 1px solid var(--rule); }
           <div class="tl-head"><span class="ver">v0.2</span><span class="chip chip-done">Shipped 14 Nov 2026</span></div>
           <h3>Set up in the browser</h3>
           <ul><li>First-run setup and Add connection</li><li>Search everything with Ctrl+K</li><li>AI assistants draft, you paste</li></ul>
-          <a href="https://github.com/saadzarook/probeowl/releases/tag/v0.2.3">0.2.3 release notes</a>
+          <a href="https://github.com/saadzarook/probeowl/releases/tag/v0.2.4">0.2.4 release notes</a>
         </div>
       </li>
       <li class="tl now">
@@ -856,7 +857,7 @@ footer { margin-top: 96px; border-top: 1px solid var(--rule); }
 
 <footer>
   <div class="wrap foot">
-    <span>ProbeOwl · v0.2.3 pre-release · Apache License 2.0</span>
+    <span>ProbeOwl · v0.2.4 pre-release · Apache License 2.0</span>
     <nav aria-label="Footer">
       <a href="./guide/">Guide</a>
       <a href="https://github.com/saadzarook/probeowl">GitHub</a>
