@@ -13,7 +13,7 @@ v0.2 phase (a) first-run setup and Add connection, v0.3 phase (b) the entity gra
 v0.4 phase (c) blocks and probe by example, v0.5 phase (d) templates and New runbook.
 See docs/implementation-plan.md, Releases. -->
 
-## [0.2.4] - DATE
+## [0.2.4] - 2026-11-26
 
 A security release on 0.2.3, with nothing else in it. Update if an identifier or a masked field is the
 key of a REST lookup, then run `owl store mask-pii <folder>` and, when you have read its list, again
