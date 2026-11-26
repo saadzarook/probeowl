@@ -20,8 +20,10 @@ from probeowl.checks.sql_shape import (
     time_bound,
 )
 from probeowl.connectors.rest import build_request
+from probeowl.engine.expressions import fields_used
 from probeowl.engine.identifiers import MAX_MATCH_ROWS, resolution_lookup
 from probeowl.engine.locations import DEFAULT_MAX_ROWS, rows_read
+from probeowl.engine.masking import Masked, is_rest, masked_fields
 from probeowl.engine.runner import check_probe
 from probeowl.errors import ConfigError, GuardViolation
 from probeowl.guards.dialects import RULES_BY_CONNECTOR_TYPE, DialectRules
@@ -205,6 +207,64 @@ def pii_key_warnings(app: LoadedApplication) -> list[str]:
         for name, entity in sorted(app.entities.items())
         if entity.identifiers[entity.root_key].pii
     ]
+
+
+def unexposed_warnings(app: LoadedApplication) -> list[str]:
+    """For owl check: REST fields the configuration uses that are masked, as not exposed.
+
+    A REST location shows only the fields it exposes. A compare field outside them is compared by
+    fingerprint, and a probe that reads one shows it masked when it fails. Listing such a field in
+    mask says it is meant to be masked, and the warning goes.
+    """
+    found: list[str] = []
+    for entity_name, entity in sorted(app.entities.items()):
+        reads = _probe_reads(app, entity_name)
+        for name, location in _all_locations(entity):
+            if not is_rest(location):
+                continue
+            meant = Masked(masked_fields(entity, location).fields)
+            shown = {f.lower() for f in location.exposes}
+            uses: dict[str, list[str]] = {}
+            for field in location.compare:
+                uses.setdefault(field, []).append("compared by fingerprint")
+            for probe, field in reads.get(name, []):
+                uses.setdefault(field, []).append(f"probe {probe} shows it masked")
+            masked = [
+                f"{field} ({'; '.join(sorted(set(why)))})"
+                for field, why in sorted(uses.items())
+                if field.split(".")[0].lower() not in shown and field not in meant
+            ]
+            if masked:
+                found.append(
+                    f"{app.application.application}: {entity_name}.{name} is a REST location, "
+                    f"which shows only the fields it exposes; masked: {', '.join(masked)}; "
+                    "add them to exposes to show them, or to mask to keep them masked"
+                )
+    return found
+
+
+def _all_locations(entity: Entity) -> Iterator[tuple[str, Location | FanOutLocation]]:
+    for name, location in entity.locations.items():
+        yield name, location
+        yield from location.each.items()
+
+
+def _probe_reads(app: LoadedApplication, entity: str) -> dict[str, list[tuple[str, str]]]:
+    """For each location of the entity, the (probe, field) pairs its probes' expressions read."""
+    found: dict[str, list[tuple[str, str]]] = {}
+    for probe_name, probe in sorted(app.probes.items()):
+        if probe.entity != entity:
+            continue
+        try:
+            steps = check_probe(probe, app.entities[entity])
+        except ConfigError:
+            continue  # owl check reports it as an error
+        for step in steps:
+            nodes = [*([step.when[1]] if step.when else []), *(node for _, node in step.expect)]
+            for node in nodes:
+                for location, field in fields_used(node):
+                    found.setdefault(location, []).append((probe_name, field))
+    return found
 
 
 def rule_warnings(app: LoadedApplication, entity: Entity) -> list[str]:

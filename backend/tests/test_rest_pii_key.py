@@ -100,6 +100,22 @@ def masked_at_source(setup: Setup, application: str, name: str, location: str, f
     change(setup, application, name, edit)
 
 
+# What echo answers besides status, amount and currency: shown only once exposed.
+ECHOED = ["id", "href", "by_id", "events"]
+
+
+def exposing(setup: Setup, application: str, name: str, location: str, fields: list[str]) -> None:
+    """The REST location shows these fields too: the rest of its answer is masked."""
+
+    def edit(entity: Entity) -> Entity:
+        found = dict(entity.locations)
+        source = found[location]
+        found[location] = source.model_copy(update={"exposes": [*source.exposes, *fields]})
+        return entity.model_copy(update={"locations": found})
+
+    change(setup, application, name, edit)
+
+
 def location(run: dict[str, Any], name: str) -> dict[str, Any]:
     [found] = [r for r in run["locations"] if r["location"] == name]
     return dict(found)
@@ -147,6 +163,7 @@ def test_a_key_is_masked_in_the_request_line_and_in_what_the_api_echoes(
     setup: Setup, caplog: pytest.LogCaptureFixture, how: str
 ) -> None:
     setup.fakes["checkout_api"] = Api(echo)  # type: ignore[assignment]
+    exposing(setup, "wallet", "topup", "payment", ECHOED)
     if how == "identifier":
         identifier_is_pii(setup, "wallet", "topup", "provider_payment_id")
     else:
@@ -264,6 +281,7 @@ def test_a_failed_expectation_on_an_echoed_key_does_not_print_it(
 
 def test_a_key_that_is_not_masked_stays_exactly_as_sent(setup: Setup) -> None:
     setup.fakes["checkout_api"] = Api(echo)  # type: ignore[assignment]
+    exposing(setup, "wallet", "topup", "payment", ["id"])
     api = setup.client()
     run = finished(api, start(api, value=TOPUP))
     evidence = location(run, "payment")["evidence"]

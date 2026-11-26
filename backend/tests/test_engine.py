@@ -231,6 +231,8 @@ def test_an_unknown_location_lists_the_locations_and_the_closest_one() -> None:
 def test_pii_columns_and_rest_fields_are_masked_everywhere_they_leave_the_runner() -> None:
     entity = ENTITY.model_copy(deep=True)
     entity.locations["payment"].mask = ["customer.email"]
+    # Exposed, so the mask is what hides its email, and the rest of it shows.
+    entity.locations["payment"].exposes = [*entity.locations["payment"].exposes, "customer"]
     probe = Probe.model_validate(
         {
             "probe": "masked",

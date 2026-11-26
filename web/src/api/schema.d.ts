@@ -1859,7 +1859,7 @@ export interface components {
             cardinality: components["schemas"]["Cardinality"];
             /**
              * Exposes
-             * @description Fields other locations and identifiers may use.
+             * @description Fields other locations and identifiers may use. REST locations: the only fields of the JSON response shown unmasked; every other field is masked in every result and in evidence.
              */
             exposes?: string[];
             /**
@@ -1869,7 +1869,7 @@ export interface components {
             pii?: string[];
             /**
              * Mask
-             * @description REST locations: fields of the JSON response masked in every result and in evidence, as dotted paths such as customer.email.
+             * @description REST locations: fields inside an exposed field masked in every result and in evidence, as dotted paths such as customer.email. A field not exposed is masked already; listing it here says it is meant to be.
              */
             mask?: string[];
             /**
@@ -1884,7 +1884,7 @@ export interface components {
             anchor_time?: string | null;
             /**
              * Compare
-             * @description REST locations: fields of the JSON response a healthy comparison shows. SQL locations mark compare columns in the table catalog instead.
+             * @description REST locations: fields of the JSON response a healthy comparison shows. A field that is not exposed, or is masked, is compared by fingerprint: same or different, never its value. SQL locations mark compare columns in the table catalog instead.
              */
             compare?: string[];
             /**
@@ -2288,7 +2288,7 @@ export interface components {
             cardinality: components["schemas"]["Cardinality"];
             /**
              * Exposes
-             * @description Fields other locations and identifiers may use.
+             * @description Fields other locations and identifiers may use. REST locations: the only fields of the JSON response shown unmasked; every other field is masked in every result and in evidence.
              */
             exposes?: string[];
             /**
@@ -2298,7 +2298,7 @@ export interface components {
             pii?: string[];
             /**
              * Mask
-             * @description REST locations: fields of the JSON response masked in every result and in evidence, as dotted paths such as customer.email.
+             * @description REST locations: fields inside an exposed field masked in every result and in evidence, as dotted paths such as customer.email. A field not exposed is masked already; listing it here says it is meant to be.
              */
             mask?: string[];
             /**
@@ -2313,7 +2313,7 @@ export interface components {
             anchor_time?: string | null;
             /**
              * Compare
-             * @description REST locations: fields of the JSON response a healthy comparison shows. SQL locations mark compare columns in the table catalog instead.
+             * @description REST locations: fields of the JSON response a healthy comparison shows. A field that is not exposed, or is masked, is compared by fingerprint: same or different, never its value. SQL locations mark compare columns in the table catalog instead.
              */
             compare?: string[];
             /**
